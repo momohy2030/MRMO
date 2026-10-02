@@ -16,7 +16,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 
-  <!-- PWA Links -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0f172a">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -55,21 +54,13 @@
       measurementId: "G-N9DW5R28H0"
     };
 
-    const ADMIN_IDENTIFIERS = [
-      "mohamedmohy676676@gmail.com",
-      "+201000000000"
-    ];
-
-    const ENGINEER_IDENTIFIERS = [
-      "mesahaforconsultant@gmail.com"
-    ];
+    const ADMIN_IDENTIFIERS = ["mohamedmohy676676@gmail.com", "+201000000000"];
+    const ENGINEER_IDENTIFIERS = ["mesahaforconsultant@gmail.com"];
 
     let db = null;
     let auth = null;
     try {
-      if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-      }
+      if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
       db = firebase.database();
       auth = firebase.auth();
       auth.languageCode = 'ar';
@@ -84,6 +75,7 @@
       subCategories: ["طوب", "اسمنت", "رملة", "عمالة", "الاكل", "نجار", "حداد", "خلاطة"],
       costTypes: ["مصنعيات", "بضاعة/مواد", "أكل", "مواصلات", "إيجار معدات", "نثريات وإكراميات"],
       suppliers: ["مورد الأسمنت", "مورد الرمل", "مقاول النجارة", "مصنع الطوب"],
+      employees: ["المهندس التنفيذي", "مشرف العمال"],
       logo: ""
     };
 
@@ -104,7 +96,7 @@
             type: 'bar',
             data: {
               labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'],
-              datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#4f46e5', '#e11d48', '#10b981'], borderRadius: 6 }]
+              datasets: [{ label: 'الموقف المالي', data: [allWork, allExp, allPay], backgroundColor: ['#4f46e5', '#e11d48', '#10b981'], borderRadius: 6 }]
             },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
           });
@@ -156,11 +148,13 @@
       const [expenses, setExpenses] = useState([]);
       const [extracts, setExtracts] = useState([]);
       const [payments, setPayments] = useState([]);
+      const [advances, setAdvances] = useState([]);
       const [loginLogs, setLoginLogs] = useState([]);
       const [settings, setSettings] = useState(initialSettings);
       
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
       const [activeTab, setActiveTab] = useState("dashboard");
+      const [myEmpName, setMyEmpName] = useState(localStorage.getItem('myEmpName') || "");
       
       const [toast, setToast] = useState({ show: false, message: "", type: "success" });
       const [activeInvoiceModal, setActiveInvoiceModal] = useState(null);
@@ -173,44 +167,30 @@
       const todayDate = new Date().toISOString().split('T')[0];
 
       const nextSuggestedProjectId = useMemo(() => {
-        const consNumbers = projects
-          .map(p => {
-            const m = String(p.id).match(/^cons-(\d+)$/i);
-            return m ? parseInt(m[1], 10) : 0;
-          })
-          .filter(n => n > 0);
+        const consNumbers = projects.map(p => { const m = String(p.id).match(/^cons-(\d+)$/i); return m ? parseInt(m[1], 10) : 0; }).filter(n => n > 0);
         const maxNum = consNumbers.length > 0 ? Math.max(...consNumbers) : 0;
         const next = maxNum + 1;
         return `cons-${next < 10 ? '0' + next : next}`;
       }, [projects]);
 
       const [newProj, setNewProj] = useState({ id: "cons-01", name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
-      const [newExp, setNewExp] = useState({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", quantity: 1, unitPrice: "", paymentMethod: "كاش", receiptImg: "" });
+      
+      // تم إضافة description للنموذج الأولي للمصروفات
+      const [newExp, setNewExp] = useState({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: "", receiptImg: "" });
       const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "كاش", notes: "" });
       const [newExt, setNewExt] = useState({ date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: "" });
+      const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
 
-      useEffect(() => {
-        setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId }));
-      }, [nextSuggestedProjectId]);
+      useEffect(() => { setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId })); }, [nextSuggestedProjectId]);
+      useEffect(() => { if (userRole === "Staff" && myEmpName && !newExp.custodyEmployee) { setNewExp(prev => ({ ...prev, custodyEmployee: myEmpName })); } }, [userRole, myEmpName]);
 
-      const showToast = (message, type = "success") => {
-        setToast({ show: true, message, type });
-        setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3500);
-      };
+      const showToast = (message, type = "success") => { setToast({ show: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3500); };
 
       const recordLoginLog = (currentUser, roleName) => {
         if (!db) return;
         const now = new Date();
         const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const logEntry = {
-          uid: currentUser.uid,
-          name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم",
-          identifier: currentUser.email || currentUser.phoneNumber || "غير محدد",
-          role: roleName,
-          device: isMobile ? "📱 هاتف محمول" : "💻 كمبيوتر",
-          timestamp: now.toISOString(),
-          formattedDate: now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG')
-        };
+        const logEntry = { uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم", identifier: currentUser.email || currentUser.phoneNumber || "غير محدد", role: roleName, device: isMobile ? "📱 هاتف محمول" : "💻 كمبيوتر", timestamp: now.toISOString(), formattedDate: now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG') };
         db.ref('login_logs').push(logEntry);
       };
 
@@ -219,36 +199,19 @@
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           if (currentUser) {
             const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase();
-            
             let detectedRole = "موظف (Staff)";
             let adminCheck = ADMIN_IDENTIFIERS.some(id => identifier.includes(id.toLowerCase())) || currentUser.email === "mohamedmohy676676@gmail.com";
             let engineerCheck = ENGINEER_IDENTIFIERS.some(id => identifier.includes(id.toLowerCase())) || currentUser.email === "mesahaforconsultant@gmail.com";
 
-            if (adminCheck) {
-              detectedRole = "مدير النظام (Admin)";
-            } else if (engineerCheck) {
-              detectedRole = "مهندس المشاريع (Engineer)";
-            }
+            if (adminCheck) detectedRole = "مدير النظام (Admin)";
+            else if (engineerCheck) detectedRole = "مهندس المشاريع (Engineer)";
 
-            setUser({
-              uid: currentUser.uid,
-              name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق",
-              identifier: identifier
-            });
-            setIsAdmin(adminCheck);
-            setIsEngineer(engineerCheck);
-            setUserRole(detectedRole);
+            setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", identifier: identifier });
+            setIsAdmin(adminCheck); setIsEngineer(engineerCheck); setUserRole(detectedRole);
 
-            if (!sessionStorage.getItem('login_recorded')) {
-              recordLoginLog(currentUser, detectedRole);
-              sessionStorage.setItem('login_recorded', 'true');
-            }
+            if (!sessionStorage.getItem('login_recorded')) { recordLoginLog(currentUser, detectedRole); sessionStorage.setItem('login_recorded', 'true'); }
           } else {
-            setUser(null);
-            setIsAdmin(false);
-            setIsEngineer(false);
-            setUserRole("Staff");
-            sessionStorage.removeItem('login_recorded');
+            setUser(null); setIsAdmin(false); setIsEngineer(false); setUserRole("Staff"); sessionStorage.removeItem('login_recorded');
           }
           setAuthLoading(false);
         });
@@ -273,6 +236,7 @@
             setExpenses([...toArr(data.expenses)].reverse());
             setExtracts([...toArr(data.extracts)].reverse());
             setPayments([...toArr(data.payments)].reverse());
+            setAdvances([...toArr(data.advances)].reverse());
             setLoginLogs([...toArr(data.login_logs)].reverse());
 
             const savedSettings = data.settings || {};
@@ -281,6 +245,7 @@
               subCategories: toArr(savedSettings.subCategories).length ? toArr(savedSettings.subCategories) : initialSettings.subCategories,
               costTypes: toArr(savedSettings.costTypes).length ? toArr(savedSettings.costTypes) : initialSettings.costTypes,
               suppliers: toArr(savedSettings.suppliers).length ? toArr(savedSettings.suppliers) : initialSettings.suppliers,
+              employees: toArr(savedSettings.employees).length ? toArr(savedSettings.employees) : initialSettings.employees,
               logo: savedSettings.logo || ""
             });
 
@@ -295,121 +260,63 @@
         return () => { rootRef.off('value', handleValue); };
       }, [user]);
 
-      // دالة إضافة بند جديد للخيارات من قبل أي مستخدم
       const handleAddNewSettingItem = (settingKey, currentArray, title) => {
-        const newVal = window.prompt(`أدخل ${title} جديد لإضافته للقائمة:` , "");
+        const newVal = window.prompt(`أدخل [${title}] جديد لإضافته فوراً للقائمة:` , "");
         if (newVal && newVal.trim() !== "") {
           const cleanVal = newVal.trim();
-          
-          if (currentArray.includes(cleanVal)) {
-            showToast(`هذا البند موجود مسبقاً!`, "error");
-            return;
-          }
-          
+          if (currentArray.includes(cleanVal)) { showToast(`هذا البند موجود مسبقاً!`, "error"); return; }
           const updatedArray = [...currentArray, cleanVal];
-          
-          // تحديث الحالة محلياً وقاعدة البيانات
           setSettings(prev => ({ ...prev, [settingKey]: updatedArray }));
           if (db) db.ref(`settings/${settingKey}`).set(updatedArray);
           
-          // الاختيار التلقائي للبند الجديد في النموذج
           if (settingKey === 'mainCategories') setNewExp(prev => ({...prev, mainCategory: cleanVal}));
           if (settingKey === 'subCategories') setNewExp(prev => ({...prev, subCategory: cleanVal}));
           if (settingKey === 'costTypes') setNewExp(prev => ({...prev, costType: cleanVal}));
           if (settingKey === 'suppliers') setNewExp(prev => ({...prev, supplier: cleanVal}));
+          if (settingKey === 'employees') { setNewExp(prev => ({...prev, custodyEmployee: cleanVal})); setNewAdv(prev => ({...prev, employeeName: cleanVal})); }
 
-          showToast(`تم إضافة "${cleanVal}" بنجاح!`);
+          showToast(`تم إضافة "${cleanVal}" للقائمة بنجاح!`);
         }
       };
 
-      const handleGoogleLogin = () => {
-        setLoginError("");
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch((error) => {
-          setLoginError("تعذر تسجيل الدخول بجوجل: " + error.message);
-        });
-      };
-
-      const setupRecaptcha = () => {
-        if (!window.recaptchaVerifier) {
-          window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', { 'size': 'invisible' });
-        }
-      };
-
+      const handleGoogleLogin = () => { setLoginError(""); const provider = new firebase.auth.GoogleAuthProvider(); auth.signInWithPopup(provider).catch((error) => { setLoginError("تعذر الدخول بجوجل: " + error.message); }); };
+      const setupRecaptcha = () => { if (!window.recaptchaVerifier) { window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', { 'size': 'invisible' }); } };
       const handleSendOtp = (e) => {
-        e.preventDefault();
-        setLoginError("");
-        setupRecaptcha();
-        const appVerifier = window.recaptchaVerifier;
-        let formattedPhone = phoneNumber;
-        if (formattedPhone.startsWith("01")) { formattedPhone = "+20" + formattedPhone.substring(1); }
-        
-        auth.signInWithPhoneNumber(formattedPhone, appVerifier)
-          .then((confirmationResult) => {
-            window.confirmationResult = confirmationResult;
-            setVerificationId(true);
-            showToast("تم إرسال كود التحقق للهاتف 📩");
-          }).catch(() => {
-            setLoginError("تعذر إرسال الرمز. يرجى مراجعة رقم الهاتف.");
-            if(window.recaptchaVerifier) window.recaptchaVerifier.render().then(widgetId => grecaptcha.reset(widgetId));
-          });
+        e.preventDefault(); setLoginError(""); setupRecaptcha(); const appVerifier = window.recaptchaVerifier;
+        let formattedPhone = phoneNumber; if (formattedPhone.startsWith("01")) { formattedPhone = "+20" + formattedPhone.substring(1); }
+        auth.signInWithPhoneNumber(formattedPhone, appVerifier).then((confirmationResult) => { window.confirmationResult = confirmationResult; setVerificationId(true); showToast("تم إرسال كود التحقق 📩"); }).catch(() => { setLoginError("تعذر إرسال الرمز. يرجى مراجعة رقم الهاتف."); if(window.recaptchaVerifier) window.recaptchaVerifier.render().then(widgetId => grecaptcha.reset(widgetId)); });
       };
-
-      const handleVerifyOtp = (e) => {
-        e.preventDefault();
-        setLoginError("");
-        window.confirmationResult.confirm(otpCode).catch(() => {
-          setLoginError("الرمز غير صحيح.");
-        });
-      };
-
-      const handleLogout = () => {
-        auth.signOut();
-        setLoginMethod("choose");
-        setVerificationId(null);
-        setDrawerOpen(false);
-      };
+      const handleVerifyOtp = (e) => { e.preventDefault(); setLoginError(""); window.confirmationResult.confirm(otpCode).catch(() => { setLoginError("الرمز غير صحيح."); }); };
+      const handleLogout = () => { auth.signOut(); setLoginMethod("choose"); setVerificationId(null); setDrawerOpen(false); };
 
       const handleReceiptUpload = (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
+        const file = e.target.files && e.target.files[0]; if (!file) return;
         const reader = new FileReader();
-        reader.onload = (evt) => {
-          setNewExp(prev => ({ ...prev, receiptImg: evt.target.result }));
-          showToast("تم إرفاق صورة الفاتورة بنجاح 📸");
-        };
+        reader.onload = (evt) => { setNewExp(prev => ({ ...prev, receiptImg: evt.target.result })); showToast("تم إرفاق صورة الفاتورة 📸"); };
         reader.readAsDataURL(file);
       };
 
       const deleteItem = (path, id, list) => {
-        if (!isAdmin) {
-          showToast("خاصية الحذف مصرحة لمدير النظام فقط 🔒", "error");
-          return;
-        }
+        if (!isAdmin) { showToast("خاصية الحذف لمدير النظام فقط 🔒", "error"); return; }
         if (window.confirm("هل أنت متأكد من الحذف نهائياً؟")) {
           const newList = list.filter(item => item.id !== id);
           if (db) db.ref(path).set(newList);
-          if (path === 'expenses') setExpenses(newList);
-          if (path === 'extracts') setExtracts(newList);
-          if (path === 'payments') setPayments(newList);
-          if (path === 'projects') setProjects(newList);
+          if (path === 'expenses') setExpenses(newList); if (path === 'extracts') setExtracts(newList); if (path === 'payments') setPayments(newList); if (path === 'projects') setProjects(newList); if (path === 'advances') setAdvances(newList);
           showToast("تم الحذف بنجاح! 🗑");
         }
       };
 
       const exportToExcel = () => {
         const wb = XLSX.utils.book_new();
-        const wsProjects = XLSX.utils.json_to_sheet(projects.map(p => ({ 'كود المشروع': p.id, 'العميل': p.name, 'الموقع': p.location, 'الميزانية': p.budget || 0, 'تاريخ البدء': p.startDate, 'التسليم': p.deliveryDate, 'الحالة': p.status }))); XLSX.utils.book_append_sheet(wb, wsProjects, "المشاريع");
-        const wsExpenses = XLSX.utils.json_to_sheet(expenses.map(e => ({ 'التاريخ': e.date, 'المشروع': e.projectId, 'البند': `${e.mainCategory} - ${e.subCategory}`, 'المورد': e.supplier, 'الكمية': e.quantity, 'السعر': e.unitPrice, 'الإجمالي': e.amount, 'طريقة الدفع': e.paymentMethod, 'الفاتورة': e.receiptImg ? 'مرفقة' : 'لا يوجد', 'بواسطة': e.createdBy }))); XLSX.utils.book_append_sheet(wb, wsExpenses, "المصروفات");
-        const wsExtracts = XLSX.utils.json_to_sheet(extracts.map(ex => ({ 'التاريخ': ex.date, 'المشروع': ex.projectId, 'المستخلص': ex.extractNo, 'البيان': ex.workDescription, 'قيمة الأعمال': ex.totalWork, 'الاستقطاع': ex.deductions, 'الصافي': ex.net, 'بواسطة': ex.createdBy }))); XLSX.utils.book_append_sheet(wb, wsExtracts, "المستخلصات");
-        const wsPayments = XLSX.utils.json_to_sheet(payments.map(p => ({ 'التاريخ': p.date, 'المشروع': p.projectId, 'المبلغ': p.amount, 'البيان': p.notes, 'بواسطة': p.createdBy }))); XLSX.utils.book_append_sheet(wb, wsPayments, "الدفعات");
-        XLSX.writeFile(wb, `MOMOHY_ERP_Report_${todayDate}.xlsx`);
-        showToast("تم تحميل ملف الإكسل بنجاح! 📥");
+        const wsProjects = XLSX.utils.json_to_sheet(projects); XLSX.utils.book_append_sheet(wb, wsProjects, "المشاريع");
+        const wsExpenses = XLSX.utils.json_to_sheet(expenses.map(e => ({ 'التاريخ': e.date, 'المشروع': e.projectId, 'البند': `${e.mainCategory} - ${e.subCategory}`, 'نوع التكلفة': e.costType, 'المورد': e.supplier, 'الكمية': e.quantity, 'سعر الوحدة': e.unitPrice, 'الإجمالي': e.amount, 'الوصف / ملاحظات': e.description || '-', 'طريقة الدفع': e.paymentMethod, 'عهدة الموظف': e.custodyEmployee || '-', 'بواسطة': e.createdBy }))); XLSX.utils.book_append_sheet(wb, wsExpenses, "المصروفات");
+        const wsAdvances = XLSX.utils.json_to_sheet(advances.map(a => ({ 'التاريخ': a.date, 'المشروع': a.projectId, 'الموظف': a.employeeName, 'قيمة السلفة': a.amount, 'ملاحظات': a.notes, 'بواسطة': a.createdBy }))); XLSX.utils.book_append_sheet(wb, wsAdvances, "سجل العهد والسلف");
+        const wsExtracts = XLSX.utils.json_to_sheet(extracts); XLSX.utils.book_append_sheet(wb, wsExtracts, "المستخلصات");
+        const wsPayments = XLSX.utils.json_to_sheet(payments); XLSX.utils.book_append_sheet(wb, wsPayments, "الدفعات");
+        XLSX.writeFile(wb, `MOMOHY_ERP_Report_${todayDate}.xlsx`); showToast("تم تحميل الإكسل بنجاح! 📥");
       };
 
-      if (authLoading) {
-        return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold text-sm">جاري التحقق من الهوية... 🔒</div>;
-      }
+      if (authLoading) return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold text-sm">جاري التحقق... 🔒</div>;
 
       if (!user) {
         return (
@@ -418,21 +325,13 @@
               <div class="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-inner">🏗️</div>
               <h2 class="text-2xl font-black text-slate-800 mb-1">بوابة الدخول السحابية</h2>
               <p class="text-slate-500 text-xs mb-6 font-semibold">إدارة المعاملات الإنشائية - MOMOHY ERP</p>
-
               {loginError && <div class="bg-rose-100 text-rose-700 p-2.5 rounded-xl text-xs font-bold mb-4">{loginError}</div>}
-
               {loginMethod === "choose" && (
                 <div class="space-y-3">
-                  <button onClick={handleGoogleLogin} class="w-full flex items-center justify-center gap-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-2xl transition shadow-sm text-xs">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                    الدخول عبر Google
-                  </button>
-                  <button onClick={() => setLoginMethod("phone")} class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-2xl transition shadow text-xs">
-                    📱 الدخول عبر الهاتف
-                  </button>
+                  <button onClick={handleGoogleLogin} class="w-full flex items-center justify-center gap-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-2xl transition shadow-sm text-xs"><svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> الدخول عبر Google </button>
+                  <button onClick={() => setLoginMethod("phone")} class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-2xl transition shadow text-xs">📱 الدخول عبر الهاتف</button>
                 </div>
               )}
-
               {loginMethod === "phone" && !verificationId && (
                 <form onSubmit={handleSendOtp} class="space-y-3">
                   <input type="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)} placeholder="01xxxxxxxxx" class="w-full border p-3 rounded-xl text-center font-bold text-xs outline-none" dir="ltr" required />
@@ -441,7 +340,6 @@
                   <button type="button" onClick={() => setLoginMethod("choose")} class="w-full text-slate-500 text-xs">الرجوع</button>
                 </form>
               )}
-
               {loginMethod === "phone" && verificationId && (
                 <form onSubmit={handleVerifyOtp} class="space-y-3">
                   <input type="text" value={otpCode} onChange={e=>setOtpCode(e.target.value)} placeholder="کود التحقق (OTP)" class="w-full border p-3 rounded-xl text-center font-black tracking-widest text-sm outline-none" dir="ltr" required />
@@ -453,14 +351,13 @@
         );
       }
 
-      if (loading) {
-        return <div class="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white"><div class="text-3xl animate-bounce mb-2">☁️</div><h1 class="text-base font-bold">جاري تحميل البيانات...</h1></div>;
-      }
+      if (loading) return <div class="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white"><div class="text-3xl animate-bounce mb-2">☁️</div><h1 class="text-base font-bold">جاري تحميل البيانات...</h1></div>;
 
       const currentProj = projects.find(p => cleanId(p.id) === cleanId(selectedProjId)) || projects[0] || {};
       const projExpenses = expenses.filter(e => cleanId(e.projectId) === cleanId(currentProj.id));
       const projExtracts = extracts.filter(e => cleanId(e.projectId) === cleanId(currentProj.id));
       const projPayments = payments.filter(p => cleanId(p.projectId) === cleanId(currentProj.id));
+      const projAdvances = advances.filter(a => cleanId(a.projectId) === cleanId(currentProj.id));
 
       const totalWorkNet = projExtracts.reduce((sum, item) => sum + (Number(item.net) || 0), 0);
       const totalCost = projExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
@@ -480,22 +377,39 @@
       const projExpLabels = Object.keys(projExpMap);
       const projExpData = Object.values(projExpMap);
 
-      const filteredSearchExpenses = projExpenses.filter(e => {
-        return (searchMainCat === "" || e.mainCategory === searchMainCat) && (searchSubCat === "" || e.subCategory === searchSubCat) && (searchCostType === "" || e.costType === searchCostType);
-      });
+      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || e.mainCategory === searchMainCat) && (searchSubCat === "" || e.subCategory === searchSubCat) && (searchCostType === "" || e.costType === searchCostType); });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-      const navTabs = [
-        { id: "dashboard", label: "الرئيسية", icon: "📊" },
-        { id: "add_data", label: "إدخال", icon: "➕" },
-        { id: "expenses", label: "المصروفات", icon: "💸" },
-        { id: "extracts", label: "المستخلصات", icon: "📄" },
-        { id: "statement", label: "كشف حساب", icon: "📑" }
-      ];
+      const getCustodyStats = (empName) => {
+        const empAdv = projAdvances.filter(a => a.employeeName === empName).reduce((sum, a) => sum + Number(a.amount), 0);
+        const empExp = projExpenses.filter(e => e.paymentMethod === 'خصم من العهدة' && e.custodyEmployee === empName).reduce((sum, e) => sum + Number(e.amount), 0);
+        return { received: empAdv, spent: empExp, balance: empAdv - empExp };
+      };
+
+      const activeEmployeesCustody = settings.employees.map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
+
+      const getNavTabs = () => {
+        const tabs = [
+          { id: "dashboard", label: userRole === "Staff" ? "لوحة عهدتي" : "لوحة التحكم", icon: "📊" },
+          { id: "add_data", label: "إدخال", icon: "➕" },
+          { id: "expenses", label: "المصروفات", icon: "💸" }
+        ];
+        if (isAdmin || isEngineer) {
+          tabs.push(
+            { id: "projects", label: "المشاريع", icon: "📁" },
+            { id: "payments", label: "الدفعات", icon: "💰" },
+            { id: "extracts", label: "المستخلصات", icon: "📄" },
+            { id: "statement", label: "كشف حساب", icon: "📑" }
+          );
+        }
+        if (isAdmin) { tabs.push({ id: "audit_log", label: "الدخول", icon: "🛡️" }); }
+        tabs.push({ id: "settings", label: "الإعدادات", icon: "⚙️" });
+        return tabs;
+      };
+      const navTabs = getNavTabs();
 
       return (
         <div class="min-h-screen pb-24 md:pb-10">
-          
           <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 print-hidden border-b border-slate-800">
             <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
               <div class="flex items-center gap-2.5">
@@ -504,43 +418,19 @@
                   <h1 class="text-sm sm:text-base font-black leading-tight">إدارة المعاملات الإنشائية</h1>
                   <div class="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">
                     <span class="truncate max-w-[130px] sm:max-w-none">{user.name}</span>
-                    
-                    {isAdmin ? (
-                      <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">👑 مدير النظام</span>
-                    ) : isEngineer ? (
-                      <span class="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">📐 مهندس المشاريع</span>
-                    ) : (
-                      <span class="bg-slate-700/50 text-slate-300 px-1.5 py-0.2 rounded text-[10px]">موظف</span>
-                    )}
+                    {isAdmin ? <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">👑 مدير النظام</span> : isEngineer ? <span class="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">📐 مهندس</span> : <span class="bg-slate-700/50 text-slate-300 px-1.5 py-0.2 rounded text-[10px]">موظف</span>}
                   </div>
                 </div>
               </div>
-
               <div class="flex items-center gap-2">
-                <button onClick={exportToExcel} class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 shadow-sm transition">
-                  📤 <span class="hidden sm:inline">تصدير</span> إكسل
-                </button>
-                <button onClick={() => setDrawerOpen(true)} class="bg-slate-800 hover:bg-slate-700 p-2 rounded-xl text-slate-200 border border-slate-700 text-sm">
-                  ☰
-                </button>
+                <button onClick={exportToExcel} class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 shadow-sm transition">📤 <span class="hidden sm:inline">تصدير</span></button>
+                <button onClick={() => setDrawerOpen(true)} class="bg-slate-800 hover:bg-slate-700 p-2 rounded-xl text-slate-200 border border-slate-700 text-sm">☰</button>
               </div>
             </div>
 
             <div class="hidden md:flex bg-slate-800/90 border-t border-slate-700 px-4 py-1.5 overflow-x-auto scrollbar-hide gap-1 text-xs">
-              {[
-                { id: "dashboard", label: "📊 لوحة التحكم" },
-                { id: "add_data", label: "➕ إدخال بيانات" },
-                { id: "projects", label: "📁 دليل المشاريع" },
-                { id: "expenses", label: "💸 المصروفات" },
-                { id: "payments", label: "💰 الدفعات" },
-                { id: "extracts", label: "📄 المستخلصات" },
-                { id: "statement", label: "📑 كشف حساب شامل" },
-                ...(isAdmin ? [{ id: "audit_log", label: "🛡️ سجل الدخول" }] : []),
-                { id: "settings", label: "⚙️ الإعدادات" }
-              ].map(t => (
-                <button key={t.id} onClick={() => setActiveTab(t.id)} class={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition ${activeTab === t.id ? "bg-blue-600 text-white shadow" : "text-slate-300 hover:bg-slate-700"}`}>
-                  {t.label}
-                </button>
+              {navTabs.map(t => (
+                <button key={t.id} onClick={() => setActiveTab(t.id)} class={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition ${activeTab === t.id ? "bg-blue-600 text-white shadow" : "text-slate-300 hover:bg-slate-700"}`}>{t.icon} {t.label}</button>
               ))}
             </div>
           </header>
@@ -550,34 +440,14 @@
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onClick={() => setDrawerOpen(false)}></div>
               <div class="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-5 flex flex-col justify-between">
                 <div>
-                  <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-                    <span class="font-black text-sm">قائمة النظام الإداري</span>
-                    <button onClick={() => setDrawerOpen(false)} class="text-slate-400 hover:text-white text-lg">✕</button>
-                  </div>
+                  <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4"><span class="font-black text-sm">قائمة النظام الإداري</span><button onClick={() => setDrawerOpen(false)} class="text-slate-400 hover:text-white text-lg">✕</button></div>
                   <nav class="space-y-1.5 text-xs font-bold">
-                    {[
-                      { id: "dashboard", label: "📊 لوحة التحكم" },
-                      { id: "add_data", label: "➕ إدخال بيانات" },
-                      { id: "projects", label: "📁 دليل المشاريع" },
-                      { id: "expenses", label: "💸 المصروفات" },
-                      { id: "payments", label: "💰 الدفعات" },
-                      { id: "extracts", label: "📄 المستخلصات المعتمدة" },
-                      { id: "statement", label: "📑 كشف حساب شامل" },
-                      ...(isAdmin ? [{ id: "audit_log", label: "🛡️ سجل نشاط الدخول" }] : []),
-                      { id: "settings", label: "⚙️ إعدادات وشعار الشركة" }
-                    ].map(item => (
-                      <button key={item.id} onClick={() => { setActiveTab(item.id); setDrawerOpen(false); }} class={`w-full text-right p-3 rounded-xl transition flex items-center justify-between ${activeTab === item.id ? "bg-blue-600 text-white font-black" : "text-slate-300 hover:bg-slate-800"}`}>
-                        <span>{item.label}</span>
-                        {activeTab === item.id && <span>•</span>}
-                      </button>
+                    {navTabs.map(item => (
+                      <button key={item.id} onClick={() => { setActiveTab(item.id); setDrawerOpen(false); }} class={`w-full text-right p-3 rounded-xl transition flex items-center justify-between ${activeTab === item.id ? "bg-blue-600 text-white font-black" : "text-slate-300 hover:bg-slate-800"}`}><span>{item.icon} {item.label}</span>{activeTab === item.id && <span>•</span>}</button>
                     ))}
                   </nav>
                 </div>
-                <div class="pt-4 border-t border-slate-800">
-                  <button onClick={handleLogout} class="w-full bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
-                    🚪 تسجيل الخروج
-                  </button>
-                </div>
+                <div class="pt-4 border-t border-slate-800"><button onClick={handleLogout} class="w-full bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">🚪 تسجيل الخروج</button></div>
               </div>
             </div>
           )}
@@ -594,7 +464,6 @@
                     <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">▼</div>
                   </div>
                 </div>
-                
                 <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 bg-slate-50 md:bg-transparent p-2.5 md:p-0 rounded-xl text-slate-600 text-[11px] sm:text-xs">
                   <div>العميل: <strong class="text-slate-900 block sm:inline font-bold">{currentProj.name || '-'}</strong></div>
                   <div>الموقع: <strong class="text-slate-900 block sm:inline font-bold">{currentProj.location || '-'}</strong></div>
@@ -606,63 +475,128 @@
           <main class="max-w-7xl mx-auto px-4 mt-3.5">
             {activeTab === "dashboard" && (
               <div class="space-y-4">
-                {projBudget > 0 && (
-                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
-                    <div class="flex justify-between items-center mb-1.5 font-bold">
-                      <span class="text-slate-700">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span>
-                      <span class={budgetConsumedPercent > 90 ? "text-rose-600" : "text-blue-700"}>{budgetConsumedPercent}% مستهلك</span>
+                {userRole === "Staff" && (
+                  <div class="bg-indigo-50 border border-indigo-200 p-5 rounded-3xl shadow-sm">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-5">
+                      <div>
+                        <h2 class="text-lg font-black text-indigo-900 flex items-center gap-2">💼 لوحة تحكم عهدة الموظف</h2>
+                        <p class="text-xs font-bold text-indigo-600 mt-1">تابع إجمالي السلف المستلمة والمنصرف والرصيد المتبقي معك.</p>
+                      </div>
+                      <div class="w-full sm:w-64">
+                        <label class="block font-bold text-xs mb-1 text-indigo-800">تأكيد اسمك (صاحب العهدة):</label>
+                        <select value={myEmpName} onChange={(e) => { setMyEmpName(e.target.value); localStorage.setItem('myEmpName', e.target.value); }} class="w-full bg-white border border-indigo-300 font-extrabold text-indigo-900 rounded-xl px-3 py-2 outline-none shadow-sm">
+                          <option value="">اختر اسمك من هنا...</option>
+                          {settings.employees.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                        </select>
+                      </div>
                     </div>
-                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                      <div class={`h-2.5 rounded-full transition-all duration-500 ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-blue-600"}`} style={{ width: `${budgetConsumedPercent}%` }}></div>
-                    </div>
+
+                    {myEmpName ? (() => {
+                      const myStats = getCustodyStats(myEmpName);
+                      return (
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div class="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex flex-col justify-center items-center text-center"><span class="text-xs text-slate-500 font-bold mb-1">إجمالي السلف المستلمة 📥</span><span class="text-2xl font-black text-emerald-600">{myStats.received.toLocaleString()} ج.م</span></div>
+                          <div class="bg-white p-4 rounded-2xl shadow-sm border border-rose-100 flex flex-col justify-center items-center text-center"><span class="text-xs text-slate-500 font-bold mb-1">المنصرف من العهدة 📤</span><span class="text-2xl font-black text-rose-600">{myStats.spent.toLocaleString()} ج.م</span></div>
+                          <div class="bg-indigo-600 p-4 rounded-2xl shadow-md flex flex-col justify-center items-center text-center"><span class="text-xs text-indigo-100 font-bold mb-1">الرصيد المتبقي في جيبك 💰</span><span class="text-3xl font-black text-white">{myStats.balance.toLocaleString()} ج.م</span></div>
+                        </div>
+                      )
+                    })() : (
+                      <div class="bg-white p-6 rounded-2xl text-center border border-dashed border-indigo-300 font-bold text-slate-500">يرجى اختيار اسمك من القائمة العلوية لعرض رصيد عهدتك التفاعلي.</div>
+                    )}
                   </div>
                 )}
 
-                <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
+                {(isAdmin || isEngineer) && (
+                  <>
+                    {projBudget > 0 && (
+                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
+                        <div class="flex justify-between items-center mb-1.5 font-bold">
+                          <span class="text-slate-700">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span>
+                          <span class={budgetConsumedPercent > 90 ? "text-rose-600" : "text-blue-700"}>{budgetConsumedPercent}% مستهلك</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                          <div class={`h-2.5 rounded-full transition-all duration-500 ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-blue-600"}`} style={{ width: `${budgetConsumedPercent}%` }}></div>
+                        </div>
+                      </div>
+                    )}
 
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span><div class="text-base font-black text-slate-800 mt-1">{totalWorkNet.toLocaleString()} ج.م</div></div>
-                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي المصروفات</span><div class="text-base font-black text-rose-600 mt-1">{totalCost.toLocaleString()} ج.م</div></div>
-                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span><div class={`text-base font-black mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div></div>
-                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">مديونية العميل</span><div class={`text-base font-black mt-1 ${clientDebt > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{clientDebt.toLocaleString()} ج.م</div></div>
-                </div>
+                    <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
 
-                <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-300 text-xs">
-                  <h3 class="font-bold text-indigo-900 mb-2.5">🔍 محرك البحث في مصروفات المشروع النشط</h3>
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2.5">
-                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="border rounded-xl p-2 bg-white"><option value="">كل البنود الرئيسية</option>{settings.mainCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="border rounded-xl p-2 bg-white"><option value="">كل البنود الفرعية</option>{settings.subCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                    <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="border rounded-xl p-2 bg-white"><option value="">كل أنواع التكلفة</option>{settings.costTypes.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                  </div>
-                  <div class="bg-indigo-100 text-indigo-900 px-3.5 py-2 rounded-xl flex justify-between font-bold">
-                    <span>إجمالي المطابق:</span>
-                    <span>{filteredSearchTotal.toLocaleString()} ج.م</span>
-                  </div>
-                </div>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span><div class="text-base font-black text-slate-800 mt-1">{totalWorkNet.toLocaleString()} ج.م</div></div>
+                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي المصروفات</span><div class="text-base font-black text-rose-600 mt-1">{totalCost.toLocaleString()} ج.م</div></div>
+                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span><div class={`text-base font-black mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div></div>
+                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">مديونية العميل</span><div class={`text-base font-black mt-1 ${clientDebt > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{clientDebt.toLocaleString()} ج.م</div></div>
+                    </div>
+
+                    {activeEmployeesCustody.length > 0 && (
+                      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
+                        <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">💼 حالة العهد والسلف للموظفين (المشروع النشط)</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {activeEmployeesCustody.map(emp => (
+                            <div key={emp.name} class="border rounded-xl p-3 bg-slate-50 flex flex-col gap-2">
+                              <span class="font-black text-blue-900 border-b border-slate-200 pb-1">{emp.name}</span>
+                              <div class="flex justify-between font-bold text-[10px] text-slate-500"><span>استلم: <span class="text-emerald-600">{emp.received.toLocaleString()}</span></span><span>صرف: <span class="text-rose-600">{emp.spent.toLocaleString()}</span></span></div>
+                              <div class="bg-white border rounded p-1.5 text-center font-bold text-slate-700 shadow-sm">الرصيد لديه: <span class="font-black text-indigo-700 text-sm">{emp.balance.toLocaleString()} ج.م</span></div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
             {activeTab === "add_data" && (
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-                {/* قسم تسجيل المصروفات المحدث بأزرار الإضافة السريعة */}
+                {(isAdmin || isEngineer) && (
+                  <div class="bg-emerald-50 p-4 sm:p-5 rounded-2xl border border-emerald-200 shadow-sm lg:col-span-2">
+                    <h3 class="font-bold text-emerald-900 mb-3 border-b border-emerald-200 pb-2 text-xs sm:text-sm">💵 تسليم عهدة مالية / سلفة لموظف</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if(!newAdv.employeeName || !newAdv.amount) return;
+                      const targetProj = cleanId(selectedProjId);
+                      const newItem = { id: Date.now(), projectId: targetProj, ...newAdv, amount: Number(newAdv.amount), createdBy: user.name };
+                      const updated = [newItem, ...advances];
+                      setAdvances(updated);
+                      if(db) db.ref('advances').set(updated);
+                      setNewAdv({ date: todayDate, employeeName: "", amount: "", notes: "" });
+                      showToast(`تم تسجيل العهدة للموظف بنجاح!`);
+                    }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
+                      <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold" required/></div>
+                      <div class="sm:col-span-1">
+                        <label class="block font-bold mb-1">اسم الموظف المستلم</label>
+                        <div class="flex gap-1">
+                          <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold" required><option value="">اختر...</option>{settings.employees.map(c => <option key={c}>{c}</option>)}</select>
+                          <button type="button" onClick={()=>handleAddNewSettingItem('employees', settings.employees, 'موظف مستلم')} class="bg-emerald-200 text-emerald-800 px-3 rounded-xl font-black text-lg hover:bg-emerald-300 transition">+</button>
+                        </div>
+                      </div>
+                      <div><label class="block font-bold mb-1">المبلغ (ج.م)</label><input type="number" step="any" value={newAdv.amount} onChange={e=>setNewAdv({...newAdv, amount: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 bg-white font-black text-emerald-700" required/></div>
+                      <div><label class="block font-bold mb-1">البيان (اختياري)</label><input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="عهدة لشراء خامات..." class="w-full border border-emerald-300 rounded-xl p-2"/></div>
+                      <div class="sm:col-span-4"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ العهدة في حساب الموظف</button></div>
+                    </form>
+                  </div>
+                )}
+
+                {/* نموذج تسجيل المصروف مع خانة الوصف بعد سعر الوحدة */}
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
                   <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة</h3>
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     if(!newExp.unitPrice || !newExp.quantity) return;
+                    if(newExp.paymentMethod === 'خصم من العهدة' && !newExp.custodyEmployee) { showToast("يجب اختيار اسم الموظف صاحب العهدة!", "error"); return; }
                     const totalAmt = Number(newExp.quantity) * Number(newExp.unitPrice);
                     const targetProj = cleanId(selectedProjId);
                     const newItem = { id: Date.now(), projectId: targetProj, ...newExp, amount: totalAmt, createdBy: user.name };
                     const updated = [newItem, ...expenses];
                     setExpenses(updated);
                     if (db) db.ref('expenses').set(updated);
-                    setNewExp({...newExp, quantity: 1, unitPrice: "", date: todayDate, receiptImg: ""});
+                    setNewExp({...newExp, quantity: 1, unitPrice: "", description: "", date: todayDate, receiptImg: ""});
                     showToast(`تم حفظ المصروف للمشروع (${selectedProjId}) بنجاح!`);
                   }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                    
                     <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
                     
-                    {/* القوائم المنسدلة مع أزرار الإضافة الجديدة (+) */}
                     <div>
                       <label class="block font-bold mb-1">البند الرئيسي</label>
                       <div class="flex gap-1">
@@ -688,16 +622,39 @@
                     </div>
 
                     <div>
-                      <label class="block font-bold mb-1">المورد</label>
+                      <label class="block font-bold mb-1">المورد / الجهة</label>
                       <div class="flex gap-1">
                         <select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border rounded-xl p-2"><option value="">اختر...</option>{settings.suppliers.map(c => <option key={c}>{c}</option>)}</select>
                         <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>
                       </div>
                     </div>
 
-                    <div><label class="block font-bold mb-1">طريقة الدفع</label><select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} class="w-full border rounded-xl p-2"><option>كاش</option><option>تحويل بنكي</option><option>شيك</option></select></div>
+                    <div>
+                      <label class="block font-bold mb-1">طريقة الدفع</label>
+                      <select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-slate-700"><option value="خصم من العهدة">خصم من العهدة</option><option value="كاش">كاش (مباشر)</option><option value="تحويل بنكي">تحويل بنكي</option><option value="شيك">شيك</option></select>
+                    </div>
+
+                    {newExp.paymentMethod === 'خصم من العهدة' && (
+                      <div class="sm:col-span-2">
+                        <label class="block font-bold mb-1 text-rose-600">👤 خصم من عهدة الموظف (صاحب السلفة)</label>
+                        <div class="flex gap-1">
+                          <select value={newExp.custodyEmployee || ""} onChange={e=>setNewExp({...newExp, custodyEmployee: e.target.value})} class="w-full border border-rose-300 bg-rose-50 rounded-xl p-2 font-bold" required>
+                            <option value="">اختر اسمك أو اسم الموظف...</option>
+                            {settings.employees.map(c => <option key={c}>{c}</option>)}
+                          </select>
+                          <button type="button" onClick={()=>handleAddNewSettingItem('employees', settings.employees, 'موظف')} class="bg-rose-100 text-rose-700 px-3 rounded-xl font-black text-lg hover:bg-rose-200 transition">+</button>
+                        </div>
+                      </div>
+                    )}
+
                     <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/></div>
                     <div><label class="block font-bold mb-1">سعر الوحدة</label><input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/></div>
+
+                    {/* خانة الوصف / الملاحظات الجديدة مباشرة بعد سعر الوحدة */}
+                    <div class="sm:col-span-2">
+                      <label class="block font-bold mb-1 text-slate-700">📝 الوصف / ملاحظات الفاتورة</label>
+                      <input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="تفاصيل إضافية عن البند، رقم الفاتورة الورقية، موقع التوريد..." class="w-full border rounded-xl p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"/>
+                    </div>
                     
                     <div class="sm:col-span-2">
                       <label class="block font-bold mb-1 text-slate-700">📸 إرفاق صورة الفاتورة / الإيصال</label>
@@ -710,62 +667,82 @@
                   </form>
                 </div>
 
-                <div class="space-y-3.5">
-                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
-                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">📄 اعتماد مستخلص أعمال</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const totalWork = Number(newExt.quantity) * Number(newExt.unitPrice);
-                      const net = totalWork - Number(newExt.deductions || 0);
-                      const targetProj = cleanId(selectedProjId);
-                      const newItem = { id: Date.now(), projectId: targetProj, ...newExt, totalWork, deductions: Number(newExt.deductions||0), net, createdBy: user.name };
-                      const updated = [newItem, ...extracts];
-                      setExtracts(updated);
-                      if (db) db.ref('extracts').set(updated);
-                      setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""});
-                      showToast("تم اعتماد المستخلص وحفظه!");
-                    }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                      <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-1">رقم المستخلص</label><input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} class="w-full border rounded-xl p-2" required placeholder="مستخلص 1"/></div>
-                      <div class="sm:col-span-2"><label class="block font-bold mb-1">بيان الأعمال</label><input type="text" value={newExt.workDescription} onChange={e=>setNewExt({...newExt, workDescription: e.target.value})} class="w-full border rounded-xl p-2" required placeholder="تكسير، حفر، مباني..."/></div>
-                      <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={newExt.quantity} onChange={e=>setNewExt({...newExt, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-indigo-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-1">الفئة</label><input type="number" step="any" value={newExt.unitPrice} onChange={e=>setNewExt({...newExt, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-indigo-50 font-bold" required/></div>
-                      <div class="sm:col-span-2"><label class="block font-bold mb-1">الاستقطاعات</label><input type="number" step="any" value={newExt.deductions} onChange={e=>setNewExt({...newExt, deductions: e.target.value})} class="w-full border rounded-xl p-2 text-rose-600"/></div>
-                      <div class="sm:col-span-2 bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl flex justify-between items-center"><span class="font-bold text-indigo-900">الصافي:</span><span class="text-sm font-black text-indigo-700">{(((Number(newExt.quantity)||0) * (Number(newExt.unitPrice)||0)) - (Number(newExt.deductions)||0)).toLocaleString()} ج.م</span></div>
-                      <div class="sm:col-span-2"><button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المستخلص</button></div>
-                    </form>
-                  </div>
+                {(isAdmin || isEngineer) && (
+                  <div class="space-y-3.5">
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                      <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">📄 اعتماد مستخلص أعمال</h3>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const totalWork = Number(newExt.quantity) * Number(newExt.unitPrice);
+                        const net = totalWork - Number(newExt.deductions || 0);
+                        const targetProj = cleanId(selectedProjId);
+                        const newItem = { id: Date.now(), projectId: targetProj, ...newExt, totalWork, deductions: Number(newExt.deductions||0), net, createdBy: user.name };
+                        const updated = [newItem, ...extracts];
+                        setExtracts(updated);
+                        if (db) db.ref('extracts').set(updated);
+                        setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""});
+                        showToast("تم اعتماد المستخلص وحفظه!");
+                      }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                        <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
+                        <div><label class="block font-bold mb-1">رقم المستخلص</label><input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} class="w-full border rounded-xl p-2" required placeholder="مستخلص 1"/></div>
+                        <div class="sm:col-span-2"><label class="block font-bold mb-1">بيان الأعمال</label><input type="text" value={newExt.workDescription} onChange={e=>setNewExt({...newExt, workDescription: e.target.value})} class="w-full border rounded-xl p-2" required placeholder="تكسير، حفر، مباني..."/></div>
+                        <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={newExt.quantity} onChange={e=>setNewExt({...newExt, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-indigo-50 font-bold" required/></div>
+                        <div><label class="block font-bold mb-1">الفئة</label><input type="number" step="any" value={newExt.unitPrice} onChange={e=>setNewExt({...newExt, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-indigo-50 font-bold" required/></div>
+                        <div class="sm:col-span-2"><label class="block font-bold mb-1">الاستقطاعات</label><input type="number" step="any" value={newExt.deductions} onChange={e=>setNewExt({...newExt, deductions: e.target.value})} class="w-full border rounded-xl p-2 text-rose-600"/></div>
+                        <div class="sm:col-span-2 bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl flex justify-between items-center"><span class="font-bold text-indigo-900">الصافي:</span><span class="text-sm font-black text-indigo-700">{(((Number(newExt.quantity)||0) * (Number(newExt.unitPrice)||0)) - (Number(newExt.deductions)||0)).toLocaleString()} ج.م</span></div>
+                        <div class="sm:col-span-2"><button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المستخلص</button></div>
+                      </form>
+                    </div>
 
-                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
-                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💰 تسجيل دفعة عميل</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const targetProj = cleanId(selectedProjId);
-                      const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: Number(newPay.amount), createdBy: user.name};
-                      const updated = [newItem, ...payments];
-                      setPayments(updated);
-                      if (db) db.ref('payments').set(updated);
-                      setNewPay({date: todayDate, amount: "", paymentMethod: "كاش", notes: ""});
-                      showToast("تم تسجيل الدفعة بنجاح! 💵");
-                    }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                      <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-1">المبلغ</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-emerald-600 bg-emerald-50" required/></div>
-                      <div class="sm:col-span-2"><label class="block font-bold mb-1">البيان</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded-xl p-2" placeholder="دفعة تحت الحساب..."/></div>
-                      <div class="sm:col-span-2"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ الدفعة</button></div>
-                    </form>
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                      <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💰 تسجيل دفعة عميل</h3>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const targetProj = cleanId(selectedProjId);
+                        const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: Number(newPay.amount), createdBy: user.name};
+                        const updated = [newItem, ...payments];
+                        setPayments(updated);
+                        if (db) db.ref('payments').set(updated);
+                        setNewPay({date: todayDate, amount: "", paymentMethod: "كاش", notes: ""});
+                        showToast("تم تسجيل الدفعة بنجاح! 💵");
+                      }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                        <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
+                        <div><label class="block font-bold mb-1">المبلغ</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-emerald-600 bg-emerald-50" required/></div>
+                        <div class="sm:col-span-2"><label class="block font-bold mb-1">البيان</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded-xl p-2" placeholder="دفعة تحت الحساب..."/></div>
+                        <div class="sm:col-span-2"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ الدفعة</button></div>
+                      </form>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
             {activeTab === "expenses" && (
               <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
                 <table class="w-full text-right">
-                  <thead><tr class="bg-slate-100 text-slate-600"><th class="p-2.5">التاريخ</th><th class="p-2.5">المشروع</th><th class="p-2.5">البيان</th><th class="p-2.5">المورد</th><th class="p-2.5">الإجمالي</th><th class="p-2.5">الفاتورة</th><th class="p-2.5">بواسطة</th>{isAdmin && <th class="p-2.5">حذف</th>}</tr></thead>
+                  <thead>
+                    <tr class="bg-slate-100 text-slate-600">
+                      <th class="p-2.5">التاريخ</th>
+                      <th class="p-2.5">المشروع</th>
+                      <th class="p-2.5">البيان</th>
+                      <th class="p-2.5">الوصف / ملاحظات</th>
+                      <th class="p-2.5">المورد</th>
+                      <th class="p-2.5">الدفع</th>
+                      <th class="p-2.5">الإجمالي</th>
+                      <th class="p-2.5">الفاتورة</th>
+                      <th class="p-2.5">بواسطة</th>
+                      {isAdmin && <th class="p-2.5">حذف</th>}
+                    </tr>
+                  </thead>
                   <tbody>
                     {expenses.map((e) => (
                       <tr key={e.id} class="border-t hover:bg-slate-50">
-                        <td class="p-2.5 text-slate-600">{e.date}</td><td class="p-2.5 font-bold text-blue-700">{e.projectId}</td><td class="p-2.5">{e.mainCategory} - {e.subCategory}</td><td class="p-2.5">{e.supplier}</td>
+                        <td class="p-2.5 text-slate-600">{e.date}</td>
+                        <td class="p-2.5 font-bold text-blue-700">{e.projectId}</td>
+                        <td class="p-2.5">{e.mainCategory} - {e.subCategory}</td>
+                        <td class="p-2.5 text-slate-600 max-w-[150px] truncate" title={e.description || ""}>{e.description || '-'}</td>
+                        <td class="p-2.5">{e.supplier}</td>
+                        <td class="p-2.5"><span class={`px-1.5 py-0.5 rounded-lg text-[10px] ${e.paymentMethod === 'خصم من العهدة' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200' : 'bg-slate-100 text-slate-600'}`}>{e.paymentMethod} {e.custodyEmployee && `(${e.custodyEmployee})`}</span></td>
                         <td class="p-2.5 font-bold text-rose-600">{(e.amount || 0).toLocaleString()}</td>
                         <td class="p-2.5">
                           {e.receiptImg ? (
@@ -781,14 +758,14 @@
               </div>
             )}
 
-            {activeTab === "statement" && (
+            {activeTab === "statement" && (isAdmin || isEngineer) && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm print-area text-xs">
                 <div class="flex justify-between items-center mb-4 border-b pb-3 print-hidden">
                   <div>
                     <h3 class="font-black text-slate-800 text-sm">📑 كشف حساب وتحليل مالي شامل للمشروع</h3>
                     <p class="text-slate-500 text-[11px]">يجمع بين مستحقات العميل والمصروفات وصافي الأرباح الفعلية.</p>
                   </div>
-                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨️ طباعة كشف الحساب</button>
+                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨 طباعة كشف الحساب</button>
                 </div>
 
                 <div class="border border-slate-300 p-3.5 rounded-2xl mb-4">
@@ -845,7 +822,7 @@
               </div>
             )}
 
-            {activeTab === "projects" && (
+            {activeTab === "projects" && (isAdmin || isEngineer) && (
               <div class="space-y-3.5">
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
                   <h3 class="font-bold mb-2.5 border-b pb-1.5 text-xs sm:text-sm">📁 إضافة مشروع جديد</h3>
@@ -866,10 +843,7 @@
                     setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
                     showToast(`تمت إضافة المشروع (${clean}) بنجاح!`);
                   }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
-                    <div>
-                      <label class="block font-bold mb-1">كود المشروع</label>
-                      <input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded-xl p-2 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required />
-                    </div>
+                    <div><label class="block font-bold mb-1">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded-xl p-2 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required /></div>
                     <div><label class="block font-bold mb-1">اسم العميل</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded-xl p-2" required /></div>
                     <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded-xl p-2" /></div>
                     <div><label class="block font-bold mb-1">الميزانية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded-xl p-2 text-blue-700 font-bold" placeholder="500000" /></div>
@@ -895,7 +869,7 @@
               </div>
             )}
 
-            {activeTab === "payments" && (
+            {activeTab === "payments" && (isAdmin || isEngineer) && (
               <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
                 <table class="w-full text-right">
                   <thead><tr class="bg-slate-100 text-slate-600"><th class="p-2.5">التاريخ</th><th class="p-2.5">المشروع</th><th class="p-2.5">المبلغ</th><th class="p-2.5">البيان</th><th class="p-2.5">بواسطة</th>{isAdmin && <th class="p-2.5">حذف</th>}</tr></thead>
@@ -906,11 +880,11 @@
               </div>
             )}
 
-            {activeTab === "extracts" && (
+            {activeTab === "extracts" && (isAdmin || isEngineer) && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto print-area text-xs">
                 <div class="flex justify-between items-center mb-4 print-hidden">
                   <h3 class="font-bold text-slate-800 text-sm">سجل المستخلصات المعتمدة</h3>
-                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨️ طباعة المستخلص كـ PDF</button>
+                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨 طباعة المستخلص كـ PDF</button>
                 </div>
                 <div class="flex justify-between items-center border-b-2 border-slate-800 pb-3 mb-3">
                   <div>
@@ -973,36 +947,21 @@
             )}
           </main>
 
-          {/* شريط التنقل السفلي للهواتف الذكية */}
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-lg z-40 px-2 py-1.5 flex justify-around items-center">
-            {navTabs.map(tab => (
-              <button 
-                key={tab.id} 
-                onClick={() => setActiveTab(tab.id)} 
-                class={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition duration-200 ${activeTab === tab.id ? "text-blue-600 font-black scale-105" : "text-slate-400 hover:text-slate-600"}`}>
-                <span class="text-base">{tab.icon}</span>
-                <span class="text-[10px] mt-0.5">{tab.label}</span>
-              </button>
+            {navTabs.slice(0, 4).map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} class={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition duration-200 ${activeTab === tab.id ? "text-blue-600 font-black scale-105" : "text-slate-400 hover:text-slate-600"}`}><span class="text-base">{tab.icon}</span><span class="text-[10px] mt-0.5">{tab.label}</span></button>
             ))}
-            <button 
-              onClick={() => setDrawerOpen(true)} 
-              class="flex flex-col items-center justify-center py-1 px-2.5 text-slate-400 hover:text-slate-600">
-              <span class="text-base">☰</span>
-              <span class="text-[10px] mt-0.5">المزيد</span>
-            </button>
+            <button onClick={() => setDrawerOpen(true)} class="flex flex-col items-center justify-center py-1 px-2.5 text-slate-400 hover:text-slate-600"><span class="text-base">☰</span><span class="text-[10px] mt-0.5">المزيد</span></button>
           </nav>
 
-          {/* نافذة التنبيهات المنبثقة التفاعلية */}
           {toast.show && (
             <div class="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
               <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
-                <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
-                <span>{toast.message}</span>
+                <span>{toast.type === 'error' ? '⚠️' : '✅'}</span><span>{toast.message}</span>
               </div>
             </div>
           )}
 
-          {/* نافذة معاينة الفاتورة */}
           {activeInvoiceModal && (
             <div class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
               <div class="bg-white p-4 rounded-3xl max-w-lg w-full flex flex-col items-center shadow-2xl">
