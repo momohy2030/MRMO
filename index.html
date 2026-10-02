@@ -54,14 +54,8 @@
       measurementId: "G-N9DW5R28H0"
     };
 
-    const DIRECTOR_EMAILS = [
-      "mohamedmohy676676@gmail.com",
-      "+201000000000"
-    ];
-
-    const ENGINEER_EMAILS = [
-      "mesahaforconsultant@gmail.com"
-    ];
+    const DIRECTOR_EMAILS = ["mohamedmohy676676@gmail.com", "+201000000000"];
+    const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
 
     let db = null;
     let auth = null;
@@ -72,9 +66,7 @@
       auth.languageCode = 'ar';
     } catch (e) { console.error("Firebase init error:", e); }
 
-    const initialProjects = [
-      {"id": "cons-01", "name": "مشروع رئيسي 01", "location": "الموقع العام", "budget": 500000, "startDate": "2026-01-01", "deliveryDate": "2026-12-31", "status": "جاري العمل", "createdBy": "النظام"}
-    ];
+    const initialProjects = [{"id": "cons-01", "name": "مشروع رئيسي 01", "location": "الموقع العام", "budget": 500000, "startDate": "2026-01-01", "deliveryDate": "2026-12-31", "status": "جاري العمل", "createdBy": "النظام"}];
 
     const initialSettings = {
       mainCategories: ["مباني", "صبة خرسانه", "كهرباء", "سباكة", "محارة", "نقاشة"],
@@ -155,8 +147,9 @@
       const [projects, setProjects] = useState(initialProjects);
       const [expenses, setExpenses] = useState([]);
       const [extracts, setExtracts] = useState([]);
-      const [payments, setPayments] = useState([]);
+      const [payments, setPayments] = useState([]); // دفعات العميل
       const [advances, setAdvances] = useState([]);
+      const [supplierPayments, setSupplierPayments] = useState([]); // دفعات الموردين الجديدة
       const [loginLogs, setLoginLogs] = useState([]);
       const [settings, setSettings] = useState(initialSettings);
       
@@ -186,6 +179,7 @@
       const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "كاش", notes: "" });
       const [newExt, setNewExt] = useState({ date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: "" });
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
+      const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" }); // فورم الموردين
 
       useEffect(() => { setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId })); }, [nextSuggestedProjectId]);
       useEffect(() => { 
@@ -210,28 +204,17 @@
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           if (currentUser) {
             const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase();
-            
             const isManager = DIRECTOR_EMAILS.some(id => identifier.includes(id.toLowerCase()));
             const isEng = ENGINEER_EMAILS.some(id => identifier.includes(id.toLowerCase()));
             const hasFullAccess = isManager || isEng;
             
             let detectedRole = "موظف (Staff)";
-
-            if (isManager) {
-              detectedRole = "مدير النظام (Admin)";
-              setActiveTab("dashboard");
-            } else if (isEng) {
-              detectedRole = "مهندس المشاريع";
-              setActiveTab("dashboard");
-            } else {
-              setActiveTab("add_data");
-            }
+            if (isManager) { detectedRole = "مدير النظام (Admin)"; setActiveTab("dashboard"); } 
+            else if (isEng) { detectedRole = "مهندس المشاريع"; setActiveTab("dashboard"); } 
+            else { setActiveTab("add_data"); }
 
             setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", identifier: identifier });
-            setIsAdmin(hasFullAccess);
-            setIsDirector(isManager);
-            setIsProjectEng(isEng);
-            setUserRole(detectedRole);
+            setIsAdmin(hasFullAccess); setIsDirector(isManager); setIsProjectEng(isEng); setUserRole(detectedRole);
 
             if (!sessionStorage.getItem('login_recorded')) { recordLoginLog(currentUser, detectedRole); sessionStorage.setItem('login_recorded', 'true'); }
           } else {
@@ -261,6 +244,7 @@
             setExtracts([...toArr(data.extracts)].reverse());
             setPayments([...toArr(data.payments)].reverse());
             setAdvances([...toArr(data.advances)].reverse());
+            setSupplierPayments([...toArr(data.supplier_payments)].reverse()); // جلب دفعات الموردين
             setLoginLogs([...toArr(data.login_logs)].reverse());
 
             const savedSettings = data.settings || {};
@@ -296,7 +280,7 @@
           if (settingKey === 'mainCategories') setNewExp(prev => ({...prev, mainCategory: cleanVal}));
           if (settingKey === 'subCategories') setNewExp(prev => ({...prev, subCategory: cleanVal}));
           if (settingKey === 'costTypes') setNewExp(prev => ({...prev, costType: cleanVal}));
-          if (settingKey === 'suppliers') setNewExp(prev => ({...prev, supplier: cleanVal}));
+          if (settingKey === 'suppliers') { setNewExp(prev => ({...prev, supplier: cleanVal})); setNewSuppPay(prev => ({...prev, supplier: cleanVal})); }
           if (settingKey === 'employees') { setNewExp(prev => ({...prev, custodyEmployee: cleanVal})); setNewAdv(prev => ({...prev, employeeName: cleanVal})); }
 
           showToast(`تم إضافة "${cleanVal}" للقائمة بنجاح!`);
@@ -325,7 +309,7 @@
         if (window.confirm("هل أنت متأكد من الحذف نهائياً؟")) {
           const newList = list.filter(item => item.id !== id);
           if (db) db.ref(path).set(newList);
-          if (path === 'expenses') setExpenses(newList); if (path === 'extracts') setExtracts(newList); if (path === 'payments') setPayments(newList); if (path === 'projects') setProjects(newList); if (path === 'advances') setAdvances(newList);
+          if (path === 'expenses') setExpenses(newList); if (path === 'extracts') setExtracts(newList); if (path === 'payments') setPayments(newList); if (path === 'projects') setProjects(newList); if (path === 'advances') setAdvances(newList); if (path === 'supplier_payments') setSupplierPayments(newList);
           showToast("تم الحذف بنجاح! 🗑");
         }
       };
@@ -337,6 +321,7 @@
         const wsAdvances = XLSX.utils.json_to_sheet(advances.map(a => ({ 'التاريخ': a.date, 'المشروع': a.projectId, 'الموظف': a.employeeName, 'قيمة السلفة': a.amount, 'ملاحظات': a.notes, 'بواسطة': a.createdBy }))); XLSX.utils.book_append_sheet(wb, wsAdvances, "سجل العهد والسلف");
         const wsExtracts = XLSX.utils.json_to_sheet(extracts); XLSX.utils.book_append_sheet(wb, wsExtracts, "المستخلصات");
         const wsPayments = XLSX.utils.json_to_sheet(payments); XLSX.utils.book_append_sheet(wb, wsPayments, "الدفعات");
+        const wsSupplierPay = XLSX.utils.json_to_sheet(supplierPayments); XLSX.utils.book_append_sheet(wb, wsSupplierPay, "دفعات الموردين");
         XLSX.writeFile(wb, `MOMOHY_ERP_Report_${todayDate}.xlsx`); showToast("تم تحميل الإكسل بنجاح! 📥");
       };
 
@@ -402,13 +387,23 @@
       const projExpLabels = Object.keys(projExpMap);
       const projExpData = Object.values(projExpMap);
 
-      // محرك البحث الدقيق
+      // محرك البحث في المصروفات
       const filteredSearchExpenses = projExpenses.filter(e => { 
         return (searchMainCat === "" || e.mainCategory === searchMainCat) && 
                (searchSubCat === "" || e.subCategory === searchSubCat) && 
                (searchCostType === "" || e.costType === searchCostType); 
       });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+      // حسابات الموردين (إجمالي مسحوبات، إجمالي مدفوعات، الرصيد)
+      const suppliersLedger = settings.suppliers.map(supp => {
+        // المسحوبات من المورد = الفواتير المسجلة باسمه في المصروفات
+        const totalPurchases = expenses.filter(e => e.supplier === supp).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        // الدفعات النقدية اللي أديتهاله
+        const totalPaid = supplierPayments.filter(p => p.supplier === supp).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        const balance = totalPaid - totalPurchases;
+        return { name: supp, purchases: totalPurchases, paid: totalPaid, balance };
+      }).filter(s => s.purchases > 0 || s.paid > 0);
 
       const getCustodyStats = (empName) => {
         const empAdv = projAdvances.filter(a => a.employeeName === empName).reduce((sum, a) => sum + Number(a.amount), 0);
@@ -435,7 +430,10 @@
         );
 
         if (isAdmin) {
-          tabs.push({ id: "statement", label: "كشف حساب", icon: "📑" });
+          tabs.push(
+            { id: "suppliers", label: "حسابات الموردين", icon: "🚚" },
+            { id: "statement", label: "كشف حساب", icon: "📑" }
+          );
         }
 
         if (isDirector) {
@@ -457,6 +455,7 @@
                   <h1 class="text-sm sm:text-base font-black leading-tight">إدارة المعاملات الإنشائية</h1>
                   <div class="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">
                     <span class="truncate max-w-[130px] sm:max-w-none">{user.name}</span>
+                    
                     {isDirector ? (
                       <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">👑 مدير النظام</span>
                     ) : isProjectEng ? (
@@ -497,7 +496,7 @@
             </div>
           )}
 
-          {["dashboard", "add_data", "projects", "payments", "extracts", "statement", "my_custody"].includes(activeTab) && (
+          {["dashboard", "add_data", "projects", "payments", "extracts", "statement", "my_custody", "expenses"].includes(activeTab) && (
             <div class="print-hidden max-w-7xl mx-auto px-4 mt-3.5">
               <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -518,7 +517,7 @@
           )}
 
           <main class="max-w-7xl mx-auto px-4 mt-3.5">
-            {/* 1. لوحة تحكم الإدارة الكاملة (للأدمن ومهندس المشاريع) */}
+            {/* 1. لوحة تحكم الإدارة الكاملة */}
             {activeTab === "dashboard" && isAdmin && (
               <div class="space-y-4">
                 {projBudget > 0 && (
@@ -549,33 +548,8 @@
                   <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span><div class={`text-base font-black mt-1 ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{netProfit.toLocaleString()} ج.م</div></div>
                 </div>
 
-                {/* محرك البحث الدقيق والفلترة في لوحة التحكم */}
-                <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs mt-2">
-                  <h3 class="font-bold text-indigo-900 mb-3 flex items-center gap-1.5 border-b pb-2">
-                    <span>🔍</span> محرك البحث والفلترة الدقيقة لمصروفات المشروع النشط
-                  </h3>
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="border border-slate-300 rounded-xl p-2.5 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-400">
-                      <option value="">كل البنود الرئيسية</option>
-                      {settings.mainCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="border border-slate-300 rounded-xl p-2.5 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-400">
-                      <option value="">كل البنود الفرعية</option>
-                      {settings.subCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="border border-slate-300 rounded-xl p-2.5 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-400">
-                      <option value="">كل أنواع التكلفة</option>
-                      {settings.costTypes.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div class="bg-indigo-50 border border-indigo-200 text-indigo-900 px-4 py-3 rounded-xl flex justify-between items-center font-bold">
-                    <span>إجمالي المصروفات المطابقة للبحث:</span>
-                    <span class="text-base font-black text-indigo-700">{filteredSearchTotal.toLocaleString()} ج.م</span>
-                  </div>
-                </div>
-
                 {activeEmployeesCustody.length > 0 && (
-                  <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs mt-2">
+                  <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
                     <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">💼 حالة العهد والسلف للموظفين (المشروع النشط)</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {activeEmployeesCustody.map(emp => (
@@ -626,8 +600,7 @@
             {/* 3. إدخال البيانات (متاح للجميع) */}
             {activeTab === "add_data" && (
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-                
-                {/* نموذج تسليم واستلام العهدة متاح للموظف والإدارة على السواء بدون قيود */}
+                {/* نموذج العهدة المالية (متاح للجميع) */}
                 <div class="bg-emerald-50 p-4 sm:p-5 rounded-2xl border border-emerald-200 shadow-sm lg:col-span-2">
                   <h3 class="font-bold text-emerald-900 mb-3 border-b border-emerald-200 pb-2 text-xs sm:text-sm flex items-center gap-1.5">
                     <span>💵</span> تسجيل استلام / تسليم عهدة مالية أو سلفة
@@ -641,23 +614,22 @@
                     setAdvances(updated);
                     if(db) db.ref('advances').set(updated);
                     setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" });
-                    showToast(`تم تسجيل العهدة بنجاح!`);
+                    showToast(`تم تسجيل العهدة للموظف بنجاح!`);
                   }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
                     <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold bg-white" required/></div>
                     <div class="sm:col-span-1">
-                      <label class="block font-bold mb-1">اسم الموظف المستلم للعهدة</label>
+                      <label class="block font-bold mb-1">اسم الموظف (المستلم)</label>
                       <div class="flex gap-1">
                         <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold bg-white" required><option value="">اختر...</option>{settings.employees.map(c => <option key={c}>{c}</option>)}</select>
-                        <button type="button" onClick={()=>handleAddNewSettingItem('employees', settings.employees, 'موظف مستلم')} class="bg-emerald-200 text-emerald-800 px-3 rounded-xl font-black text-lg hover:bg-emerald-300 transition">+</button>
+                        <button type="button" onClick={()=>handleAddNewSettingItem('employees', settings.employees, 'موظف')} class="bg-emerald-200 text-emerald-800 px-3 rounded-xl font-black text-lg hover:bg-emerald-300 transition">+</button>
                       </div>
                     </div>
                     <div><label class="block font-bold mb-1">المبلغ (ج.م)</label><input type="number" step="any" value={newAdv.amount} onChange={e=>setNewAdv({...newAdv, amount: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 bg-white font-black text-emerald-700" placeholder="مثال: 5000" required/></div>
-                    <div><label class="block font-bold mb-1">البيان (اختياري)</label><input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="سلفة شخصية، عهدة خامات..." class="w-full border border-emerald-300 rounded-xl p-2 bg-white"/></div>
-                    <div class="sm:col-span-4"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">تأكيد استلام / حفظ العهدة</button></div>
+                    <div><label class="block font-bold mb-1">البيان / ملاحظات</label><input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="سلفة لتمويل مشتريات..." class="w-full border border-emerald-300 rounded-xl p-2 bg-white"/></div>
+                    <div class="sm:col-span-4"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ العهدة في حساب الموظف</button></div>
                   </form>
                 </div>
 
-                {/* نموذج تسجيل المصروف */}
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
                   <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة</h3>
                   <form onSubmit={(e) => {
@@ -743,9 +715,241 @@
                     <div class="sm:col-span-2"><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المصروف ({selectedProjId})</button></div>
                   </form>
                 </div>
+              </div>
+            )}
 
-                <div class="space-y-3.5">
-                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+            {/* 4. المصروفات ومحرك البحث الدقيق */}
+            {activeTab === "expenses" && (
+              <div class="space-y-4">
+                {/* محرك البحث الدقيق في صفحة المصروفات */}
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-300 text-xs shadow-sm">
+                  <h3 class="font-bold text-indigo-900 mb-3 flex items-center gap-1.5">
+                    <span>🔍</span> محرك البحث والفلترة الدقيقة لمصروفات المشروع
+                  </h3>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="border rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
+                      <option value="">كل البنود الرئيسية</option>
+                      {settings.mainCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="border rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
+                      <option value="">كل البنود الفرعية</option>
+                      {settings.subCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="border rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
+                      <option value="">كل أنواع التكلفة</option>
+                      {settings.costTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div class="bg-indigo-100/70 border border-indigo-200 text-indigo-900 px-4 py-2.5 rounded-xl flex justify-between items-center font-bold">
+                    <span>إجمالي المصروفات المطابقة للبحث:</span>
+                    <span class="text-sm font-black text-indigo-800">{filteredSearchTotal.toLocaleString()} ج.م</span>
+                  </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
+                  <table class="w-full text-right border-collapse">
+                    <thead>
+                      <tr class="bg-slate-100 text-slate-700 border-b">
+                        <th class="p-2.5">التاريخ</th>
+                        <th class="p-2.5">المشروع</th>
+                        <th class="p-2.5">البند</th>
+                        <th class="p-2.5">البيان</th>
+                        <th class="p-2.5 text-center">الكمية</th>
+                        <th class="p-2.5 text-center">السعر</th>
+                        <th class="p-2.5 text-center">الإجمالي</th>
+                        <th class="p-2.5">الدفع</th>
+                        <th class="p-2.5">الفاتورة</th>
+                        <th class="p-2.5">بواسطة</th>
+                        {isAdmin && <th class="p-2.5 text-center">حذف</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSearchExpenses.length === 0 ? <tr><td colSpan={isAdmin ? 11 : 10} class="text-center p-4 text-slate-500">لا توجد نتائج مطابقة</td></tr> : 
+                      filteredSearchExpenses.map((e) => (
+                        <tr key={e.id} class="border-b hover:bg-slate-50">
+                          <td class="p-2.5 text-slate-600 whitespace-nowrap">{e.date}</td>
+                          <td class="p-2.5 font-bold text-blue-700 font-mono">{e.projectId}</td>
+                          <td class="p-2.5 font-semibold">{e.mainCategory} - {e.subCategory}</td>
+                          <td class="p-2.5 text-slate-700 max-w-[150px] truncate" title={e.description || ""}>{e.description || '-'}</td>
+                          <td class="p-2.5 text-center font-bold">{e.quantity || 1}</td>
+                          <td class="p-2.5 text-center font-mono">{(Number(e.unitPrice) || Number(e.amount)).toLocaleString()}</td>
+                          <td class="p-2.5 text-center font-black text-rose-600 font-mono">{(Number(e.amount) || 0).toLocaleString()}</td>
+                          <td class="p-2.5"><span class={`px-1.5 py-0.5 rounded-lg text-[10px] ${e.paymentMethod === 'خصم من العهدة' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200' : 'bg-slate-100 text-slate-600'}`}>{e.paymentMethod}</span></td>
+                          <td class="p-2.5">
+                            {e.receiptImg ? <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold">عرض</button> : <span class="text-slate-400">لا</span>}
+                          </td>
+                          <td class="p-2.5 text-slate-500 whitespace-nowrap">{e.createdBy || '-'}</td>
+                          {isAdmin && <td class="p-2.5 text-center"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500 hover:text-rose-700">🗑️️</button></td>}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 5. حسابات الموردين (خاص للإدارة) */}
+            {activeTab === "suppliers" && isAdmin && (
+              <div class="space-y-4">
+                {/* فورم دفع فلوس للمورد */}
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
+                  <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 flex items-center gap-1.5">
+                    <span>💵</span> تسجيل دفعة نقدية / تحويل لمورد
+                  </h3>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if(!newSuppPay.supplier || !newSuppPay.amount) return;
+                    const newItem = { id: Date.now(), ...newSuppPay, amount: Number(newSuppPay.amount), createdBy: user.name };
+                    const updated = [newItem, ...supplierPayments];
+                    setSupplierPayments(updated);
+                    if(db) db.ref('supplier_payments').set(updated);
+                    setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" });
+                    showToast(`تم تسجيل الدفعة للمورد بنجاح!`);
+                  }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                    <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} class="w-full border rounded-xl p-2 font-bold bg-slate-50" required/></div>
+                    <div>
+                      <label class="block font-bold mb-1">اسم المورد</label>
+                      <select value={newSuppPay.supplier} onChange={e=>setNewSuppPay({...newSuppPay, supplier: e.target.value})} class="w-full border rounded-xl p-2" required><option value="">اختر...</option>{settings.suppliers.map(c => <option key={c}>{c}</option>)}</select>
+                    </div>
+                    <div><label class="block font-bold mb-1">المبلغ المدفوع (ج.م)</label><input type="number" step="any" value={newSuppPay.amount} onChange={e=>setNewSuppPay({...newSuppPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-black text-emerald-600 bg-emerald-50" required/></div>
+                    <div><label class="block font-bold mb-1">ملاحظات / رقم الإيصال</label><input type="text" value={newSuppPay.notes} onChange={e=>setNewSuppPay({...newSuppPay, notes: e.target.value})} class="w-full border rounded-xl p-2"/></div>
+                    <div class="sm:col-span-4"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ الدفعة في حساب المورد</button></div>
+                  </form>
+                </div>
+
+                {/* كشف الحساب التلقائي للموردين */}
+                <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
+                  <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">
+                    <span>🚚</span> خلاصة أرصدة الموردين النشطين
+                  </h3>
+                  <table class="w-full text-right border-collapse">
+                    <thead>
+                      <tr class="bg-slate-100 text-slate-700 border-b">
+                        <th class="p-2.5">اسم المورد</th>
+                        <th class="p-2.5 text-center">إجمالي البضاعة المسحوبة (مديونية)</th>
+                        <th class="p-2.5 text-center">إجمالي الدفعات المعطاة</th>
+                        <th class="p-2.5 text-center">الرصيد النهائي (الصافي)</th>
+                        <th class="p-2.5 text-center">الموقف</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {suppliersLedger.length === 0 ? <tr><td colSpan="5" class="text-center p-4 text-slate-500">لا يوجد حركات مسجلة للموردين حتى الآن</td></tr> :
+                      suppliersLedger.map((s, i) => (
+                        <tr key={i} class="border-b hover:bg-slate-50">
+                          <td class="p-2.5 font-bold text-indigo-900">{s.name}</td>
+                          <td class="p-2.5 text-center font-bold text-rose-600">{s.purchases.toLocaleString()}</td>
+                          <td class="p-2.5 text-center font-bold text-emerald-600">{s.paid.toLocaleString()}</td>
+                          <td class={`p-2.5 text-center font-black text-sm ${s.balance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{Math.abs(s.balance).toLocaleString()} ج.م</td>
+                          <td class="p-2.5 text-center">
+                            {s.balance === 0 ? <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-bold text-[10px]">خالص</span> :
+                             s.balance > 0 ? <span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg font-bold text-[10px]">لينا رصيد عنده</span> :
+                             <span class="bg-rose-100 text-rose-800 px-2 py-1 rounded-lg font-bold text-[10px]">مطلوب سداده</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* جدول الدفعات السابقة */}
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs mt-4">
+                  <h4 class="font-bold text-slate-700 mb-2">سجل الدفعات المدفوعة للموردين</h4>
+                  <table class="w-full text-right border-collapse">
+                    <thead><tr class="bg-slate-200 text-slate-700"><th class="p-2 border">التاريخ</th><th class="p-2 border">المورد</th><th class="p-2 border">المبلغ</th><th class="p-2 border">البيان</th><th class="p-2 border text-center">حذف</th></tr></thead>
+                    <tbody>
+                      {supplierPayments.map(p => (
+                        <tr key={p.id}><td class="p-2 border">{p.date}</td><td class="p-2 border font-bold">{p.supplier}</td><td class="p-2 border font-bold text-emerald-600">{p.amount.toLocaleString()}</td><td class="p-2 border">{p.notes}</td><td class="p-2 border text-center"><button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="text-rose-500">🗑️</button></td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 6. جدول المشاريع (متاح للجميع) */}
+            {activeTab === "projects" && (
+              <div class="space-y-3.5">
+                {isAdmin && (
+                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
+                    <h3 class="font-bold mb-2.5 border-b pb-1.5 text-xs sm:text-sm">📁 إضافة مشروع جديد</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newProj.id || !newProj.name) return;
+                      const clean = cleanId(newProj.id);
+                      const projectToAdd = { ...newProj, id: clean, budget: Number(newProj.budget) || 0, createdBy: user.name };
+                      const updatedProjects = [...projects, projectToAdd];
+                      setProjects(updatedProjects);
+                      if (db) db.ref('projects').set(updatedProjects);
+                      setSelectedProjId(clean);
+                      setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
+                      showToast(`تمت إضافة المشروع بنجاح!`);
+                    }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
+                      <div><label class="block font-bold mb-1">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded-xl p-2 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required /></div>
+                      <div><label class="block font-bold mb-1">العميل</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded-xl p-2" required /></div>
+                      <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded-xl p-2" /></div>
+                      <div><label class="block font-bold mb-1">الميزانية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded-xl p-2 text-blue-700 font-bold" /></div>
+                      <div><label class="block font-bold mb-1">تاريخ البدء</label><input type="date" value={newProj.startDate} onChange={e=>setNewProj({...newProj, startDate: e.target.value})} class="w-full border rounded-xl p-2" /></div>
+                      <div><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl transition">حفظ</button></div>
+                    </form>
+                  </div>
+                )}
+                <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
+                  <table class="w-full text-right">
+                    <thead><tr class="bg-slate-100 text-slate-700"><th class="p-2.5">الكود</th><th class="p-2.5">العميل</th><th class="p-2.5">الموقع</th><th class="p-2.5">الميزانية</th><th class="p-2.5">الحالة</th>{isAdmin && <th class="p-2.5 text-center">إجراء</th>}</tr></thead>
+                    <tbody>
+                      {projects.map(p => (
+                        <tr key={p.id} class="border-b hover:bg-slate-50">
+                          <td class="p-2.5 font-bold text-blue-700 font-mono">{p.id}</td><td class="p-2.5 font-semibold">{p.name}</td><td class="p-2.5">{p.location || '-'}</td>
+                          <td class="p-2.5 font-bold text-slate-700">{(Number(p.budget)||0).toLocaleString()} ج.م</td>
+                          <td class="p-2.5"><span class="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-lg text-[10px]">{p.status || 'جاري'}</span></td>
+                          {isAdmin && <td class="p-2.5 text-center"><button onClick={()=>deleteItem('projects', p.id, projects)} class="text-rose-500">🗑️</button></td>}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 7. جدول الدفعات */}
+            {activeTab === "payments" && (
+              <div class="space-y-3.5">
+                {isAdmin && (
+                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
+                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💰 تسجيل دفعة عميل</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const targetProj = cleanId(selectedProjId);
+                      const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: Number(newPay.amount), createdBy: user.name};
+                      const updated = [newItem, ...payments];
+                      setPayments(updated);
+                      if (db) db.ref('payments').set(updated);
+                      setNewPay({date: todayDate, amount: "", paymentMethod: "كاش", notes: ""});
+                      showToast("تم تسجيل الدفعة بنجاح! 💵");
+                    }} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                      <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
+                      <div><label class="block font-bold mb-1">المبلغ</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-emerald-600 bg-emerald-50" required/></div>
+                      <div class="sm:col-span-3"><label class="block font-bold mb-1">البيان</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded-xl p-2" placeholder="دفعة تحت الحساب..."/></div>
+                      <div class="sm:col-span-3"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ الدفعة</button></div>
+                    </form>
+                  </div>
+                )}
+                <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
+                  <table class="w-full text-right">
+                    <thead><tr class="bg-slate-100 text-slate-600"><th class="p-2.5">التاريخ</th><th class="p-2.5">المشروع</th><th class="p-2.5">المبلغ</th><th class="p-2.5">البيان</th><th class="p-2.5">بواسطة</th>{isAdmin && <th class="p-2.5">حذف</th>}</tr></thead>
+                    <tbody>{payments.map((p) => (
+                      <tr key={p.id} class="border-b hover:bg-slate-50"><td class="p-2.5 text-slate-600">{p.date}</td><td class="p-2.5 font-bold text-blue-700">{p.projectId}</td><td class="p-2.5 text-emerald-600 font-bold">{(p.amount || 0).toLocaleString()}</td><td class="p-2.5">{p.notes}</td><td class="p-2.5 text-slate-500">{p.createdBy || '-'}</td>{isAdmin && <td class="p-2.5"><button onClick={()=>deleteItem('payments',p.id,payments)} class="text-rose-500">🗑️</button></td>}</tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 8. جدول المستخلصات */}
+            {activeTab === "extracts" && (
+              <div class="space-y-3.5">
+                {isAdmin && (
+                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
                     <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">📄 اعتماد مستخلص أعمال</h3>
                     <form onSubmit={(e) => {
                       e.preventDefault();
@@ -769,155 +973,24 @@
                       <div class="sm:col-span-2"><button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المستخلص</button></div>
                     </form>
                   </div>
-
-                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
-                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💰 تسجيل دفعة عميل</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const targetProj = cleanId(selectedProjId);
-                      const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: Number(newPay.amount), createdBy: user.name};
-                      const updated = [newItem, ...payments];
-                      setPayments(updated);
-                      if (db) db.ref('payments').set(updated);
-                      setNewPay({date: todayDate, amount: "", paymentMethod: "كاش", notes: ""});
-                      showToast("تم تسجيل الدفعة بنجاح! 💵");
-                    }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                      <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-1">المبلغ</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-emerald-600 bg-emerald-50" required/></div>
-                      <div class="sm:col-span-2"><label class="block font-bold mb-1">البيان</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded-xl p-2" placeholder="دفعة تحت الحساب..."/></div>
-                      <div class="sm:col-span-2"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ الدفعة</button></div>
-                    </form>
+                )}
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto print-area text-xs">
+                  <div class="flex justify-between items-center mb-4 print-hidden">
+                    <h3 class="font-bold text-slate-800 text-sm">سجل المستخلصات المعتمدة</h3>
+                    <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨️ طباعة المستخلص كـ PDF</button>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* 4. جدول المشاريع */}
-            {activeTab === "projects" && (
-              <div class="space-y-3.5">
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
-                  <h3 class="font-bold mb-2.5 border-b pb-1.5 text-xs sm:text-sm">📁 إضافة مشروع جديد</h3>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!newProj.id || !newProj.name) return;
-                    const clean = cleanId(newProj.id);
-                    const projectToAdd = { ...newProj, id: clean, budget: Number(newProj.budget) || 0, createdBy: user.name };
-                    const updatedProjects = [...projects, projectToAdd];
-                    setProjects(updatedProjects);
-                    if (db) db.ref('projects').set(updatedProjects);
-                    setSelectedProjId(clean);
-                    setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
-                    showToast(`تمت إضافة المشروع (${clean}) بنجاح!`);
-                  }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
-                    <div><label class="block font-bold mb-1">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded-xl p-2 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required /></div>
-                    <div><label class="block font-bold mb-1">اسم العميل</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded-xl p-2" required /></div>
-                    <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded-xl p-2" /></div>
-                    <div><label class="block font-bold mb-1">الميزانية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded-xl p-2 text-blue-700 font-bold" placeholder="500000" /></div>
-                    <div><label class="block font-bold mb-1">تاريخ البدء</label><input type="date" value={newProj.startDate} onChange={e=>setNewProj({...newProj, startDate: e.target.value})} class="w-full border rounded-xl p-2" /></div>
-                    <div><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl transition">➕ حفظ المشروع</button></div>
-                  </form>
-                </div>
-                <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
-                  <table class="w-full text-right">
-                    <thead><tr class="bg-slate-100 text-slate-700"><th class="p-2.5">الكود</th><th class="p-2.5">العميل</th><th class="p-2.5">الموقع</th><th class="p-2.5">الميزانية</th><th class="p-2.5">الحالة</th>{isAdmin && <th class="p-2.5 text-center">إجراء</th>}</tr></thead>
-                    <tbody>
-                      {projects.map(p => (
-                        <tr key={p.id} class="border-b hover:bg-slate-50">
-                          <td class="p-2.5 font-bold text-blue-700 font-mono">{p.id}</td><td class="p-2.5 font-semibold">{p.name}</td><td class="p-2.5">{p.location || '-'}</td>
-                          <td class="p-2.5 font-bold text-slate-700">{(Number(p.budget)||0).toLocaleString()} ج.م</td>
-                          <td class="p-2.5"><span class="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-lg text-[10px]">{p.status || 'جاري'}</span></td>
-                          {isAdmin && <td class="p-2.5 text-center"><button onClick={()=>deleteItem('projects', p.id, projects)} class="text-rose-500">🗑</button></td>}
-                        </tr>
-                      ))}
-                    </tbody>
+                  <table class="w-full text-right border-collapse border border-slate-300">
+                    <thead><tr class="bg-slate-200 text-slate-800"><th class="p-2 border border-slate-300">التاريخ</th><th class="p-2 border border-slate-300">رقم المستخلص</th><th class="p-2 border border-slate-300">بيان الأعمال</th><th class="p-2 border border-slate-300 text-center">الكمية</th><th class="p-2 border border-slate-300 text-center">الفئة</th><th class="p-2 border border-slate-300 text-center">الإجمالي</th><th class="p-2 border border-slate-300 text-center">الاستقطاع</th><th class="p-2 border border-slate-300 text-center">الصافي</th>{isAdmin && <th class="p-2 print-hidden border text-center">حذف</th>}</tr></thead>
+                    <tbody>{projExtracts.map((ex, i) => (
+                      <tr key={ex.id} class="hover:bg-slate-50"><td class="p-2 border border-slate-300">{ex.date}</td><td class="p-2 border border-slate-300 font-bold">{ex.extractNo}</td><td class="p-2 border border-slate-300">{ex.workDescription}</td><td class="p-2 border border-slate-300 text-center">{ex.quantity}</td><td class="p-2 border border-slate-300 text-center">{ex.unitPrice}</td><td class="p-2 border border-slate-300 text-center font-bold">{ex.totalWork.toLocaleString()}</td><td class="p-2 border border-slate-300 text-center text-rose-600">{ex.deductions}</td><td class="p-2 border border-slate-300 text-center font-black text-indigo-700 bg-indigo-50">{ex.net.toLocaleString()}</td>{isAdmin && <td class="p-2 print-hidden border text-center"><button onClick={() => deleteItem('extracts', ex.id, extracts)} class="text-rose-500">🗑️</button></td>}</tr>
+                    ))}</tbody>
+                    <tfoot><tr class="bg-slate-800 text-white font-bold"><td class="p-2.5 text-left" colSpan="7">إجمالي المستخلصات:</td><td class="p-2.5 text-center text-sm" colSpan={isAdmin ? 2 : 1}>{totalWorkNet.toLocaleString()} ج.م</td></tr></tfoot>
                   </table>
                 </div>
               </div>
             )}
 
-            {/* 5. جدول الدفعات */}
-            {activeTab === "payments" && (
-              <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
-                <table class="w-full text-right">
-                  <thead><tr class="bg-slate-100 text-slate-600"><th class="p-2.5">التاريخ</th><th class="p-2.5">المشروع</th><th class="p-2.5">المبلغ</th><th class="p-2.5">البيان</th><th class="p-2.5">بواسطة</th>{isAdmin && <th class="p-2.5">حذف</th>}</tr></thead>
-                  <tbody>{payments.map((p) => (
-                    <tr key={p.id} class="border-b hover:bg-slate-50"><td class="p-2.5 text-slate-600">{p.date}</td><td class="p-2.5 font-bold text-blue-700">{p.projectId}</td><td class="p-2.5 text-emerald-600 font-bold">{(p.amount || 0).toLocaleString()}</td><td class="p-2.5">{p.notes}</td><td class="p-2.5 text-slate-500">{p.createdBy || '-'}</td>{isAdmin && <td class="p-2.5"><button onClick={()=>deleteItem('payments',p.id,payments)} class="text-rose-500">🗑️</button></td>}</tr>
-                  ))}</tbody>
-                </table>
-              </div>
-            )}
-
-            {/* 6. جدول المستخلصات */}
-            {activeTab === "extracts" && (
-              <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto print-area text-xs">
-                <div class="flex justify-between items-center mb-4 print-hidden">
-                  <h3 class="font-bold text-slate-800 text-sm">سجل المستخلصات المعتمدة</h3>
-                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨️ طباعة المستخلص كـ PDF</button>
-                </div>
-                <div class="flex justify-between items-center border-b-2 border-slate-800 pb-3 mb-3">
-                  <div>
-                    <h2 class="text-xl font-black text-slate-900">مستخلص أعمال تنفيذي</h2>
-                    <p class="text-slate-600 font-bold mt-1 text-[11px]">العميل: {currentProj.name} | المشروع: {selectedProjId}</p>
-                  </div>
-                  {settings.logo && <img src={settings.logo} class="h-14 object-contain"/>}
-                </div>
-                <table class="w-full text-right border-collapse border border-slate-300">
-                  <thead><tr class="bg-slate-200 text-slate-800"><th class="p-2 border border-slate-300">التاريخ</th><th class="p-2 border border-slate-300">رقم المستخلص</th><th class="p-2 border border-slate-300">بيان الأعمال</th><th class="p-2 border border-slate-300 text-center">الكمية</th><th class="p-2 border border-slate-300 text-center">الفئة</th><th class="p-2 border border-slate-300 text-center">الإجمالي</th><th class="p-2 border border-slate-300 text-center">الاستقطاع</th><th class="p-2 border border-slate-300 text-center">الصافي</th>{isAdmin && <th class="p-2 print-hidden border text-center">حذف</th>}</tr></thead>
-                  <tbody>{projExtracts.map((ex, i) => (
-                    <tr key={ex.id} class="hover:bg-slate-50"><td class="p-2 border border-slate-300">{ex.date}</td><td class="p-2 border border-slate-300 font-bold">{ex.extractNo}</td><td class="p-2 border border-slate-300">{ex.workDescription}</td><td class="p-2 border border-slate-300 text-center">{ex.quantity}</td><td class="p-2 border border-slate-300 text-center">{ex.unitPrice}</td><td class="p-2 border border-slate-300 text-center font-bold">{ex.totalWork.toLocaleString()}</td><td class="p-2 border border-slate-300 text-center text-rose-600">{ex.deductions}</td><td class="p-2 border border-slate-300 text-center font-black text-indigo-700 bg-indigo-50">{ex.net.toLocaleString()}</td>{isAdmin && <td class="p-2 print-hidden border text-center"><button onClick={() => deleteItem('extracts', ex.id, extracts)} class="text-rose-500">🗑️</button></td>}</tr>
-                  ))}</tbody>
-                  <tfoot><tr class="bg-slate-800 text-white font-bold"><td class="p-2.5 text-left" colSpan="7">إجمالي المستخلصات:</td><td class="p-2.5 text-center text-sm" colSpan={isAdmin ? 2 : 1}>{totalWorkNet.toLocaleString()} ج.م</td></tr></tfoot>
-                </table>
-              </div>
-            )}
-
-            {/* 7. جدول المصروفات */}
-            {activeTab === "expenses" && (
-              <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
-                <table class="w-full text-right border-collapse">
-                  <thead>
-                    <tr class="bg-slate-100 text-slate-700 border-b">
-                      <th class="p-2.5">التاريخ</th>
-                      <th class="p-2.5">المشروع</th>
-                      <th class="p-2.5">البند (رئيسي / فرعي)</th>
-                      <th class="p-2.5">الوصف / البيان</th>
-                      <th class="p-2.5 text-center">الكمية</th>
-                      <th class="p-2.5 text-center">الفئة (السعر)</th>
-                      <th class="p-2.5 text-center">الإجمالي</th>
-                      <th class="p-2.5">المورد</th>
-                      <th class="p-2.5">الدفع</th>
-                      <th class="p-2.5">الفاتورة</th>
-                      <th class="p-2.5">بواسطة</th>
-                      {isAdmin && <th class="p-2.5 text-center">حذف</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expenses.map((e) => (
-                      <tr key={e.id} class="border-b hover:bg-slate-50">
-                        <td class="p-2.5 text-slate-600 whitespace-nowrap">{e.date}</td>
-                        <td class="p-2.5 font-bold text-blue-700 font-mono">{e.projectId}</td>
-                        <td class="p-2.5 font-semibold">{e.mainCategory} - {e.subCategory}</td>
-                        <td class="p-2.5 text-slate-700 max-w-[200px] truncate" title={e.description || ""}>{e.description || '-'}</td>
-                        <td class="p-2.5 text-center font-bold">{e.quantity || 1}</td>
-                        <td class="p-2.5 text-center font-mono">{(Number(e.unitPrice) || Number(e.amount)).toLocaleString()}</td>
-                        <td class="p-2.5 text-center font-black text-rose-600 font-mono">{(Number(e.amount) || 0).toLocaleString()} ج.م</td>
-                        <td class="p-2.5 text-slate-600">{e.supplier || '-'}</td>
-                        <td class="p-2.5"><span class={`px-1.5 py-0.5 rounded-lg text-[10px] ${e.paymentMethod === 'خصم من العهدة' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200' : 'bg-slate-100 text-slate-600'}`}>{e.paymentMethod} {e.custodyEmployee && `(${e.custodyEmployee})`}</span></td>
-                        <td class="p-2.5">
-                          {e.receiptImg ? (
-                            <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold hover:bg-blue-100">عرض 🖼️</button>
-                          ) : <span class="text-slate-400">لا يوجد</span>}
-                        </td>
-                        <td class="p-2.5 text-slate-500 whitespace-nowrap">{e.createdBy || '-'}</td>
-                        {isAdmin && <td class="p-2.5 text-center"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500 hover:text-rose-700">🗑️</button></td>}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* 8. كشف الحساب الشامل */}
+            {/* 9. كشف الحساب الشامل (للإدارة فقط) */}
             {activeTab === "statement" && isAdmin && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm print-area text-xs">
                 <div class="flex justify-between items-center mb-4 border-b pb-3 print-hidden">
@@ -972,7 +1045,7 @@
                   </div>
 
                   <div>
-                    <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">3. بيان تفصيلي بجميع المصروفات والفواتير المنفذة في الموقع</h4>
+                    <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">3. بيان تفصيلي بالمصروفات</h4>
                     <div class="overflow-x-auto">
                       <table class="w-full text-right border border-slate-300">
                         <thead>
@@ -984,11 +1057,10 @@
                             <th class="p-1.5 border text-center">الفئة</th>
                             <th class="p-1.5 border text-center">الإجمالي</th>
                             <th class="p-1.5 border">المورد</th>
-                            <th class="p-1.5 border">طريقة السداد</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {projExpenses.length === 0 ? <tr><td colSpan="8" class="text-center p-3 text-slate-400">لا توجد مصروفات مسجلة</td></tr> :
+                          {projExpenses.length === 0 ? <tr><td colSpan="7" class="text-center p-3 text-slate-400">لا توجد مصروفات مسجلة</td></tr> :
                           projExpenses.map(e => (
                             <tr key={e.id} class="hover:bg-slate-50">
                               <td class="p-1.5 border text-slate-600">{e.date}</td>
@@ -998,7 +1070,6 @@
                               <td class="p-1.5 border text-center">{(Number(e.unitPrice) || Number(e.amount)).toLocaleString()}</td>
                               <td class="p-1.5 border text-center font-black text-rose-600">{(Number(e.amount) || 0).toLocaleString()}</td>
                               <td class="p-1.5 border text-slate-600">{e.supplier || '-'}</td>
-                              <td class="p-1.5 border">{e.paymentMethod} {e.custodyEmployee && `(${e.custodyEmployee})`}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1006,7 +1077,7 @@
                           <tr class="bg-slate-200 font-bold">
                             <td colSpan="5" class="p-1.5 text-left border">إجمالي المصروفات المنفذة للمشروع:</td>
                             <td class="p-1.5 text-center border font-black text-rose-700">{totalCost.toLocaleString()} ج.م</td>
-                            <td colSpan="2" class="border"></td>
+                            <td class="border"></td>
                           </tr>
                         </tfoot>
                       </table>
@@ -1016,10 +1087,10 @@
               </div>
             )}
 
-            {/* 9. سجل الدخول (متاح للمدير العام فقط) */}
+            {/* 10. سجل الدخول (خاص بالمدير العام فقط) */}
             {activeTab === "audit_log" && isDirector && (
               <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
-                <h3 class="font-bold text-slate-800 mb-2.5 border-b pb-2">🛡️ سجل دخول المستخدمين (خاص بالمدير العام)</h3>
+                <h3 class="font-bold text-slate-800 mb-2.5 border-b pb-2">🛡️ سجل دخول المستخدمين</h3>
                 <div class="overflow-x-auto">
                   <table class="w-full text-right">
                     <thead><tr class="bg-slate-100 text-slate-700 border-b"><th class="p-2.5">المستخدم</th><th class="p-2.5">المعرف</th><th class="p-2.5">الرتبة</th><th class="p-2.5">الجهاز</th><th class="p-2.5">الوقت</th></tr></thead>
@@ -1041,7 +1112,7 @@
               </div>
             )}
 
-            {/* 10. الإعدادات */}
+            {/* 11. الإعدادات */}
             {activeTab === "settings" && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs max-w-xl">
                 <h3 class="font-bold mb-3 text-sm">🖼️ شعار الشركة المعتمد للمستندات والتقارير</h3>
