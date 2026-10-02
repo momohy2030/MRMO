@@ -1,6 +1,6 @@
 {
-  "name": "MOMOHY ERP - إدارة المعاملات",
-  "short_name": "MOMOHY ERP",
+  "name": "Survey - إدارة المعاملات",
+  "short_name": "Survey",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8fafc",
