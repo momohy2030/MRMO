@@ -54,13 +54,11 @@
       measurementId: "G-N9DW5R28H0"
     };
 
-    // حساب المدير العام صاحب الصلاحية المطلقة بما فيها سجل الدخول
     const DIRECTOR_EMAILS = [
       "mohamedmohy676676@gmail.com",
       "+201000000000"
     ];
 
-    // حساب مهندس المشاريع (صلاحيات كاملة عدا سجل الدخول)
     const ENGINEER_EMAILS = [
       "mesahaforconsultant@gmail.com"
     ];
@@ -190,7 +188,12 @@
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
 
       useEffect(() => { setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId })); }, [nextSuggestedProjectId]);
-      useEffect(() => { if (userRole === "Staff" && myEmpName && !newExp.custodyEmployee) { setNewExp(prev => ({ ...prev, custodyEmployee: myEmpName })); } }, [userRole, myEmpName]);
+      useEffect(() => { 
+        if (myEmpName) {
+          if (!newExp.custodyEmployee) setNewExp(prev => ({ ...prev, custodyEmployee: myEmpName }));
+          if (!newAdv.employeeName) setNewAdv(prev => ({ ...prev, employeeName: myEmpName }));
+        }
+      }, [myEmpName]);
 
       const showToast = (message, type = "success") => { setToast({ show: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3500); };
 
@@ -208,7 +211,6 @@
           if (currentUser) {
             const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase();
             
-            // التفريق الدقيق بين المدير العام ومهندس المشاريع
             const isManager = DIRECTOR_EMAILS.some(id => identifier.includes(id.toLowerCase()));
             const isEng = ENGINEER_EMAILS.some(id => identifier.includes(id.toLowerCase()));
             const hasFullAccess = isManager || isEng;
@@ -400,7 +402,12 @@
       const projExpLabels = Object.keys(projExpMap);
       const projExpData = Object.values(projExpMap);
 
-      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || e.mainCategory === searchMainCat) && (searchSubCat === "" || e.subCategory === searchSubCat) && (searchCostType === "" || e.costType === searchCostType); });
+      // محرك البحث الدقيق
+      const filteredSearchExpenses = projExpenses.filter(e => { 
+        return (searchMainCat === "" || e.mainCategory === searchMainCat) && 
+               (searchSubCat === "" || e.subCategory === searchSubCat) && 
+               (searchCostType === "" || e.costType === searchCostType); 
+      });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
       const getCustodyStats = (empName) => {
@@ -411,7 +418,6 @@
 
       const activeEmployeesCustody = settings.employees.map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
-      // تبويبات التنقل: حجب سجل الدخول عن مهندس المشاريع وإتاحته للمدير العام فقط
       const getNavTabs = () => {
         const tabs = [];
         if (isAdmin) {
@@ -432,7 +438,6 @@
           tabs.push({ id: "statement", label: "كشف حساب", icon: "📑" });
         }
 
-        // سجل الدخول (Audit Log) للمدير العام فقط دون مهندس المشاريع
         if (isDirector) {
           tabs.push({ id: "audit_log", label: "الدخول", icon: "🛡️" });
         }
@@ -447,12 +452,11 @@
           <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 print-hidden border-b border-slate-800">
             <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
               <div class="flex items-center gap-2.5">
-                <span class="text-2xl p-1 bg-blue-600/30 rounded-xl">🏗️️</span>
+                <span class="text-2xl p-1 bg-blue-600/30 rounded-xl">🏗️</span>
                 <div>
                   <h1 class="text-sm sm:text-base font-black leading-tight">إدارة المعاملات الإنشائية</h1>
                   <div class="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">
                     <span class="truncate max-w-[130px] sm:max-w-none">{user.name}</span>
-                    
                     {isDirector ? (
                       <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">👑 مدير النظام</span>
                     ) : isProjectEng ? (
@@ -545,8 +549,33 @@
                   <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span><div class={`text-base font-black mt-1 ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{netProfit.toLocaleString()} ج.م</div></div>
                 </div>
 
+                {/* محرك البحث الدقيق والفلترة في لوحة التحكم */}
+                <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs mt-2">
+                  <h3 class="font-bold text-indigo-900 mb-3 flex items-center gap-1.5 border-b pb-2">
+                    <span>🔍</span> محرك البحث والفلترة الدقيقة لمصروفات المشروع النشط
+                  </h3>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="border border-slate-300 rounded-xl p-2.5 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-400">
+                      <option value="">كل البنود الرئيسية</option>
+                      {settings.mainCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="border border-slate-300 rounded-xl p-2.5 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-400">
+                      <option value="">كل البنود الفرعية</option>
+                      {settings.subCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="border border-slate-300 rounded-xl p-2.5 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-400">
+                      <option value="">كل أنواع التكلفة</option>
+                      {settings.costTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div class="bg-indigo-50 border border-indigo-200 text-indigo-900 px-4 py-3 rounded-xl flex justify-between items-center font-bold">
+                    <span>إجمالي المصروفات المطابقة للبحث:</span>
+                    <span class="text-base font-black text-indigo-700">{filteredSearchTotal.toLocaleString()} ج.م</span>
+                  </div>
+                </div>
+
                 {activeEmployeesCustody.length > 0 && (
-                  <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
+                  <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs mt-2">
                     <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">💼 حالة العهد والسلف للموظفين (المشروع النشط)</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {activeEmployeesCustody.map(emp => (
@@ -594,38 +623,41 @@
               </div>
             )}
 
-            {/* 3. إدخال البيانات */}
+            {/* 3. إدخال البيانات (متاح للجميع) */}
             {activeTab === "add_data" && (
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-                {isAdmin && (
-                  <div class="bg-emerald-50 p-4 sm:p-5 rounded-2xl border border-emerald-200 shadow-sm lg:col-span-2">
-                    <h3 class="font-bold text-emerald-900 mb-3 border-b border-emerald-200 pb-2 text-xs sm:text-sm">💵 تسليم عهدة مالية / سلفة لموظف</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if(!newAdv.employeeName || !newAdv.amount) return;
-                      const targetProj = cleanId(selectedProjId);
-                      const newItem = { id: Date.now(), projectId: targetProj, ...newAdv, amount: Number(newAdv.amount), createdBy: user.name };
-                      const updated = [newItem, ...advances];
-                      setAdvances(updated);
-                      if(db) db.ref('advances').set(updated);
-                      setNewAdv({ date: todayDate, employeeName: "", amount: "", notes: "" });
-                      showToast(`تم تسجيل العهدة للموظف بنجاح!`);
-                    }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
-                      <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold" required/></div>
-                      <div class="sm:col-span-1">
-                        <label class="block font-bold mb-1">اسم الموظف المستلم</label>
-                        <div class="flex gap-1">
-                          <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold" required><option value="">اختر...</option>{settings.employees.map(c => <option key={c}>{c}</option>)}</select>
-                          <button type="button" onClick={()=>handleAddNewSettingItem('employees', settings.employees, 'موظف مستلم')} class="bg-emerald-200 text-emerald-800 px-3 rounded-xl font-black text-lg hover:bg-emerald-300 transition">+</button>
-                        </div>
+                
+                {/* نموذج تسليم واستلام العهدة متاح للموظف والإدارة على السواء بدون قيود */}
+                <div class="bg-emerald-50 p-4 sm:p-5 rounded-2xl border border-emerald-200 shadow-sm lg:col-span-2">
+                  <h3 class="font-bold text-emerald-900 mb-3 border-b border-emerald-200 pb-2 text-xs sm:text-sm flex items-center gap-1.5">
+                    <span>💵</span> تسجيل استلام / تسليم عهدة مالية أو سلفة
+                  </h3>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if(!newAdv.employeeName || !newAdv.amount) return;
+                    const targetProj = cleanId(selectedProjId);
+                    const newItem = { id: Date.now(), projectId: targetProj, ...newAdv, amount: Number(newAdv.amount), createdBy: user.name };
+                    const updated = [newItem, ...advances];
+                    setAdvances(updated);
+                    if(db) db.ref('advances').set(updated);
+                    setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" });
+                    showToast(`تم تسجيل العهدة بنجاح!`);
+                  }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold bg-white" required/></div>
+                    <div class="sm:col-span-1">
+                      <label class="block font-bold mb-1">اسم الموظف المستلم للعهدة</label>
+                      <div class="flex gap-1">
+                        <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold bg-white" required><option value="">اختر...</option>{settings.employees.map(c => <option key={c}>{c}</option>)}</select>
+                        <button type="button" onClick={()=>handleAddNewSettingItem('employees', settings.employees, 'موظف مستلم')} class="bg-emerald-200 text-emerald-800 px-3 rounded-xl font-black text-lg hover:bg-emerald-300 transition">+</button>
                       </div>
-                      <div><label class="block font-bold mb-1">المبلغ (ج.م)</label><input type="number" step="any" value={newAdv.amount} onChange={e=>setNewAdv({...newAdv, amount: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 bg-white font-black text-emerald-700" required/></div>
-                      <div><label class="block font-bold mb-1">البيان (اختياري)</label><input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="عهدة لشراء خامات..." class="w-full border border-emerald-300 rounded-xl p-2"/></div>
-                      <div class="sm:col-span-4"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ العهدة في حساب الموظف</button></div>
-                    </form>
-                  </div>
-                )}
+                    </div>
+                    <div><label class="block font-bold mb-1">المبلغ (ج.م)</label><input type="number" step="any" value={newAdv.amount} onChange={e=>setNewAdv({...newAdv, amount: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 bg-white font-black text-emerald-700" placeholder="مثال: 5000" required/></div>
+                    <div><label class="block font-bold mb-1">البيان (اختياري)</label><input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="سلفة شخصية، عهدة خامات..." class="w-full border border-emerald-300 rounded-xl p-2 bg-white"/></div>
+                    <div class="sm:col-span-4"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">تأكيد استلام / حفظ العهدة</button></div>
+                  </form>
+                </div>
 
+                {/* نموذج تسجيل المصروف */}
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
                   <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة</h3>
                   <form onSubmit={(e) => {
@@ -760,7 +792,7 @@
               </div>
             )}
 
-            {/* 4. جدول المشاريع (متاح للجميع) */}
+            {/* 4. جدول المشاريع */}
             {activeTab === "projects" && (
               <div class="space-y-3.5">
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
@@ -794,7 +826,7 @@
                           <td class="p-2.5 font-bold text-blue-700 font-mono">{p.id}</td><td class="p-2.5 font-semibold">{p.name}</td><td class="p-2.5">{p.location || '-'}</td>
                           <td class="p-2.5 font-bold text-slate-700">{(Number(p.budget)||0).toLocaleString()} ج.م</td>
                           <td class="p-2.5"><span class="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-lg text-[10px]">{p.status || 'جاري'}</span></td>
-                          {isAdmin && <td class="p-2.5 text-center"><button onClick={()=>deleteItem('projects', p.id, projects)} class="text-rose-500">🗑️</button></td>}
+                          {isAdmin && <td class="p-2.5 text-center"><button onClick={()=>deleteItem('projects', p.id, projects)} class="text-rose-500">🗑</button></td>}
                         </tr>
                       ))}
                     </tbody>
@@ -803,7 +835,7 @@
               </div>
             )}
 
-            {/* 5. جدول الدفعات (متاح للجميع) */}
+            {/* 5. جدول الدفعات */}
             {activeTab === "payments" && (
               <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
                 <table class="w-full text-right">
@@ -815,7 +847,7 @@
               </div>
             )}
 
-            {/* 6. جدول المستخلصات (متاح للجميع) */}
+            {/* 6. جدول المستخلصات */}
             {activeTab === "extracts" && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto print-area text-xs">
                 <div class="flex justify-between items-center mb-4 print-hidden">
@@ -839,7 +871,7 @@
               </div>
             )}
 
-            {/* 7. جدول المصروفات (متاح للجميع) */}
+            {/* 7. جدول المصروفات */}
             {activeTab === "expenses" && (
               <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
                 <table class="w-full text-right border-collapse">
@@ -885,7 +917,7 @@
               </div>
             )}
 
-            {/* 8. كشف الحساب الشامل (للإدارة: المدير العام ومهندس المشاريع) */}
+            {/* 8. كشف الحساب الشامل */}
             {activeTab === "statement" && isAdmin && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm print-area text-xs">
                 <div class="flex justify-between items-center mb-4 border-b pb-3 print-hidden">
@@ -984,7 +1016,7 @@
               </div>
             )}
 
-            {/* 9. سجل الدخول (متاح للمدير العام فقط دون مهندس المشاريع) */}
+            {/* 9. سجل الدخول (متاح للمدير العام فقط) */}
             {activeTab === "audit_log" && isDirector && (
               <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
                 <h3 class="font-bold text-slate-800 mb-2.5 border-b pb-2">🛡️ سجل دخول المستخدمين (خاص بالمدير العام)</h3>
