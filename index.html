@@ -4,9 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>إدارة المعاملات الإنشائية</title>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f172a">
-  <link rel="apple-touch-icon" href="icon-192.png">
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -18,6 +15,11 @@
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
+
+  <!-- PWA Links -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="apple-touch-icon" href="icon-192.png">
 
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -87,7 +89,6 @@
 
     const cleanId = (id) => (id ? String(id).trim().toLowerCase().replace(/[.#$\[\]\/]/g, "-") : "");
 
-    // مكون الرسوم البيانية مع معالجة التداخل ومنع الطفح
     function DashboardCharts({ allWork, allExp, allPay, projExpLabels, projExpData, projName }) {
       const chart1Ref = useRef(null);
       const chart2Ref = useRef(null);
@@ -105,11 +106,7 @@
               labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'],
               datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#4f46e5', '#e11d48', '#10b981'], borderRadius: 6 }]
             },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } }
-            }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
           });
         }
         if (chart2Ref.current) {
@@ -119,20 +116,7 @@
               labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'],
               datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }]
             },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'bottom',
-                  labels: {
-                    boxWidth: 8,
-                    padding: 6,
-                    font: { size: 9, family: 'Cairo' }
-                  }
-                }
-              }
-            }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, padding: 6, font: { size: 9, family: 'Cairo' } } } } }
           });
         }
         return () => {
@@ -311,6 +295,33 @@
         return () => { rootRef.off('value', handleValue); };
       }, [user]);
 
+      // دالة إضافة بند جديد للخيارات من قبل أي مستخدم
+      const handleAddNewSettingItem = (settingKey, currentArray, title) => {
+        const newVal = window.prompt(`أدخل ${title} جديد لإضافته للقائمة:` , "");
+        if (newVal && newVal.trim() !== "") {
+          const cleanVal = newVal.trim();
+          
+          if (currentArray.includes(cleanVal)) {
+            showToast(`هذا البند موجود مسبقاً!`, "error");
+            return;
+          }
+          
+          const updatedArray = [...currentArray, cleanVal];
+          
+          // تحديث الحالة محلياً وقاعدة البيانات
+          setSettings(prev => ({ ...prev, [settingKey]: updatedArray }));
+          if (db) db.ref(`settings/${settingKey}`).set(updatedArray);
+          
+          // الاختيار التلقائي للبند الجديد في النموذج
+          if (settingKey === 'mainCategories') setNewExp(prev => ({...prev, mainCategory: cleanVal}));
+          if (settingKey === 'subCategories') setNewExp(prev => ({...prev, subCategory: cleanVal}));
+          if (settingKey === 'costTypes') setNewExp(prev => ({...prev, costType: cleanVal}));
+          if (settingKey === 'suppliers') setNewExp(prev => ({...prev, supplier: cleanVal}));
+
+          showToast(`تم إضافة "${cleanVal}" بنجاح!`);
+        }
+      };
+
       const handleGoogleLogin = () => {
         setLoginError("");
         const provider = new firebase.auth.GoogleAuthProvider();
@@ -485,7 +496,6 @@
       return (
         <div class="min-h-screen pb-24 md:pb-10">
           
-          {/* Header نظيف ومتوافق مع الهواتف */}
           <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 print-hidden border-b border-slate-800">
             <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
               <div class="flex items-center gap-2.5">
@@ -516,7 +526,6 @@
               </div>
             </div>
 
-            {/* شريط التبويبات لسطح المكتب فقط */}
             <div class="hidden md:flex bg-slate-800/90 border-t border-slate-700 px-4 py-1.5 overflow-x-auto scrollbar-hide gap-1 text-xs">
               {[
                 { id: "dashboard", label: "📊 لوحة التحكم" },
@@ -536,7 +545,6 @@
             </div>
           </header>
 
-          {/* القائمة الجانبية المنبثقة (Drawer) */}
           {drawerOpen && (
             <div class="fixed inset-0 z-50 flex">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onClick={() => setDrawerOpen(false)}></div>
@@ -574,7 +582,6 @@
             </div>
           )}
 
-          {/* بطاقة المشروع النشط المتجاوبة */}
           {["dashboard", "add_data", "statement"].includes(activeTab) && (
             <div class="print-hidden max-w-7xl mx-auto px-4 mt-3.5">
               <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
@@ -611,10 +618,8 @@
                   </div>
                 )}
 
-                {/* الرسوم البيانية مع فاصل حماية لمنع التداخل */}
                 <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
 
-                {/* المربعات الإحصائية الأربعة */}
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                   <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span><div class="text-base font-black text-slate-800 mt-1">{totalWorkNet.toLocaleString()} ج.م</div></div>
                   <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي المصروفات</span><div class="text-base font-black text-rose-600 mt-1">{totalCost.toLocaleString()} ج.م</div></div>
@@ -639,6 +644,7 @@
 
             {activeTab === "add_data" && (
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+                {/* قسم تسجيل المصروفات المحدث بأزرار الإضافة السريعة */}
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
                   <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة</h3>
                   <form onSubmit={(e) => {
@@ -653,11 +659,42 @@
                     setNewExp({...newExp, quantity: 1, unitPrice: "", date: todayDate, receiptImg: ""});
                     showToast(`تم حفظ المصروف للمشروع (${selectedProjId}) بنجاح!`);
                   }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    
                     <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
-                    <div><label class="block font-bold mb-1">البند الرئيسي</label><select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border rounded-xl p-2" required><option value="">اختر...</option>{settings.mainCategories.map(c => <option key={c}>{c}</option>)}</select></div>
-                    <div><label class="block font-bold mb-1">البند الفرعي</label><select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border rounded-xl p-2" required><option value="">اختر...</option>{settings.subCategories.map(c => <option key={c}>{c}</option>)}</select></div>
-                    <div><label class="block font-bold mb-1">نوع التكلفة</label><select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border rounded-xl p-2"><option value="">اختر...</option>{settings.costTypes.map(c => <option key={c}>{c}</option>)}</select></div>
-                    <div><label class="block font-bold mb-1">المورد</label><select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border rounded-xl p-2"><option value="">اختر...</option>{settings.suppliers.map(c => <option key={c}>{c}</option>)}</select></div>
+                    
+                    {/* القوائم المنسدلة مع أزرار الإضافة الجديدة (+) */}
+                    <div>
+                      <label class="block font-bold mb-1">البند الرئيسي</label>
+                      <div class="flex gap-1">
+                        <select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border rounded-xl p-2" required><option value="">اختر...</option>{settings.mainCategories.map(c => <option key={c}>{c}</option>)}</select>
+                        <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label class="block font-bold mb-1">البند الفرعي</label>
+                      <div class="flex gap-1">
+                        <select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border rounded-xl p-2" required><option value="">اختر...</option>{settings.subCategories.map(c => <option key={c}>{c}</option>)}</select>
+                        <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="block font-bold mb-1">نوع التكلفة</label>
+                      <div class="flex gap-1">
+                        <select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border rounded-xl p-2"><option value="">اختر...</option>{settings.costTypes.map(c => <option key={c}>{c}</option>)}</select>
+                        <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="block font-bold mb-1">المورد</label>
+                      <div class="flex gap-1">
+                        <select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border rounded-xl p-2"><option value="">اختر...</option>{settings.suppliers.map(c => <option key={c}>{c}</option>)}</select>
+                        <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>
+                      </div>
+                    </div>
+
                     <div><label class="block font-bold mb-1">طريقة الدفع</label><select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} class="w-full border rounded-xl p-2"><option>كاش</option><option>تحويل بنكي</option><option>شيك</option></select></div>
                     <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/></div>
                     <div><label class="block font-bold mb-1">سعر الوحدة</label><input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/></div>
@@ -982,19 +1019,6 @@
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
-  </script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(registration => {
-            console.log('تم تشغيل Service Worker بنجاح:', registration.scope);
-          })
-          .catch(error => {
-            console.log('فشل تشغيل Service Worker:', error);
-          });
-      });
-    }
   </script>
 </body>
 </html>
