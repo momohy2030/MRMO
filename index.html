@@ -55,6 +55,10 @@
       "+201000000000"
     ];
 
+    const ENGINEER_IDENTIFIERS = [
+      "mesahaforconsultant@gmail.com"
+    ];
+
     let db = null;
     let auth = null;
     try {
@@ -80,6 +84,7 @@
 
     const cleanId = (id) => (id ? String(id).trim().toLowerCase().replace(/[.#$\[\]\/]/g, "-") : "");
 
+    // مكون الرسوم البيانية مع معالجة التداخل ومنع الطفح
     function DashboardCharts({ allWork, allExp, allPay, projExpLabels, projExpData, projName }) {
       const chart1Ref = useRef(null);
       const chart2Ref = useRef(null);
@@ -97,7 +102,11 @@
               labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'],
               datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#4f46e5', '#e11d48', '#10b981'], borderRadius: 6 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } }
+            }
           });
         }
         if (chart2Ref.current) {
@@ -107,7 +116,20 @@
               labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'],
               datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Cairo' } } } } }
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    boxWidth: 8,
+                    padding: 6,
+                    font: { size: 9, family: 'Cairo' }
+                  }
+                }
+              }
+            }
           });
         }
         return () => {
@@ -117,14 +139,14 @@
       }, [allWork, allExp, allPay, projExpLabels.join(','), projExpData.join(',')]);
 
       return (
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-3.5">
-          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm h-64 flex flex-col">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm h-72 flex flex-col overflow-hidden">
             <h4 class="font-bold text-slate-700 mb-2 text-center text-xs">📈 الموقف المالي العام للشركة</h4>
-            <div class="flex-1 relative w-full"><canvas ref={chart1Ref}></canvas></div>
+            <div class="relative w-full flex-1 min-h-0"><canvas ref={chart1Ref}></canvas></div>
           </div>
-          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm h-64 flex flex-col">
-            <h4 class="font-bold text-slate-700 mb-2 text-center text-xs">📊 توزيع تكلفة ({projName})</h4>
-            <div class="flex-1 relative w-full"><canvas ref={chart2Ref}></canvas></div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm h-72 flex flex-col overflow-hidden">
+            <h4 class="font-bold text-slate-700 mb-2 text-center text-xs truncate px-2">📊 توزيع تكلفة ({projName})</h4>
+            <div class="relative w-full flex-1 min-h-0"><canvas ref={chart2Ref}></canvas></div>
           </div>
         </div>
       );
@@ -132,7 +154,9 @@
 
     function App() {
       const [user, setUser] = useState(null);
+      const [userRole, setUserRole] = useState("Staff");
       const [isAdmin, setIsAdmin] = useState(false);
+      const [isEngineer, setIsEngineer] = useState(false);
       const [authLoading, setAuthLoading] = useState(true);
       const [loginMethod, setLoginMethod] = useState("choose");
       const [phoneNumber, setPhoneNumber] = useState("");
@@ -151,7 +175,6 @@
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
       const [activeTab, setActiveTab] = useState("dashboard");
       
-      // التنبيهات المنبثقة العصرية (Toasts)
       const [toast, setToast] = useState({ show: false, message: "", type: "success" });
       const [activeInvoiceModal, setActiveInvoiceModal] = useState(null);
       const [drawerOpen, setDrawerOpen] = useState(false);
@@ -188,7 +211,7 @@
         setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3500);
       };
 
-      const recordLoginLog = (currentUser, adminStatus) => {
+      const recordLoginLog = (currentUser, roleName) => {
         if (!db) return;
         const now = new Date();
         const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -196,7 +219,7 @@
           uid: currentUser.uid,
           name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم",
           identifier: currentUser.email || currentUser.phoneNumber || "غير محدد",
-          role: adminStatus ? "مدير النظام (Admin)" : "موظف (Staff)",
+          role: roleName,
           device: isMobile ? "📱 هاتف محمول" : "💻 كمبيوتر",
           timestamp: now.toISOString(),
           formattedDate: now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG')
@@ -208,23 +231,36 @@
         if (!auth) { setAuthLoading(false); return; }
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           if (currentUser) {
-            const identifier = currentUser.email || currentUser.phoneNumber || "";
-            const adminCheck = ADMIN_IDENTIFIERS.some(id => identifier.toLowerCase().includes(id.toLowerCase())) || currentUser.email === "mohamedmohy676676@gmail.com";
+            const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase();
             
+            let detectedRole = "موظف (Staff)";
+            let adminCheck = ADMIN_IDENTIFIERS.some(id => identifier.includes(id.toLowerCase())) || currentUser.email === "mohamedmohy676676@gmail.com";
+            let engineerCheck = ENGINEER_IDENTIFIERS.some(id => identifier.includes(id.toLowerCase())) || currentUser.email === "mesahaforconsultant@gmail.com";
+
+            if (adminCheck) {
+              detectedRole = "مدير النظام (Admin)";
+            } else if (engineerCheck) {
+              detectedRole = "مهندس المشاريع (Engineer)";
+            }
+
             setUser({
               uid: currentUser.uid,
               name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق",
               identifier: identifier
             });
             setIsAdmin(adminCheck);
+            setIsEngineer(engineerCheck);
+            setUserRole(detectedRole);
 
             if (!sessionStorage.getItem('login_recorded')) {
-              recordLoginLog(currentUser, adminCheck);
+              recordLoginLog(currentUser, detectedRole);
               sessionStorage.setItem('login_recorded', 'true');
             }
           } else {
             setUser(null);
             setIsAdmin(false);
+            setIsEngineer(false);
+            setUserRole("Staff");
             sessionStorage.removeItem('login_recorded');
           }
           setAuthLoading(false);
@@ -333,7 +369,7 @@
 
       const deleteItem = (path, id, list) => {
         if (!isAdmin) {
-          showToast("الحذف مصرح لمدير النظام فقط 🔒", "error");
+          showToast("خاصية الحذف مصرحة لمدير النظام فقط 🔒", "error");
           return;
         }
         if (window.confirm("هل أنت متأكد من الحذف نهائياً؟")) {
@@ -454,8 +490,15 @@
                 <div>
                   <h1 class="text-sm sm:text-base font-black leading-tight">إدارة المعاملات الإنشائية</h1>
                   <div class="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">
-                    <span class="truncate max-w-[140px] sm:max-w-none">{user.name}</span>
-                    {isAdmin && <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">👑 مدير</span>}
+                    <span class="truncate max-w-[130px] sm:max-w-none">{user.name}</span>
+                    
+                    {isAdmin ? (
+                      <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">👑 مدير النظام</span>
+                    ) : isEngineer ? (
+                      <span class="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">📐 مهندس المشاريع</span>
+                    ) : (
+                      <span class="bg-slate-700/50 text-slate-300 px-1.5 py-0.2 rounded text-[10px]">موظف</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -528,7 +571,7 @@
             </div>
           )}
 
-          {/* إعادة هيكلة بطاقة المشروع النشط (Responsive Stack) */}
+          {/* بطاقة المشروع النشط المتجاوبة */}
           {["dashboard", "add_data", "statement"].includes(activeTab) && (
             <div class="print-hidden max-w-7xl mx-auto px-4 mt-3.5">
               <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
@@ -552,7 +595,7 @@
 
           <main class="max-w-7xl mx-auto px-4 mt-3.5">
             {activeTab === "dashboard" && (
-              <div class="space-y-3.5">
+              <div class="space-y-4">
                 {projBudget > 0 && (
                   <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
                     <div class="flex justify-between items-center mb-1.5 font-bold">
@@ -565,13 +608,15 @@
                   </div>
                 )}
 
+                {/* الرسوم البيانية مع فاصل حماية لمنع التداخل */}
                 <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
 
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
-                  <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span><div class="text-base font-black text-slate-800 mt-0.5">{totalWorkNet.toLocaleString()} ج.م</div></div>
-                  <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي المصروفات</span><div class="text-base font-black text-rose-600 mt-0.5">{totalCost.toLocaleString()} ج.م</div></div>
-                  <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span><div class={`text-base font-black mt-0.5 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div></div>
-                  <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">مديونية العميل</span><div class={`text-base font-black mt-0.5 ${clientDebt > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{clientDebt.toLocaleString()} ج.م</div></div>
+                {/* المربعات الإحصائية الأربعة */}
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span><div class="text-base font-black text-slate-800 mt-1">{totalWorkNet.toLocaleString()} ج.م</div></div>
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي المصروفات</span><div class="text-base font-black text-rose-600 mt-1">{totalCost.toLocaleString()} ج.م</div></div>
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span><div class={`text-base font-black mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div></div>
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">مديونية العميل</span><div class={`text-base font-black mt-1 ${clientDebt > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{clientDebt.toLocaleString()} ج.م</div></div>
                 </div>
 
                 <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-300 text-xs">
@@ -851,7 +896,17 @@
                   <table class="w-full text-right">
                     <thead><tr class="bg-slate-100 text-slate-700 border-b"><th class="p-2.5">المستخدم</th><th class="p-2.5">المعرف</th><th class="p-2.5">الرتبة</th><th class="p-2.5">الجهاز</th><th class="p-2.5">الوقت</th></tr></thead>
                     <tbody>{loginLogs.map((log, i) => (
-                      <tr key={i} class="border-b hover:bg-slate-50"><td class="p-2.5 font-bold">{log.name}</td><td class="p-2.5 font-mono text-slate-600">{log.identifier}</td><td class="p-2.5"><span class={`px-2 py-0.5 rounded-lg ${log.role.includes("Admin") ? "bg-amber-100 text-amber-800 font-bold" : "bg-slate-100"}`}>{log.role}</span></td><td class="p-2.5">{log.device}</td><td class="p-2.5 text-slate-500 font-mono">{log.formattedDate}</td></tr>
+                      <tr key={i} class="border-b hover:bg-slate-50">
+                        <td class="p-2.5 font-bold">{log.name}</td>
+                        <td class="p-2.5 font-mono text-slate-600">{log.identifier}</td>
+                        <td class="p-2.5">
+                          <span class={`px-2 py-0.5 rounded-lg font-bold ${log.role.includes("Admin") ? "bg-amber-100 text-amber-800" : log.role.includes("Engineer") ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-700"}`}>
+                            {log.role}
+                          </span>
+                        </td>
+                        <td class="p-2.5">{log.device}</td>
+                        <td class="p-2.5 text-slate-500 font-mono">{log.formattedDate}</td>
+                      </tr>
                     ))}</tbody>
                   </table>
                 </div>
@@ -878,7 +933,7 @@
             )}
           </main>
 
-          {/* شريط التنقل السفلي للهواتف الذكية (Bottom Navigation Bar) */}
+          {/* شريط التنقل السفلي للهواتف الذكية */}
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-lg z-40 px-2 py-1.5 flex justify-around items-center">
             {navTabs.map(tab => (
               <button 
@@ -897,7 +952,7 @@
             </button>
           </nav>
 
-          {/* نافذة التنبيهات المنبثقة التفاعلية (Toast Notification) */}
+          {/* نافذة التنبيهات المنبثقة التفاعلية */}
           {toast.show && (
             <div class="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
               <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
