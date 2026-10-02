@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إدارة المعاملات الإنشائية</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- SheetJS -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    @media print {
+      body { background-color: white; }
+      .print-hidden { display: none !important; }
+      .print-area { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; }
+    }
+  </style>
+</head>
+<body class="text-slate-800">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // --- إعدادات ربط Firebase ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyDHjQTNfAh3wQ8tSOXOIewJNXaDCHADrR8",
+      authDomain: "mrmo-d8760.firebaseapp.com",
+      databaseURL: "https://mrmo-d8760-default-rtdb.firebaseio.com",
+      projectId: "mrmo-d8760",
+      storageBucket: "mrmo-d8760.firebasestorage.app",
+      messagingSenderId: "510855132508",
+      appId: "1:510855132508:web:feee377429a2d88c277d99",
+      measurementId: "G-N9DW5R28H0"
+    };
+
+    let db = null;
+    let auth = null;
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      db = firebase.database();
+      auth = firebase.auth();
+      // إعداد لغة الرسائل القصيرة SMS لتكون بالعربية
+      auth.useDeviceLanguage(); 
+    } catch (e) { console.error("Firebase init error:", e); }
+
+    const initialProjects = [{"id": "PRJ-01", "name": "مشروع تجريبي", "location": "الموقع", "startDate": "", "deliveryDate": "", "status": "جاري العمل", "createdBy": "النظام"}];
+    const initialSettings = {
+      mainCategories: ["مباني", "صبة خرسانه", "كهرباء", "سباكة", "محارة", "نقاشة"],
+      subCategories: ["طوب", "اسمنت", "رملة", "عمالة", "الاكل", "نجار", "حداد", "خلاطة"],
+      costTypes: ["مصنعيات", "بضاعة/مواد", "أكل", "مواصلات", "إيجار معدات", "نثريات وإكراميات"],
+      suppliers: ["مورد الأسمنت", "مورد الرمل", "مقاول النجارة", "مصنع الطوب"],
+      logo: ""
+    };
+
+    // --- مكون الرسوم البيانية ---
+    function DashboardCharts({ allWork, allExp, allPay, projExpLabels, projExpData, projName }) {
+      const chart1Ref = useRef(null);
+      const chart2Ref = useRef(null);
+      const chart1Instance = useRef(null);
+      const chart2Instance = useRef(null);
+
+      useEffect(() => {
+        if (chart1Instance.current) chart1Instance.current.destroy();
+        if (chart2Instance.current) chart2Instance.current.destroy();
+
+        if (chart1Ref.current) {
+          chart1Instance.current = new Chart(chart1Ref.current, {
+            type: 'bar',
+            data: {
+              labels: ['قيمة الأعمال (مستخلصات)', 'إجمالي المصروفات', 'إجمالي التحصيلات'],
+              datasets: [{
+                label: 'الموقف المالي العام (ج.م)',
+                data: [allWork, allExp, allPay],
+                backgroundColor: ['#4f46e5', '#e11d48', '#10b981'],
+                borderRadius: 6
+              }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+          });
+        }
+
+        if (chart2Ref.current) {
+          chart2Instance.current = new Chart(chart2Ref.current, {
+            type: 'doughnut',
+            data: {
+              labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'],
+              datasets: [{
+                data: projExpData.length ? projExpData : [1],
+                backgroundColor: projExpData.length ? ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0']
+              }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {font: {family: 'Cairo'}} } } }
+          });
+        }
+
+        return () => {
+          if (chart1Instance.current) chart1Instance.current.destroy();
+          if (chart2Instance.current) chart2Instance.current.destroy();
+        };
+      }, [allWork, allExp, allPay, projExpLabels.join(','), projExpData.join(',')]);
+
+      return (
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm h-80 flex flex-col">
+            <h4 class="font-bold text-slate-700 mb-4 text-center">📈 معدل الأعمال العام للشركة</h4>
+            <div class="flex-1 relative w-full"><canvas ref={chart1Ref}></canvas></div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm h-80 flex flex-col">
+            <h4 class="font-bold text-slate-700 mb-4 text-center">📊 توزيع مصروفات المشروع ({projName})</h4>
+            <div class="flex-1 relative w-full"><canvas ref={chart2Ref}></canvas></div>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      // --- حالات المصادقة (Auth State) ---
+      const [user, setUser] = useState(null);
+      const [authChecking, setAuthChecking] = useState(true);
+      const [authMode, setAuthMode] = useState('login'); // 'login', 'register', 'phone', 'verify_otp'
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [phoneNumber, setPhoneNumber] = useState('+20');
+      const [otpCode, setOtpCode] = useState('');
+      const [authError, setAuthError] = useState('');
+
+      const [loading, setLoading] = useState(true);
+      const [projects, setProjects] = useState(initialProjects);
+      const [expenses, setExpenses] = useState([]);
+      const [extracts, setExtracts] = useState([]);
+      const [payments, setPayments] = useState([]);
+      const [settings, setSettings] = useState(initialSettings);
+      
+      const [selectedProjId, setSelectedProjId] = useState("PRJ-01");
+      const [activeTab, setActiveTab] = useState("dashboard");
+      const [alertMsg, setAlertMsg] = useState("");
+
+      const [searchMainCat, setSearchMainCat] = useState("");
+      const [searchSubCat, setSearchSubCat] = useState("");
+      const [searchCostType, setSearchCostType] = useState("");
+
+      const todayDate = new Date().toISOString().split('T')[0];
+
+      const [newProj, setNewProj] = useState({ id: "", name: "", location: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
+      const [newExp, setNewExp] = useState({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", quantity: 1, unitPrice: "", paymentMethod: "كاش" });
+      const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "كاش", notes: "" });
+      const [newExt, setNewExt] = useState({ date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: "" });
+
+      // الاستماع لتغير حالة الدخول
+      useEffect(() => {
+        if(!auth) return;
+        const unsubscribe = auth.onAuthStateChanged((u) => {
+          setUser(u);
+          setAuthChecking(false);
+          if(!u) setLoading(false);
+        });
+        return () => unsubscribe();
+      }, []);
+
+      // --- دوال تسجيل الدخول ---
+      
+      // 1. الدخول بالإيميل والباسورد
+      const handleEmailAuth = (e) => {
+        e.preventDefault();
+        setAuthError("");
+        if (authMode === 'login') {
+          auth.signInWithEmailAndPassword(email, password)
+            .catch(err => setAuthError("بيانات الدخول غير صحيحة، أو الحساب غير موجود."));
+        } else {
+          auth.createUserWithEmailAndPassword(email, password)
+            .catch(err => setAuthError("حدث خطأ! تأكد أن كلمة المرور قوية وأن الإيميل غير مستخدم مسبقاً."));
+        }
+      };
+
+      // 2. الدخول بواسطة جوجل (Google Sign-In)
+      const handleGoogleLogin = () => {
+        setAuthError("");
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(err => {
+          setAuthError("لم يتم تسجيل الدخول بواسطة جوجل. " + err.message);
+        });
+      };
+
+      // 3. إعداد Recaptcha لرقم الهاتف
+      const setupRecaptcha = () => {
+        if (!window.recaptchaVerifier) {
+          window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+            'size': 'invisible'
+          });
+        }
+      };
+
+      // 4. إرسال كود الهاتف SMS
+      const handleSendPhoneCode = (e) => {
+        e.preventDefault();
+        setAuthError("");
+        setupRecaptcha();
+        const appVerifier = window.recaptchaVerifier;
+        
+        auth.signInWithPhoneNumber(phoneNumber, appVerifier)
+          .then((confirmationResult) => {
+            window.confirmationResult = confirmationResult;
+            setAuthMode('verify_otp');
+          }).catch((error) => {
+            setAuthError("فشل إرسال الرمز. تأكد من كتابة الرقم بصيغة دولية صحيحة (مثال: +201012345678)");
+            if(window.recaptchaVerifier) window.recaptchaVerifier.render().then(w => window.recaptchaVerifier.reset());
+          });
+      };
+
+      // 5. تأكيد كود الهاتف OTP
+      const handleVerifyOTP = (e) => {
+        e.preventDefault();
+        setAuthError("");
+        window.confirmationResult.confirm(otpCode).then((result) => {
+          // تم الدخول بنجاح
+        }).catch((error) => {
+          setAuthError("الرمز الذي أدخلته غير صحيح.");
+        });
+      };
+
+      // المزامنة اللحظية مع قاعدة البيانات
+      useEffect(() => {
+        if (!user) return;
+        setLoading(true);
+
+        const timer = setTimeout(() => setLoading(false), 3000);
+        const rootRef = db.ref('/');
+
+        const handleValue = (snapshot) => {
+          clearTimeout(timer);
+          try {
+            const data = snapshot.val() || {};
+            const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
+
+            const loadedProjects = toArr(data.projects);
+            const finalProjects = loadedProjects.length > 0 ? loadedProjects : initialProjects;
+            setProjects(finalProjects);
+
+            setExpenses([...toArr(data.expenses)].reverse());
+            setExtracts([...toArr(data.extracts)].reverse());
+            setPayments([...toArr(data.payments)].reverse());
+
+            const savedSettings = data.settings || {};
+            setSettings({
+              mainCategories: toArr(savedSettings.mainCategories).length ? toArr(savedSettings.mainCategories) : initialSettings.mainCategories,
+              subCategories: toArr(savedSettings.subCategories).length ? toArr(savedSettings.subCategories) : initialSettings.subCategories,
+              costTypes: toArr(savedSettings.costTypes).length ? toArr(savedSettings.costTypes) : initialSettings.costTypes,
+              suppliers: toArr(savedSettings.suppliers).length ? toArr(savedSettings.suppliers) : initialSettings.suppliers,
+              logo: savedSettings.logo || ""
+            });
+
+            setSelectedProjId(prev => prev || (finalProjects[0]?.id || "PRJ-01"));
+          } catch (err) {
+            console.error("Data parsing error:", err);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        rootRef.on('value', handleValue, (error) => {
+          console.error("Firebase Read Error:", error);
+          clearTimeout(timer);
+          setLoading(false);
+          if(error.code === 'PERMISSION_DENIED') {
+            showAlert("خطأ في الصلاحيات! يرجى التأكد من قواعد قاعدة البيانات.");
+          }
+        });
+
+        return () => { clearTimeout(timer); rootRef.off('value', handleValue); };
+      }, [user]);
+
+      const showAlert = (msg) => { setAlertMsg(msg); setTimeout(() => setAlertMsg(""), 4000); };
+
+      const handleLogoUpload = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const base64Logo = evt.target.result;
+          if (db) db.ref('settings/logo').set(base64Logo);
+          setSettings(prev => ({ ...prev, logo: base64Logo }));
+          showAlert("تم رفع وتحديث شعار الشركة بنجاح! 🖼️");
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const promptAddNew = (type, label) => {
+        const newVal = window.prompt(`أدخل ${label} الجديد:\n(سيتم حفظه ومزامنته للجميع تلقائياً)`);
+        if (newVal && newVal.trim() !== "") {
+          const val = newVal.trim();
+          const currentList = settings[type] || [];
+          const updatedList = Array.from(new Set([...currentList, val]));
+          if (db) db.ref(`settings/${type}`).set(updatedList);
+          setSettings(prev => ({ ...prev, [type]: updatedList }));
+          return val;
+        }
+        return null;
+      };
+
+      const deleteItem = (path, id, list) => {
+        if (window.confirm("هل أنت متأكد من حذف هذا السجل نهائياً؟")) {
+          const newList = list.filter(item => item.id !== id);
+          if (db) db.ref(path).set(newList);
+          if (path === 'expenses') setExpenses(newList);
+          if (path === 'extracts') setExtracts(newList);
+          if (path === 'payments') setPayments(newList);
+          if (path === 'projects') setProjects(newList);
+          showAlert("تم الحذف بنجاح! 🗑");
+        }
+      };
+
+      const exportToExcel = () => {
+        const wb = XLSX.utils.book_new();
+        const wsProjects = XLSX.utils.json_to_sheet(projects.map(p => ({ 'كود المشروع': p.id, 'اسم العميل': p.name, 'موقع العمل': p.location, 'تاريخ البدء': p.startDate, 'تاريخ التسليم المتوقع': p.deliveryDate, 'حالة المشروع': p.status, 'بواسطة': p.createdBy || 'مجهول' }))); XLSX.utils.book_append_sheet(wb, wsProjects, "دليل المشاريع");
+        const wsExpenses = XLSX.utils.json_to_sheet(expenses.map(e => ({ 'التاريخ': e.date, 'كود المشروع': e.projectId, 'البند الرئيسي': e.mainCategory, 'البند الفرعي': e.subCategory, 'نوع التكلفة': e.costType, 'الوصف/المورد': e.supplier, 'الكمية': e.quantity || 1, 'سعر الوحدة': e.unitPrice || e.amount, 'الإجمالي': e.amount, 'طريقة الدفع': e.paymentMethod, 'بواسطة': e.createdBy || 'مجهول' }))); XLSX.utils.book_append_sheet(wb, wsExpenses, "المصروفات والتكاليف");
+        const wsExtracts = XLSX.utils.json_to_sheet(extracts.map(ex => ({ 'التاريخ': ex.date || '-', 'كود المشروع': ex.projectId, 'رقم المستخلص': ex.extractNo, 'بيان الأعمال': ex.workDescription || 'أعمال منفذة', 'الكمية': ex.quantity || 1, 'الفئة (السعر)': ex.unitPrice || ex.totalWork, 'قيمة الأعمال': ex.totalWork, 'الاستقطاعات': ex.deductions, 'الصافي (المستحق)': ex.net, 'بواسطة': ex.createdBy || 'مجهول' }))); XLSX.utils.book_append_sheet(wb, wsExtracts, "المستخلصات وقيمة الأعمال");
+        const wsPayments = XLSX.utils.json_to_sheet(payments.map(p => ({ 'التاريخ': p.date, 'كود المشروع': p.projectId, 'المبلغ المستلم': p.amount, 'طريقة الدفع': p.paymentMethod, 'البيان': p.notes, 'بواسطة': p.createdBy || 'مجهول' }))); XLSX.utils.book_append_sheet(wb, wsPayments, "دفعات العملاء");
+        const fileName = `MOMOHY_ERP_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        showAlert("تم تصدير البيانات إلى ملف إكسل بنجاح! 📥");
+      };
+
+      // شاشة فحص المصادقة (Loading)
+      if (authChecking) {
+        return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold text-xl">جاري التحقق من الهوية...</div>;
+      }
+
+      // شاشات تسجيل الدخول 
+      if (!user) {
+        return (
+          <div class="min-h-screen flex items-center justify-center bg-slate-900 px-4">
+            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center">
+              <div class="bg-blue-100 text-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🔒</div>
+              <h2 class="text-2xl font-black text-slate-800 mb-2">إدارة المعاملات الإنشائية</h2>
+              <p class="text-slate-500 text-sm mb-6 font-semibold">بوابة الدخول الموحدة للموظفين</p>
+              
+              {authError && <div class="bg-rose-100 text-rose-700 p-2 rounded mb-4 text-xs font-bold">{authError}</div>}
+              
+              {/* نموذج الإيميل */}
+              {(authMode === 'login' || authMode === 'register') && (
+                <form onSubmit={handleEmailAuth}>
+                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="البريد الإلكتروني" class="w-full border-2 border-slate-200 p-3 rounded-lg mb-4 text-center font-bold outline-none focus:border-blue-500" required dir="ltr" />
+                  <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="كلمة المرور" class="w-full border-2 border-slate-200 p-3 rounded-lg mb-4 text-center font-bold outline-none focus:border-blue-500" required dir="ltr" />
+                  <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition">
+                    {authMode === 'login' ? 'دخول بالإيميل' : 'إنشاء حساب جديد'}
+                  </button>
+                  <div class="mt-3 text-sm font-bold text-slate-500">
+                    {authMode === 'login' ? (
+                      <p>ليس لديك حساب؟ <button type="button" onClick={()=>{setAuthMode('register'); setAuthError('');}} class="text-blue-600 hover:underline">أنشئ حساباً</button></p>
+                    ) : (
+                      <p>لديك حساب بالفعل؟ <button type="button" onClick={()=>{setAuthMode('login'); setAuthError('');}} class="text-blue-600 hover:underline">تسجيل الدخول</button></p>
+                    )}
+                  </div>
+                </form>
+              )}
+
+              {/* نموذج رقم الهاتف */}
+              {authMode === 'phone' && (
+                <form onSubmit={handleSendPhoneCode}>
+                  <p class="text-xs text-slate-500 mb-2 font-bold">يجب إدخال كود الدولة (مثال: +20 لمصر)</p>
+                  <input type="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)} placeholder="+201xxxxxxxxx" class="w-full border-2 border-slate-200 p-3 rounded-lg mb-4 text-center font-bold outline-none focus:border-emerald-500" required dir="ltr" />
+                  <div id="recaptcha-container"></div>
+                  <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-md transition">
+                    إرسال كود التفعيل SMS
+                  </button>
+                </form>
+              )}
+
+              {/* نموذج إدخال رمز التحقق OTP */}
+              {authMode === 'verify_otp' && (
+                <form onSubmit={handleVerifyOTP}>
+                  <p class="text-sm text-slate-600 mb-4 font-bold">تم إرسال رسالة لرقمك، أدخل الرمز أدناه:</p>
+                  <input type="text" value={otpCode} onChange={e=>setOtpCode(e.target.value)} placeholder="رمز التحقق (OTP)" class="w-full border-2 border-emerald-500 p-3 rounded-lg mb-4 text-center font-bold outline-none text-2xl tracking-widest" required dir="ltr" />
+                  <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-md transition">
+                    تأكيد الدخول
+                  </button>
+                </form>
+              )}
+
+              {/* أزرار طرق الدخول الأخرى */}
+              {authMode !== 'verify_otp' && (
+                <div class="mt-6 border-t pt-4">
+                  <p class="text-xs text-slate-400 mb-3">أو استخدم طرق الدخول التالية</p>
+                  <div class="flex flex-col gap-2">
+                    <button onClick={handleGoogleLogin} type="button" class="w-full bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition">
+                      <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google" /> دخول بحساب جوجل
+                    </button>
+                    {authMode !== 'phone' && (
+                      <button onClick={()=>{setAuthMode('phone'); setAuthError('');}} type="button" class="w-full bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2 rounded-lg transition">
+                        📱 الدخول برقم الهاتف
+                      </button>
+                    )}
+                    {authMode === 'phone' && (
+                      <button onClick={()=>{setAuthMode('login'); setAuthError('');}} type="button" class="w-full bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2 rounded-lg transition">
+                        ✉️ الرجوع للدخول بالإيميل
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+        );
+      }
+
+      // شاشة التحميل لجلب البيانات
+      if (loading) {
+        return (
+          <div class="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+            <div class="text-4xl animate-bounce mb-4">☁️</div>
+            <h1 class="text-2xl font-bold">جاري جلب البيانات الآمنة...</h1>
+            <p class="text-slate-400 mt-2">لحظات ويتم تجهيز الشاشة</p>
+          </div>
+        );
+      }
+
+      // استخراج اسم المستخدم بناءً على طريقة دخوله (جوجل، إيميل، أو رقم هاتف)
+      const userDisplayName = user.displayName || (user.email ? user.email.split('@')[0] : user.phoneNumber) || "مستخدم موثق";
+
+      // تجهيز الإحصائيات
+      const currentProj = projects.find(p => p.id === selectedProjId) || projects[0] || {};
+      const projExpenses = expenses.filter(e => e.projectId === selectedProjId);
+      const projExtracts = extracts.filter(e => e.projectId === selectedProjId);
+      const projPayments = payments.filter(p => p.projectId === selectedProjId);
+
+      const totalWorkNet = projExtracts.reduce((sum, item) => sum + (Number(item.net) || 0), 0);
+      const totalCost = projExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      const totalReceived = projPayments.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      const netProfit = totalWorkNet - totalCost;
+      const clientDebt = totalWorkNet - totalReceived;
+
+      const allWork = extracts.reduce((sum, item) => sum + (Number(item.totalWork) || 0), 0);
+      const allExp = expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      const allPay = payments.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+      const projExpMap = {};
+      projExpenses.forEach(e => {
+        const cat = e.mainCategory || 'غير محدد';
+        projExpMap[cat] = (projExpMap[cat] || 0) + (Number(e.amount) || 0);
+      });
+      const projExpLabels = Object.keys(projExpMap);
+      const projExpData = Object.values(projExpMap);
+
+      const filteredSearchExpenses = projExpenses.filter(e => {
+        return (searchMainCat === "" || e.mainCategory === searchMainCat) &&
+               (searchSubCat === "" || e.subCategory === searchSubCat) &&
+               (searchCostType === "" || e.costType === searchCostType);
+      });
+      const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+      return (
+        <div class="min-h-screen pb-12">
+          {/* Header */}
+          <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30 print-hidden">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+              <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2 rounded-xl text-xl font-bold">🏗</div>
+                <div>
+                  <h1 class="text-xl font-extrabold tracking-wide">إدارة المعاملات الإنشائية</h1>
+                  <p class="text-xs text-slate-300 mt-1 flex items-center gap-2">
+                    الموظف: <span class="text-emerald-400 font-bold">{userDisplayName}</span> 
+                    <button onClick={() => auth.signOut()} class="bg-rose-600 hover:bg-rose-500 px-2 py-0.5 rounded text-[10px] font-bold transition">تسجيل خروج</button>
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onClick={exportToExcel} class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow-sm transition">
+                  📤 تصدير إلى إكسل
+                </button>
+              </div>
+            </div>
+            
+            {/* Tabs */}
+            <div class="bg-slate-800 border-t border-slate-700">
+              <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto py-2 scrollbar-hide">
+                {[
+                  { id: "dashboard", label: "📊 لوحة التحكم" },
+                  { id: "add_data", label: "➕ إدخال بيانات" },
+                  { id: "projects", label: "📁 المشاريع" },
+                  { id: "expenses", label: "💸 المصروفات" },
+                  { id: "payments", label: "💰 الدفعات" },
+                  { id: "extracts", label: "📄 المستخلصات" },
+                  { id: "settings", label: "⚙️ الإعدادات" }
+                ].map(t => (
+                  <button key={t.id} onClick={() => setActiveTab(t.id)}
+                    class={`px-3 py-2 text-sm font-semibold rounded-lg whitespace-nowrap transition ${activeTab === t.id ? "bg-blue-600 shadow" : "text-slate-300 hover:bg-slate-700"}`}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </header>
+
+          {alertMsg && <div class="print-hidden max-w-md mx-auto mt-4 px-4 py-3 bg-emerald-100 border border-emerald-400 text-emerald-800 rounded-lg text-center shadow font-bold z-40 relative">{alertMsg}</div>}
+
+          {/* Project Selector */}
+          {["dashboard", "add_data"].includes(activeTab) && (
+            <div class="print-hidden max-w-7xl mx-auto px-4 mt-6">
+              <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                  <span class="font-bold text-slate-700 text-sm">المشروع النشط:</span>
+                  <select value={selectedProjId} onChange={(e) => setSelectedProjId(e.target.value)} class="bg-slate-100 border border-slate-300 font-bold text-blue-900 rounded-lg px-3 py-2 outline-none min-w-[200px]">
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
+                  </select>
+                </div>
+                <div class="flex gap-4 text-sm text-slate-600">
+                  <div>العميل: <span class="font-bold text-slate-900">{currentProj.name || '-'}</span></div>
+                  <div>الموقع: <span class="font-bold text-slate-900">{currentProj.location || '-'}</span></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <main class="max-w-7xl mx-auto px-4 mt-6">
+            {/* Dashboard */}
+            {activeTab === "dashboard" && (
+              <div class="space-y-6">
+                <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع الحالي'} />
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm"><span class="text-xs text-slate-500 font-bold">المستخلصات (الصافي)</span><div class="text-xl font-black text-slate-800 mt-1">{totalWorkNet.toLocaleString()}</div></div>
+                  <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm"><span class="text-xs text-slate-500 font-bold">إجمالي المصروفات</span><div class="text-xl font-black text-rose-600 mt-1">{totalCost.toLocaleString()}</div></div>
+                  <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm"><span class="text-xs text-slate-500 font-bold">صافي الربح للمشروع</span><div class={`text-xl font-black mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()}</div></div>
+                  <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm"><span class="text-xs text-slate-500 font-bold">مديونية العميل</span><div class={`text-xl font-black mt-1 ${clientDebt > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{clientDebt.toLocaleString()}</div></div>
+                </div>
+
+                <div class="bg-slate-50 p-5 rounded-xl border border-slate-300 shadow-inner">
+                  <h3 class="font-bold text-indigo-900 mb-4 flex items-center gap-2">🔍 محرك البحث الدقيق للمصروفات</h3>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label class="block text-xs font-bold mb-1 text-slate-600">البند الأساسي</label>
+                      <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="w-full border rounded p-2 text-sm bg-white"><option value="">الكل</option>{settings.mainCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold mb-1 text-slate-600">البند الفرعي</label>
+                      <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="w-full border rounded p-2 text-sm bg-white"><option value="">الكل</option>{settings.subCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold mb-1 text-slate-600">نوع التكلفة</label>
+                      <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="w-full border rounded p-2 text-sm bg-white"><option value="">الكل</option>{settings.costTypes.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                    </div>
+                  </div>
+                  <div class="bg-indigo-100 text-indigo-900 px-4 py-3 rounded-lg flex justify-between items-center font-bold">
+                    <span>إجمالي المطابق:</span><span class="text-xl">{filteredSearchTotal.toLocaleString()} ج.م</span>
+                  </div>
+                  {filteredSearchExpenses.length > 0 && (
+                    <div class="mt-4 max-h-60 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+                      <table class="w-full text-right text-xs">
+                        <thead class="sticky top-0 bg-slate-100"><tr class="text-slate-600"><th class="p-2">التاريخ</th><th class="p-2">البند</th><th class="p-2">المورد</th><th class="p-2">الكمية</th><th class="p-2">السعر</th><th class="p-2">الإجمالي</th><th class="p-2">بواسطة</th></tr></thead>
+                        <tbody>
+                          {filteredSearchExpenses.map((e,i) => (
+                            <tr key={i} class="border-b hover:bg-slate-50"><td class="p-2">{e.date}</td><td class="p-2 font-bold">{e.mainCategory} - {e.subCategory}</td><td class="p-2">{e.supplier}</td><td class="p-2">{e.quantity || 1}</td><td class="p-2">{(e.unitPrice || e.amount).toLocaleString()}</td><td class="p-2 text-rose-600 font-bold">{(e.amount || 0).toLocaleString()}</td><td class="p-2 font-semibold text-slate-500">{e.createdBy || '-'}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Add Data */}
+            {activeTab === "add_data" && (
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                  <h3 class="font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">💸 تسجيل مصروف جديد</h3>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if(!newExp.unitPrice || !newExp.quantity) return;
+                    const totalAmt = Number(newExp.quantity) * Number(newExp.unitPrice);
+                    const newItem = { id: Date.now(), projectId: selectedProjId, ...newExp, amount: totalAmt, createdBy: userDisplayName };
+                    const updated = [newItem, ...expenses];
+                    setExpenses(updated);
+                    if (db) db.ref('expenses').set(updated);
+                    setNewExp({...newExp, quantity: 1, unitPrice: "", date: todayDate});
+                    showAlert("تم تسجيل المصروف بنجاح!");
+                  }} class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div><label class="block font-bold mb-1 text-xs text-blue-700">التاريخ</label><input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} class="w-full border border-blue-300 rounded p-2 font-bold bg-blue-50" required/></div>
+                    <div><label class="block font-bold mb-1 text-xs">البند الرئيسي</label><div class="flex gap-1"><select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border rounded p-2" required><option value="">اختر...</option>{settings.mainCategories.map(c => <option key={c}>{c}</option>)}</select><button type="button" onClick={() => { let v = promptAddNew('mainCategories', 'بند رئيسي'); if(v) setNewExp({...newExp, mainCategory: v}); }} class="bg-slate-200 px-2 rounded">➕</button></div></div>
+                    <div><label class="block font-bold mb-1 text-xs">البند الفرعي</label><div class="flex gap-1"><select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border rounded p-2" required><option value="">اختر...</option>{settings.subCategories.map(c => <option key={c}>{c}</option>)}</select><button type="button" onClick={() => { let v = promptAddNew('subCategories', 'بند فرعي'); if(v) setNewExp({...newExp, subCategory: v}); }} class="bg-slate-200 px-2 rounded">➕</button></div></div>
+                    <div><label class="block font-bold mb-1 text-xs">نوع التكلفة</label><div class="flex gap-1"><select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border rounded p-2"><option value="">اختر...</option>{settings.costTypes.map(c => <option key={c}>{c}</option>)}</select><button type="button" onClick={() => { let v = promptAddNew('costTypes', 'نوع تكلفة'); if(v) setNewExp({...newExp, costType: v}); }} class="bg-slate-200 px-2 rounded">➕</button></div></div>
+                    <div><label class="block font-bold mb-1 text-xs">المورد / المستلم</label><div class="flex gap-1"><select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border rounded p-2"><option value="">اختر...</option>{settings.suppliers.map(c => <option key={c}>{c}</option>)}</select><button type="button" onClick={() => { let v = promptAddNew('suppliers', 'مورد'); if(v) setNewExp({...newExp, supplier: v}); }} class="bg-slate-200 px-2 rounded">➕</button></div></div>
+                    <div><label class="block font-bold mb-1 text-xs">الكمية</label><input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border rounded p-2 font-bold bg-amber-50" required/></div>
+                    <div><label class="block font-bold mb-1 text-xs">سعر الوحدة</label><input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border rounded p-2 font-bold bg-amber-50" required/></div>
+                    <div class="md:col-span-2 bg-rose-50 border border-rose-200 p-3 rounded-lg flex justify-between items-center"><span class="font-bold text-rose-900">إجمالي المصروف:</span><span class="text-xl font-black text-rose-600">{((Number(newExp.quantity)||0) * (Number(newExp.unitPrice)||0)).toLocaleString()} ج.م</span></div>
+                    <div class="md:col-span-2"><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">حفظ المصروف</button></div>
+                  </form>
+                </div>
+
+                <div class="flex flex-col gap-6">
+                  <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-4 border-b pb-2">📄 اعتماد مستخلص أعمال</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const totalWork = Number(newExt.quantity) * Number(newExt.unitPrice);
+                      const net = totalWork - Number(newExt.deductions || 0);
+                      const newItem = { id: Date.now(), projectId: selectedProjId, ...newExt, totalWork, deductions: Number(newExt.deductions||0), net, createdBy: userDisplayName };
+                      const updated = [newItem, ...extracts];
+                      setExtracts(updated);
+                      if (db) db.ref('extracts').set(updated);
+                      setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""});
+                      showAlert("تم حفظ المستخلص!");
+                    }} class="space-y-3 text-sm">
+                      <div class="grid grid-cols-2 gap-3">
+                        <div><label class="block font-bold mb-1 text-xs text-blue-700">التاريخ</label><input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} class="w-full border border-blue-300 rounded p-2 font-bold bg-blue-50" required/></div>
+                        <div><label class="block font-bold mb-1 text-xs">رقم المستخلص</label><input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} class="w-full border rounded p-2" required /></div>
+                        <div class="col-span-2"><label class="block font-bold mb-1 text-xs">بيان الأعمال</label><input type="text" value={newExt.workDescription} onChange={e=>setNewExt({...newExt, workDescription: e.target.value})} class="w-full border rounded p-2" required /></div>
+                        <div><label class="block font-bold mb-1 text-xs">الكمية المنفذة</label><input type="number" step="any" value={newExt.quantity} onChange={e=>setNewExt({...newExt, quantity: e.target.value})} class="w-full border rounded p-2 font-bold bg-indigo-50" required/></div>
+                        <div><label class="block font-bold mb-1 text-xs">فئة / سعر الوحدة</label><input type="number" step="any" value={newExt.unitPrice} onChange={e=>setNewExt({...newExt, unitPrice: e.target.value})} class="w-full border rounded p-2 font-bold bg-indigo-50" required/></div>
+                        <div class="col-span-2"><label class="block font-bold mb-1 text-xs">استقطاعات (إن وجدت)</label><input type="number" step="any" value={newExt.deductions} onChange={e=>setNewExt({...newExt, deductions: e.target.value})} class="w-full border rounded p-2 text-rose-600"/></div>
+                      </div>
+                      <div class="bg-indigo-50 border border-indigo-200 p-3 rounded-lg flex justify-between items-center"><span class="font-bold text-indigo-900">الصافي:</span><span class="text-lg font-black text-indigo-700">{(((Number(newExt.quantity)||0) * (Number(newExt.unitPrice)||0)) - (Number(newExt.deductions)||0)).toLocaleString()} ج.م</span></div>
+                      <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded">حفظ المستخلص</button>
+                    </form>
+                  </div>
+
+                  <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-4 border-b pb-2">💰 تسجيل دفعة عميل</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const newItem = {id: Date.now(), projectId: selectedProjId, ...newPay, amount: Number(newPay.amount), createdBy: userDisplayName};
+                      const updated = [newItem, ...payments];
+                      setPayments(updated);
+                      if (db) db.ref('payments').set(updated);
+                      setNewPay({date: todayDate, amount: "", paymentMethod: "كاش", notes: ""});
+                      showAlert("تم حفظ الدفعة بنجاح!");
+                    }} class="grid grid-cols-2 gap-3 text-sm">
+                      <div><label class="block font-bold mb-1 text-xs text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border border-blue-300 rounded p-2 font-bold bg-blue-50" required/></div>
+                      <div><label class="block font-bold mb-1 text-xs">مبلغ الدفعة</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded p-2 font-bold text-emerald-600 bg-emerald-50" required/></div>
+                      <div class="col-span-2"><label class="block font-bold mb-1 text-xs">البيان</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded p-2" placeholder="دفعة تعاقد..."/></div>
+                      <div class="col-span-2"><button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2 rounded">حفظ الدفعة</button></div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Projects Tab */}
+            {activeTab === "projects" && (
+              <div class="space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                  <h3 class="font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">📁 إضافة مشروع جديد</h3>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newProj.id || !newProj.name) return;
+                    const projectToAdd = { ...newProj, createdBy: userDisplayName };
+                    const updatedProjects = [...projects, projectToAdd];
+                    setProjects(updatedProjects);
+                    if (db) db.ref('projects').set(updatedProjects);
+                    setSelectedProjId(newProj.id);
+                    setNewProj({ id: "", name: "", location: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
+                    showAlert("تم إضافة المشروع الجديد بنجاح!");
+                  }} class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm items-end">
+                    <div><label class="block font-bold mb-1 text-xs">الكود</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded p-2 font-bold bg-slate-50" required /></div>
+                    <div><label class="block font-bold mb-1 text-xs">اسم العميل</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded p-2 bg-slate-50" required /></div>
+                    <div><label class="block font-bold mb-1 text-xs">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded p-2 bg-slate-50" /></div>
+                    <div><label class="block font-bold mb-1 text-xs">تاريخ البدء</label><input type="date" value={newProj.startDate} onChange={e=>setNewProj({...newProj, startDate: e.target.value})} class="w-full border rounded p-2 bg-slate-50" /></div>
+                    <div><label class="block font-bold mb-1 text-xs">تاريخ التسليم</label><input type="date" value={newProj.deliveryDate} onChange={e=>setNewProj({...newProj, deliveryDate: e.target.value})} class="w-full border rounded p-2 bg-slate-50" /></div>
+                    <div><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded shadow">➕ حفظ المشروع</button></div>
+                  </form>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+                  <table class="w-full text-right text-sm">
+                    <thead><tr class="bg-slate-100 text-slate-700"><th class="p-3">الكود</th><th class="p-3">العميل</th><th class="p-3">الموقع</th><th class="p-3">الحالة</th><th class="p-3">بواسطة</th><th class="p-3 text-center">إجراء</th></tr></thead>
+                    <tbody>
+                      {projects.map(p => (
+                        <tr key={p.id} class="border-b hover:bg-slate-50">
+                          <td class="p-3 font-bold text-blue-700">{p.id}</td><td class="p-3 font-semibold">{p.name}</td><td class="p-3">{p.location || '-'}</td>
+                          <td class="p-3"><span class="bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-full text-xs">{p.status || 'جاري العمل'}</span></td><td class="p-3 text-xs font-semibold text-slate-500">{p.createdBy || '-'}</td>
+                          <td class="p-3 text-center"><button onClick={()=>deleteItem('projects', p.id, projects)} class="text-rose-500 hover:text-rose-700 p-1">🗑️</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Expenses Tab */}
+            {activeTab === "expenses" && (
+              <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+                <table class="w-full text-right text-sm">
+                  <thead><tr class="bg-slate-100 text-slate-600"><th class="p-3">التاريخ</th><th class="p-3">المشروع</th><th class="p-3">البيان</th><th class="p-3">المورد</th><th class="p-3">الكمية</th><th class="p-3">السعر</th><th class="p-3">الإجمالي</th><th class="p-3">بواسطة</th><th class="p-3">حذف</th></tr></thead>
+                  <tbody>
+                    {expenses.map((e) => (
+                      <tr key={e.id} class="border-t border-slate-100 hover:bg-slate-50">
+                        <td class="p-3 text-xs font-bold text-slate-600">{e.date}</td><td class="p-3 font-bold text-xs">{e.projectId}</td><td class="p-3">{e.mainCategory} - {e.subCategory}</td><td class="p-3">{e.supplier}</td>
+                        <td class="p-3">{e.quantity || 1}</td><td class="p-3">{(e.unitPrice || e.amount).toLocaleString()}</td>
+                        <td class="p-3 font-bold text-rose-600">{(e.amount || 0).toLocaleString()}</td>
+                        <td class="p-3 font-semibold text-slate-500 text-xs">{e.createdBy || '-'}</td>
+                        <td class="p-3"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500">🗑</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            {/* Payments Tab */}
+            {activeTab === "payments" && (
+              <div class="bg-white rounded-xl border shadow-sm overflow-x-auto">
+                <table class="w-full text-right text-sm">
+                  <thead><tr class="bg-slate-100 text-slate-600"><th class="p-3">التاريخ</th><th class="p-3">المشروع</th><th class="p-3">المبلغ</th><th class="p-3">البيان</th><th class="p-3">بواسطة</th><th class="p-3">حذف</th></tr></thead>
+                  <tbody>{payments.map((p) => (<tr key={p.id} class="border-b"><td class="p-3 text-xs font-bold text-slate-600">{p.date}</td><td class="p-3 font-bold">{p.projectId}</td><td class="p-3 text-emerald-600 font-bold">{(p.amount || 0).toLocaleString()}</td><td class="p-3">{p.notes}</td><td class="p-3 text-slate-500">{p.createdBy || '-'}</td><td class="p-3"><button onClick={()=>deleteItem('payments',p.id,payments)} class="text-rose-500">🗑️</button></td></tr>))}</tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Extracts Tab */}
+            {activeTab === "extracts" && (
+              <div class="bg-white p-8 rounded-xl border border-slate-200 shadow-sm overflow-x-auto print-area">
+                <div class="flex justify-between items-center mb-8 print-hidden">
+                  <h3 class="font-bold text-slate-800 text-lg">سجل المستخلصات المعتمدة (للطباعة)</h3>
+                  <button onClick={() => window.print()} class="bg-slate-800 hover:bg-black text-white px-5 py-2 rounded-lg font-bold shadow-md">🖨️ طباعة كـ PDF</button>
+                </div>
+
+                <div class="flex justify-between items-center border-b-2 border-slate-800 pb-6 mb-6">
+                  <div>
+                    <h2 class="text-3xl font-black text-slate-900">مستخلص أعمال تنفيذي</h2>
+                    <div class="mt-2 text-slate-600 font-bold space-y-1">
+                      <p>اسم العميل: <span class="text-blue-700">{currentProj.name || 'الكل'}</span></p>
+                      <p>المشروع / الموقع: {selectedProjId} - {currentProj.location || '-'}</p>
+                      <p>تاريخ الإصدار: {new Date().toLocaleDateString('ar-EG')}</p>
+                    </div>
+                  </div>
+                  {settings.logo ? (
+                    <img src={settings.logo} alt="شعار الشركة" class="h-24 w-auto object-contain" />
+                  ) : (
+                    <div class="h-24 w-24 bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400 text-center print-hidden">بدون شعار</div>
+                  )}
+                </div>
+
+                <table class="w-full text-right text-sm border-collapse border border-slate-300">
+                  <thead>
+                    <tr class="bg-slate-200 text-slate-800 border-y-2 border-slate-400">
+                      <th class="p-3 border border-slate-300">التاريخ</th>
+                      <th class="p-3 border border-slate-300">رقم المستخلص</th>
+                      <th class="p-3 border border-slate-300">بيان الأعمال</th>
+                      <th class="p-3 border border-slate-300 text-center">الكمية</th>
+                      <th class="p-3 border border-slate-300 text-center">الفئة</th>
+                      <th class="p-3 border border-slate-300 text-center">إجمالي الأعمال</th>
+                      <th class="p-3 border border-slate-300 text-center">الاستقطاع</th>
+                      <th class="p-3 border border-slate-300 text-center">الصافي المستحق</th>
+                      <th class="p-3 print-hidden border border-slate-300">حذف</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projExtracts.length === 0 ? (
+                      <tr><td colSpan="9" class="text-center py-8 text-slate-400 font-bold">لا توجد أعمال مسجلة لهذا المشروع.</td></tr>
+                    ) : (
+                      projExtracts.map((ex, i) => (
+                        <tr key={ex.id} class="hover:bg-slate-50">
+                          <td class="p-3 border border-slate-300 font-bold text-xs">{ex.date || '-'}</td>
+                          <td class="p-3 border border-slate-300 font-bold">{ex.extractNo}</td>
+                          <td class="p-3 border border-slate-300 font-semibold">{ex.workDescription || 'أعمال منفذة حسب العقد'}</td>
+                          <td class="p-3 border border-slate-300 text-center">{ex.quantity || 1}</td>
+                          <td class="p-3 border border-slate-300 text-center">{(ex.unitPrice || ex.totalWork).toLocaleString()}</td>
+                          <td class="p-3 border border-slate-300 text-center text-slate-700 font-bold">{(ex.totalWork || 0).toLocaleString()}</td>
+                          <td class="p-3 border border-slate-300 text-center text-rose-600">{(ex.deductions || 0).toLocaleString()}</td>
+                          <td class="p-3 border border-slate-300 text-center font-black text-indigo-700 text-lg bg-indigo-50">{(ex.net || 0).toLocaleString()}</td>
+                          <td class="p-3 print-hidden border border-slate-300 text-center"><button onClick={() => deleteItem('extracts', ex.id, extracts)} class="text-rose-500">🗑️</button></td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {projExtracts.length > 0 && (
+                    <tfoot>
+                      <tr class="bg-slate-800 text-white font-bold border-t-2 border-black">
+                        <td class="p-3 text-left text-lg" colSpan="7">الإجمالي النهائي المستحق للمشروع (ج.م):</td>
+                        <td class="p-3 text-center text-2xl" colSpan="2">{totalWorkNet.toLocaleString()}</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+                <div class="mt-16 pt-8 flex justify-between px-12 text-center font-bold text-slate-700 print-only">
+                  <div><p class="mb-8">اعتماد المكتب الفني</p><p>.............................</p></div>
+                  <div><p class="mb-8">اعتماد الإدارة / المقاول</p><p>.............................</p></div>
+                </div>
+              </div>
+            )}
+
+            {/* Settings Tab */}
+            {activeTab === "settings" && (
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm md:col-span-4 flex justify-between items-center">
+                  <div>
+                    <h3 class="font-bold mb-2">🖼️ شعار الشركة</h3>
+                    <label class="cursor-pointer bg-blue-100 text-blue-700 font-bold py-2 px-4 rounded-lg">اختر صورة<input type="file" accept="image/*" class="hidden" onChange={handleLogoUpload}/></label>
+                  </div>
+                  {settings.logo && <img src={settings.logo} class="h-20 max-w-[200px] object-contain" />}
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
