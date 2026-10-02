@@ -153,7 +153,7 @@
       const [settings, setSettings] = useState(initialSettings);
       
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
-      const [activeTab, setActiveTab] = useState("dashboard");
+      const [activeTab, setActiveTab] = useState("add_data");
       const [myEmpName, setMyEmpName] = useState(localStorage.getItem('myEmpName') || "");
       
       const [toast, setToast] = useState({ show: false, message: "", type: "success" });
@@ -174,8 +174,6 @@
       }, [projects]);
 
       const [newProj, setNewProj] = useState({ id: "cons-01", name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
-      
-      // تم إضافة description للنموذج الأولي للمصروفات
       const [newExp, setNewExp] = useState({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: "", receiptImg: "" });
       const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "كاش", notes: "" });
       const [newExt, setNewExt] = useState({ date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: "" });
@@ -203,8 +201,15 @@
             let adminCheck = ADMIN_IDENTIFIERS.some(id => identifier.includes(id.toLowerCase())) || currentUser.email === "mohamedmohy676676@gmail.com";
             let engineerCheck = ENGINEER_IDENTIFIERS.some(id => identifier.includes(id.toLowerCase())) || currentUser.email === "mesahaforconsultant@gmail.com";
 
-            if (adminCheck) detectedRole = "مدير النظام (Admin)";
-            else if (engineerCheck) detectedRole = "مهندس المشاريع (Engineer)";
+            if (adminCheck) {
+              detectedRole = "مدير النظام (Admin)";
+              setActiveTab("dashboard");
+            } else if (engineerCheck) {
+              detectedRole = "مهندس المشاريع (Engineer)";
+              setActiveTab("add_data");
+            } else {
+              setActiveTab("my_custody");
+            }
 
             setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", identifier: identifier });
             setIsAdmin(adminCheck); setIsEngineer(engineerCheck); setUserRole(detectedRole);
@@ -365,6 +370,9 @@
       const netProfit = totalWorkNet - totalCost;
       const clientDebt = totalWorkNet - totalReceived;
 
+      // حساب النقدية المتبقية (التحصيلات - المصاريف)
+      const cashRemaining = totalReceived - totalCost;
+
       const projBudget = Number(currentProj.budget) || 0;
       const budgetConsumedPercent = projBudget > 0 ? Math.min(Math.round((totalCost / projBudget) * 100), 100) : 0;
 
@@ -388,12 +396,20 @@
 
       const activeEmployeesCustody = settings.employees.map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
+      // تبويبات التنقل: لوحة التحكم للأدمن فقط
       const getNavTabs = () => {
-        const tabs = [
-          { id: "dashboard", label: userRole === "Staff" ? "لوحة عهدتي" : "لوحة التحكم", icon: "📊" },
+        const tabs = [];
+        if (isAdmin) {
+          tabs.push({ id: "dashboard", label: "لوحة التحكم", icon: "📊" });
+        } else if (userRole === "Staff") {
+          tabs.push({ id: "my_custody", label: "لوحة عهدتي", icon: "💼" });
+        }
+
+        tabs.push(
           { id: "add_data", label: "إدخال", icon: "➕" },
           { id: "expenses", label: "المصروفات", icon: "💸" }
-        ];
+        );
+
         if (isAdmin || isEngineer) {
           tabs.push(
             { id: "projects", label: "المشاريع", icon: "📁" },
@@ -452,7 +468,7 @@
             </div>
           )}
 
-          {["dashboard", "add_data", "statement"].includes(activeTab) && (
+          {["dashboard", "add_data", "statement", "my_custody"].includes(activeTab) && (
             <div class="print-hidden max-w-7xl mx-auto px-4 mt-3.5">
               <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -473,81 +489,90 @@
           )}
 
           <main class="max-w-7xl mx-auto px-4 mt-3.5">
-            {activeTab === "dashboard" && (
+            
+            {/* 1. لوحة تحكم الأدمن فقط (مقفولة عن الباقين) */}
+            {activeTab === "dashboard" && isAdmin && (
               <div class="space-y-4">
-                {userRole === "Staff" && (
-                  <div class="bg-indigo-50 border border-indigo-200 p-5 rounded-3xl shadow-sm">
-                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-5">
-                      <div>
-                        <h2 class="text-lg font-black text-indigo-900 flex items-center gap-2">💼 لوحة تحكم عهدة الموظف</h2>
-                        <p class="text-xs font-bold text-indigo-600 mt-1">تابع إجمالي السلف المستلمة والمنصرف والرصيد المتبقي معك.</p>
-                      </div>
-                      <div class="w-full sm:w-64">
-                        <label class="block font-bold text-xs mb-1 text-indigo-800">تأكيد اسمك (صاحب العهدة):</label>
-                        <select value={myEmpName} onChange={(e) => { setMyEmpName(e.target.value); localStorage.setItem('myEmpName', e.target.value); }} class="w-full bg-white border border-indigo-300 font-extrabold text-indigo-900 rounded-xl px-3 py-2 outline-none shadow-sm">
-                          <option value="">اختر اسمك من هنا...</option>
-                          {settings.employees.map(emp => <option key={emp} value={emp}>{emp}</option>)}
-                        </select>
-                      </div>
+                {projBudget > 0 && (
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
+                    <div class="flex justify-between items-center mb-1.5 font-bold">
+                      <span class="text-slate-700">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span>
+                      <span class={budgetConsumedPercent > 90 ? "text-rose-600" : "text-blue-700"}>{budgetConsumedPercent}% مستهلك</span>
                     </div>
-
-                    {myEmpName ? (() => {
-                      const myStats = getCustodyStats(myEmpName);
-                      return (
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div class="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex flex-col justify-center items-center text-center"><span class="text-xs text-slate-500 font-bold mb-1">إجمالي السلف المستلمة 📥</span><span class="text-2xl font-black text-emerald-600">{myStats.received.toLocaleString()} ج.م</span></div>
-                          <div class="bg-white p-4 rounded-2xl shadow-sm border border-rose-100 flex flex-col justify-center items-center text-center"><span class="text-xs text-slate-500 font-bold mb-1">المنصرف من العهدة 📤</span><span class="text-2xl font-black text-rose-600">{myStats.spent.toLocaleString()} ج.م</span></div>
-                          <div class="bg-indigo-600 p-4 rounded-2xl shadow-md flex flex-col justify-center items-center text-center"><span class="text-xs text-indigo-100 font-bold mb-1">الرصيد المتبقي في جيبك 💰</span><span class="text-3xl font-black text-white">{myStats.balance.toLocaleString()} ج.م</span></div>
-                        </div>
-                      )
-                    })() : (
-                      <div class="bg-white p-6 rounded-2xl text-center border border-dashed border-indigo-300 font-bold text-slate-500">يرجى اختيار اسمك من القائمة العلوية لعرض رصيد عهدتك التفاعلي.</div>
-                    )}
+                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                      <div class={`h-2.5 rounded-full transition-all duration-500 ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-blue-600"}`} style={{ width: `${budgetConsumedPercent}%` }}></div>
+                    </div>
                   </div>
                 )}
 
-                {(isAdmin || isEngineer) && (
-                  <>
-                    {projBudget > 0 && (
-                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
-                        <div class="flex justify-between items-center mb-1.5 font-bold">
-                          <span class="text-slate-700">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span>
-                          <span class={budgetConsumedPercent > 90 ? "text-rose-600" : "text-blue-700"}>{budgetConsumedPercent}% مستهلك</span>
-                        </div>
-                        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                          <div class={`h-2.5 rounded-full transition-all duration-500 ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-blue-600"}`} style={{ width: `${budgetConsumedPercent}%` }}></div>
-                        </div>
-                      </div>
-                    )}
+                <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
 
-                    <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
+                {/* 5 مربعات إحصائية تشمل خانة النقدية المتبقية (التحصيلات - المصاريف) */}
+                <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span><div class="text-base font-black text-slate-800 mt-1">{totalWorkNet.toLocaleString()} ج.م</div></div>
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي التحصيلات</span><div class="text-base font-black text-emerald-600 mt-1">{totalReceived.toLocaleString()} ج.م</div></div>
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي المصروفات</span><div class="text-base font-black text-rose-600 mt-1">{totalCost.toLocaleString()} ج.م</div></div>
+                  
+                  {/* الخانة الجديدة: النقدية المتوفرة حالياً لمعرفة الفلوس الموجودة معاك */}
+                  <div class="bg-indigo-50/70 p-3.5 rounded-2xl border-2 border-indigo-200 shadow-sm col-span-2 sm:col-span-1">
+                    <span class="text-[10px] text-indigo-800 font-extrabold block">💵 السيولة النقدية المتبقية</span>
+                    <div class={`text-lg font-black mt-1 ${cashRemaining >= 0 ? 'text-indigo-700' : 'text-rose-600'}`}>{cashRemaining.toLocaleString()} ج.م</div>
+                    <span class="text-[9px] text-indigo-500 font-semibold block mt-0.5">(التحصيلات - المصاريف)</span>
+                  </div>
 
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span><div class="text-base font-black text-slate-800 mt-1">{totalWorkNet.toLocaleString()} ج.م</div></div>
-                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي المصروفات</span><div class="text-base font-black text-rose-600 mt-1">{totalCost.toLocaleString()} ج.م</div></div>
-                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span><div class={`text-base font-black mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div></div>
-                      <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">مديونية العميل</span><div class={`text-base font-black mt-1 ${clientDebt > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{clientDebt.toLocaleString()} ج.م</div></div>
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span><div class={`text-base font-black mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div></div>
+                </div>
+
+                {activeEmployeesCustody.length > 0 && (
+                  <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
+                    <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">💼 حالة العهد والسلف للموظفين (المشروع النشط)</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {activeEmployeesCustody.map(emp => (
+                        <div key={emp.name} class="border rounded-xl p-3 bg-slate-50 flex flex-col gap-2">
+                          <span class="font-black text-blue-900 border-b border-slate-200 pb-1">{emp.name}</span>
+                          <div class="flex justify-between font-bold text-[10px] text-slate-500"><span>استلم: <span class="text-emerald-600">{emp.received.toLocaleString()}</span></span><span>صرف: <span class="text-rose-600">{emp.spent.toLocaleString()}</span></span></div>
+                          <div class="bg-white border rounded p-1.5 text-center font-bold text-slate-700 shadow-sm">الرصيد لديه: <span class="font-black text-indigo-700 text-sm">{emp.balance.toLocaleString()} ج.م</span></div>
+                        </div>
+                      ))}
                     </div>
-
-                    {activeEmployeesCustody.length > 0 && (
-                      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
-                        <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">💼 حالة العهد والسلف للموظفين (المشروع النشط)</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {activeEmployeesCustody.map(emp => (
-                            <div key={emp.name} class="border rounded-xl p-3 bg-slate-50 flex flex-col gap-2">
-                              <span class="font-black text-blue-900 border-b border-slate-200 pb-1">{emp.name}</span>
-                              <div class="flex justify-between font-bold text-[10px] text-slate-500"><span>استلم: <span class="text-emerald-600">{emp.received.toLocaleString()}</span></span><span>صرف: <span class="text-rose-600">{emp.spent.toLocaleString()}</span></span></div>
-                              <div class="bg-white border rounded p-1.5 text-center font-bold text-slate-700 shadow-sm">الرصيد لديه: <span class="font-black text-indigo-700 text-sm">{emp.balance.toLocaleString()} ج.م</span></div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
+                  </div>
                 )}
               </div>
             )}
 
+            {/* 2. لوحة العهدة الخاصة بالموظف */}
+            {activeTab === "my_custody" && userRole === "Staff" && (
+              <div class="bg-indigo-50 border border-indigo-200 p-5 rounded-3xl shadow-sm">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-5">
+                  <div>
+                    <h2 class="text-lg font-black text-indigo-900 flex items-center gap-2">💼 لوحة تحكم عهدة الموظف</h2>
+                    <p class="text-xs font-bold text-indigo-600 mt-1">تابع إجمالي السلف المستلمة والمنصرف والرصيد المتبقي معك.</p>
+                  </div>
+                  <div class="w-full sm:w-64">
+                    <label class="block font-bold text-xs mb-1 text-indigo-800">تأكيد اسمك (صاحب العهدة):</label>
+                    <select value={myEmpName} onChange={(e) => { setMyEmpName(e.target.value); localStorage.setItem('myEmpName', e.target.value); }} class="w-full bg-white border border-indigo-300 font-extrabold text-indigo-900 rounded-xl px-3 py-2 outline-none shadow-sm">
+                      <option value="">اختر اسمك من هنا...</option>
+                      {settings.employees.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {myEmpName ? (() => {
+                  const myStats = getCustodyStats(myEmpName);
+                  return (
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div class="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex flex-col justify-center items-center text-center"><span class="text-xs text-slate-500 font-bold mb-1">إجمالي السلف المستلمة 📥</span><span class="text-2xl font-black text-emerald-600">{myStats.received.toLocaleString()} ج.م</span></div>
+                      <div class="bg-white p-4 rounded-2xl shadow-sm border border-rose-100 flex flex-col justify-center items-center text-center"><span class="text-xs text-slate-500 font-bold mb-1">المنصرف من العهدة 📤</span><span class="text-2xl font-black text-rose-600">{myStats.spent.toLocaleString()} ج.م</span></div>
+                      <div class="bg-indigo-600 p-4 rounded-2xl shadow-md flex flex-col justify-center items-center text-center"><span class="text-xs text-indigo-100 font-bold mb-1">الرصيد المتبقي في جيبك 💰</span><span class="text-3xl font-black text-white">{myStats.balance.toLocaleString()} ج.م</span></div>
+                    </div>
+                  )
+                })() : (
+                  <div class="bg-white p-6 rounded-2xl text-center border border-dashed border-indigo-300 font-bold text-slate-500">يرجى اختيار اسمك من القائمة العلوية لعرض رصيد عهدتك التفاعلي.</div>
+                )}
+              </div>
+            )}
+
+            {/* 3. إدخال البيانات */}
             {activeTab === "add_data" && (
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
                 {(isAdmin || isEngineer) && (
@@ -579,7 +604,6 @@
                   </div>
                 )}
 
-                {/* نموذج تسجيل المصروف مع خانة الوصف بعد سعر الوحدة */}
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
                   <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة</h3>
                   <form onSubmit={(e) => {
@@ -650,7 +674,6 @@
                     <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/></div>
                     <div><label class="block font-bold mb-1">سعر الوحدة</label><input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/></div>
 
-                    {/* خانة الوصف / الملاحظات الجديدة مباشرة بعد سعر الوحدة */}
                     <div class="sm:col-span-2">
                       <label class="block font-bold mb-1 text-slate-700">📝 الوصف / ملاحظات الفاتورة</label>
                       <input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="تفاصيل إضافية عن البند، رقم الفاتورة الورقية، موقع التوريد..." class="w-full border rounded-xl p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"/>
@@ -717,40 +740,45 @@
               </div>
             )}
 
+            {/* 4. جدول المصروفات بالتفاصيل الكاملة (الكمية، الفئة، الوصف) */}
             {activeTab === "expenses" && (
               <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
-                <table class="w-full text-right">
+                <table class="w-full text-right border-collapse">
                   <thead>
-                    <tr class="bg-slate-100 text-slate-600">
+                    <tr class="bg-slate-100 text-slate-700 border-b">
                       <th class="p-2.5">التاريخ</th>
                       <th class="p-2.5">المشروع</th>
-                      <th class="p-2.5">البيان</th>
-                      <th class="p-2.5">الوصف / ملاحظات</th>
+                      <th class="p-2.5">البند (رئيسي / فرعي)</th>
+                      <th class="p-2.5">الوصف / البيان</th>
+                      <th class="p-2.5 text-center">الكمية</th>
+                      <th class="p-2.5 text-center">الفئة (السعر)</th>
+                      <th class="p-2.5 text-center">الإجمالي</th>
                       <th class="p-2.5">المورد</th>
                       <th class="p-2.5">الدفع</th>
-                      <th class="p-2.5">الإجمالي</th>
                       <th class="p-2.5">الفاتورة</th>
                       <th class="p-2.5">بواسطة</th>
-                      {isAdmin && <th class="p-2.5">حذف</th>}
+                      {isAdmin && <th class="p-2.5 text-center">حذف</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {expenses.map((e) => (
-                      <tr key={e.id} class="border-t hover:bg-slate-50">
-                        <td class="p-2.5 text-slate-600">{e.date}</td>
-                        <td class="p-2.5 font-bold text-blue-700">{e.projectId}</td>
-                        <td class="p-2.5">{e.mainCategory} - {e.subCategory}</td>
-                        <td class="p-2.5 text-slate-600 max-w-[150px] truncate" title={e.description || ""}>{e.description || '-'}</td>
-                        <td class="p-2.5">{e.supplier}</td>
+                      <tr key={e.id} class="border-b hover:bg-slate-50">
+                        <td class="p-2.5 text-slate-600 whitespace-nowrap">{e.date}</td>
+                        <td class="p-2.5 font-bold text-blue-700 font-mono">{e.projectId}</td>
+                        <td class="p-2.5 font-semibold">{e.mainCategory} - {e.subCategory}</td>
+                        <td class="p-2.5 text-slate-700 max-w-[200px] truncate" title={e.description || ""}>{e.description || '-'}</td>
+                        <td class="p-2.5 text-center font-bold">{e.quantity || 1}</td>
+                        <td class="p-2.5 text-center font-mono">{(Number(e.unitPrice) || Number(e.amount)).toLocaleString()}</td>
+                        <td class="p-2.5 text-center font-black text-rose-600 font-mono">{(Number(e.amount) || 0).toLocaleString()} ج.م</td>
+                        <td class="p-2.5 text-slate-600">{e.supplier || '-'}</td>
                         <td class="p-2.5"><span class={`px-1.5 py-0.5 rounded-lg text-[10px] ${e.paymentMethod === 'خصم من العهدة' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200' : 'bg-slate-100 text-slate-600'}`}>{e.paymentMethod} {e.custodyEmployee && `(${e.custodyEmployee})`}</span></td>
-                        <td class="p-2.5 font-bold text-rose-600">{(e.amount || 0).toLocaleString()}</td>
                         <td class="p-2.5">
                           {e.receiptImg ? (
                             <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold hover:bg-blue-100">عرض 🖼️</button>
                           ) : <span class="text-slate-400">لا يوجد</span>}
                         </td>
-                        <td class="p-2.5 text-slate-500">{e.createdBy || '-'}</td>
-                        {isAdmin && <td class="p-2.5"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500">🗑</button></td>}
+                        <td class="p-2.5 text-slate-500 whitespace-nowrap">{e.createdBy || '-'}</td>
+                        {isAdmin && <td class="p-2.5 text-center"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500 hover:text-rose-700">🗑️</button></td>}
                       </tr>
                     ))}
                   </tbody>
@@ -758,14 +786,15 @@
               </div>
             )}
 
+            {/* 5. كشف الحساب الشامل بجميع تفاصيل المصروفات والكميات والأوصاف */}
             {activeTab === "statement" && (isAdmin || isEngineer) && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm print-area text-xs">
                 <div class="flex justify-between items-center mb-4 border-b pb-3 print-hidden">
                   <div>
-                    <h3 class="font-black text-slate-800 text-sm">📑 كشف حساب وتحليل مالي شامل للمشروع</h3>
-                    <p class="text-slate-500 text-[11px]">يجمع بين مستحقات العميل والمصروفات وصافي الأرباح الفعلية.</p>
+                    <h3 class="font-black text-slate-800 text-sm">📑 كشف حساب وتحليل مالي تفصيلي للمشروع</h3>
+                    <p class="text-slate-500 text-[11px]">يجمع بين مستحقات العميل والمصروفات بكامل تفاصيلها من كمية ووصف.</p>
                   </div>
-                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨 طباعة كشف الحساب</button>
+                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨️ طباعة كشف الحساب</button>
                 </div>
 
                 <div class="border border-slate-300 p-3.5 rounded-2xl mb-4">
@@ -777,46 +806,80 @@
                     {settings.logo && <img src={settings.logo} class="h-10 object-contain"/>}
                   </div>
                   
-                  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-50 p-3 rounded-xl text-center border">
+                  <div class="grid grid-cols-2 md:grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl text-center border">
                     <div><span class="text-slate-500 block text-[10px]">إجمالي المستخلصات:</span><strong class="text-indigo-700 text-sm">{totalWorkNet.toLocaleString()} ج.م</strong></div>
                     <div><span class="text-slate-500 block text-[10px]">إجمالي التحصيلات:</span><strong class="text-emerald-600 text-sm">{totalReceived.toLocaleString()} ج.م</strong></div>
                     <div><span class="text-slate-500 block text-[10px]">إجمالي المصروفات:</span><strong class="text-rose-600 text-sm">{totalCost.toLocaleString()} ج.م</strong></div>
+                    <div><span class="text-slate-500 block text-[10px]">السيولة المتبقية (الخزينة):</span><strong class="text-indigo-700 text-sm">{cashRemaining.toLocaleString()} ج.م</strong></div>
                     <div><span class="text-slate-500 block text-[10px]">صافي الربح الفعلي:</span><strong class={`text-sm ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{netProfit.toLocaleString()} ج.م</strong></div>
                   </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">1. المستخلصات المعتمدة</h4>
-                    <table class="w-full text-right border">
-                      <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">البيان</th><th class="p-1.5 border">الصافي</th></tr></thead>
-                      <tbody>
-                        {projExtracts.length === 0 ? <tr><td colSpan="3" class="text-center p-2 text-slate-400">لا يوجد مستخلصات</td></tr> :
-                        projExtracts.map(ex => <tr key={ex.id}><td class="p-1.5 border">{ex.date}</td><td class="p-1.5 border">{ex.workDescription}</td><td class="p-1.5 border font-bold text-indigo-700">{ex.net.toLocaleString()}</td></tr>)}
-                      </tbody>
-                    </table>
+                <div class="space-y-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">1. المستخلصات المعتمدة (مستحقات العقد)</h4>
+                      <table class="w-full text-right border">
+                        <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">رقم المستخلص</th><th class="p-1.5 border">البيان</th><th class="p-1.5 border text-center">الصافي</th></tr></thead>
+                        <tbody>
+                          {projExtracts.length === 0 ? <tr><td colSpan="4" class="text-center p-2 text-slate-400">لا يوجد مستخلصات</td></tr> :
+                          projExtracts.map(ex => <tr key={ex.id}><td class="p-1.5 border">{ex.date}</td><td class="p-1.5 border font-bold">{ex.extractNo}</td><td class="p-1.5 border">{ex.workDescription}</td><td class="p-1.5 border text-center font-bold text-indigo-700">{Number(ex.net).toLocaleString()}</td></tr>)}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div>
+                      <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">2. الدفعات المستلمة من العميل</h4>
+                      <table class="w-full text-right border">
+                        <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">البيان</th><th class="p-1.5 border text-center">المبلغ</th></tr></thead>
+                        <tbody>
+                          {projPayments.length === 0 ? <tr><td colSpan="3" class="text-center p-2 text-slate-400">لا يوجد دفعات</td></tr> :
+                          projPayments.map(p => <tr key={p.id}><td class="p-1.5 border">{p.date}</td><td class="p-1.5 border">{p.notes || 'دفعة'}</td><td class="p-1.5 border text-center font-bold text-emerald-600">{Number(p.amount).toLocaleString()}</td></tr>)}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
                   <div>
-                    <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">2. الدفعات المستلمة</h4>
-                    <table class="w-full text-right border">
-                      <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">البيان</th><th class="p-1.5 border">المبلغ</th></tr></thead>
-                      <tbody>
-                        {projPayments.length === 0 ? <tr><td colSpan="3" class="text-center p-2 text-slate-400">لا يوجد دفعات</td></tr> :
-                        projPayments.map(p => <tr key={p.id}><td class="p-1.5 border">{p.date}</td><td class="p-1.5 border">{p.notes || 'دفعة'}</td><td class="p-1.5 border font-bold text-emerald-600">{p.amount.toLocaleString()}</td></tr>)}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div>
-                    <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">3. المصروفات المسجلة</h4>
-                    <table class="w-full text-right border">
-                      <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">البند</th><th class="p-1.5 border">المبلغ</th></tr></thead>
-                      <tbody>
-                        {projExpenses.length === 0 ? <tr><td colSpan="3" class="text-center p-2 text-slate-400">لا توجد مصروفات</td></tr> :
-                        projExpenses.map(e => <tr key={e.id}><td class="p-1.5 border">{e.date}</td><td class="p-1.5 border">{e.mainCategory} - {e.subCategory}</td><td class="p-1.5 border font-bold text-rose-600">{e.amount.toLocaleString()}</td></tr>)}
-                      </tbody>
-                    </table>
+                    <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">3. بيان تفصيلي بجميع المصروفات والفواتير المنفذة في الموقع</h4>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-right border border-slate-300">
+                        <thead>
+                          <tr class="bg-slate-100 text-slate-800">
+                            <th class="p-1.5 border">التاريخ</th>
+                            <th class="p-1.5 border">البند</th>
+                            <th class="p-1.5 border">الوصف / ملاحظات الفاتورة</th>
+                            <th class="p-1.5 border text-center">الكمية</th>
+                            <th class="p-1.5 border text-center">الفئة</th>
+                            <th class="p-1.5 border text-center">الإجمالي</th>
+                            <th class="p-1.5 border">المورد</th>
+                            <th class="p-1.5 border">طريقة السداد</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {projExpenses.length === 0 ? <tr><td colSpan="8" class="text-center p-3 text-slate-400">لا توجد مصروفات مسجلة</td></tr> :
+                          projExpenses.map(e => (
+                            <tr key={e.id} class="hover:bg-slate-50">
+                              <td class="p-1.5 border text-slate-600">{e.date}</td>
+                              <td class="p-1.5 border font-semibold">{e.mainCategory} - {e.subCategory}</td>
+                              <td class="p-1.5 border text-slate-700">{e.description || '-'}</td>
+                              <td class="p-1.5 border text-center font-bold">{e.quantity || 1}</td>
+                              <td class="p-1.5 border text-center">{(Number(e.unitPrice) || Number(e.amount)).toLocaleString()}</td>
+                              <td class="p-1.5 border text-center font-black text-rose-600">{(Number(e.amount) || 0).toLocaleString()}</td>
+                              <td class="p-1.5 border text-slate-600">{e.supplier || '-'}</td>
+                              <td class="p-1.5 border">{e.paymentMethod} {e.custodyEmployee && `(${e.custodyEmployee})`}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr class="bg-slate-200 font-bold">
+                            <td colSpan="5" class="p-1.5 text-left border">إجمالي المصروفات المنفذة للمشروع:</td>
+                            <td class="p-1.5 text-center border font-black text-rose-700">{totalCost.toLocaleString()} ج.م</td>
+                            <td colSpan="2" class="border"></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -830,12 +893,7 @@
                     e.preventDefault();
                     if (!newProj.id || !newProj.name) return;
                     const clean = cleanId(newProj.id);
-                    const projectToAdd = { 
-                      ...newProj, 
-                      id: clean, 
-                      budget: Number(newProj.budget) || 0, 
-                      createdBy: user.name 
-                    };
+                    const projectToAdd = { ...newProj, id: clean, budget: Number(newProj.budget) || 0, createdBy: user.name };
                     const updatedProjects = [...projects, projectToAdd];
                     setProjects(updatedProjects);
                     if (db) db.ref('projects').set(updatedProjects);
@@ -884,7 +942,7 @@
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto print-area text-xs">
                 <div class="flex justify-between items-center mb-4 print-hidden">
                   <h3 class="font-bold text-slate-800 text-sm">سجل المستخلصات المعتمدة</h3>
-                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨 طباعة المستخلص كـ PDF</button>
+                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨️ طباعة المستخلص كـ PDF</button>
                 </div>
                 <div class="flex justify-between items-center border-b-2 border-slate-800 pb-3 mb-3">
                   <div>
