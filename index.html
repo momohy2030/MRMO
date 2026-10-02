@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>إدارة المعاملات الإنشائية</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
@@ -16,18 +16,24 @@
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     @media print {
       body { background-color: white; }
       .print-hidden { display: none !important; }
       .print-area { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
     }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   </style>
 </head>
-<body class="text-slate-800">
+<body class="text-slate-800 antialiased select-none sm:select-auto">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -44,7 +50,6 @@
       measurementId: "G-N9DW5R28H0"
     };
 
-    // تم تحديث إيميل الأدمن المعتمد هنا
     const ADMIN_IDENTIFIERS = [
       "mohamedmohy676676@gmail.com",
       "+201000000000"
@@ -112,12 +117,12 @@
       }, [allWork, allExp, allPay, projExpLabels.join(','), projExpData.join(',')]);
 
       return (
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm h-64 flex flex-col">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-3.5">
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm h-64 flex flex-col">
             <h4 class="font-bold text-slate-700 mb-2 text-center text-xs">📈 الموقف المالي العام للشركة</h4>
             <div class="flex-1 relative w-full"><canvas ref={chart1Ref}></canvas></div>
           </div>
-          <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm h-64 flex flex-col">
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm h-64 flex flex-col">
             <h4 class="font-bold text-slate-700 mb-2 text-center text-xs">📊 توزيع تكلفة ({projName})</h4>
             <div class="flex-1 relative w-full"><canvas ref={chart2Ref}></canvas></div>
           </div>
@@ -145,8 +150,11 @@
       
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
       const [activeTab, setActiveTab] = useState("dashboard");
-      const [alertMsg, setAlertMsg] = useState("");
+      
+      // التنبيهات المنبثقة العصرية (Toasts)
+      const [toast, setToast] = useState({ show: false, message: "", type: "success" });
       const [activeInvoiceModal, setActiveInvoiceModal] = useState(null);
+      const [drawerOpen, setDrawerOpen] = useState(false);
 
       const [searchMainCat, setSearchMainCat] = useState("");
       const [searchSubCat, setSearchSubCat] = useState("");
@@ -174,6 +182,11 @@
       useEffect(() => {
         setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId }));
       }, [nextSuggestedProjectId]);
+
+      const showToast = (message, type = "success") => {
+        setToast({ show: true, message, type });
+        setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3500);
+      };
 
       const recordLoginLog = (currentUser, adminStatus) => {
         if (!db) return;
@@ -285,6 +298,7 @@
           .then((confirmationResult) => {
             window.confirmationResult = confirmationResult;
             setVerificationId(true);
+            showToast("تم إرسال كود التحقق للهاتف 📩");
           }).catch(() => {
             setLoginError("تعذر إرسال الرمز. يرجى مراجعة رقم الهاتف.");
             if(window.recaptchaVerifier) window.recaptchaVerifier.render().then(widgetId => grecaptcha.reset(widgetId));
@@ -303,9 +317,8 @@
         auth.signOut();
         setLoginMethod("choose");
         setVerificationId(null);
+        setDrawerOpen(false);
       };
-
-      const showAlert = (msg) => { setAlertMsg(msg); setTimeout(() => setAlertMsg(""), 4000); };
 
       const handleReceiptUpload = (e) => {
         const file = e.target.files && e.target.files[0];
@@ -313,14 +326,14 @@
         const reader = new FileReader();
         reader.onload = (evt) => {
           setNewExp(prev => ({ ...prev, receiptImg: evt.target.result }));
-          showAlert("تم إرفاق الفاتورة!");
+          showToast("تم إرفاق صورة الفاتورة بنجاح 📸");
         };
         reader.readAsDataURL(file);
       };
 
       const deleteItem = (path, id, list) => {
         if (!isAdmin) {
-          alert("الحذف مصرح لمدير النظام فقط.");
+          showToast("الحذف مصرح لمدير النظام فقط 🔒", "error");
           return;
         }
         if (window.confirm("هل أنت متأكد من الحذف نهائياً؟")) {
@@ -330,7 +343,7 @@
           if (path === 'extracts') setExtracts(newList);
           if (path === 'payments') setPayments(newList);
           if (path === 'projects') setProjects(newList);
-          showAlert("تم الحذف بنجاح! 🗑");
+          showToast("تم الحذف بنجاح! 🗑");
         }
       };
 
@@ -341,30 +354,30 @@
         const wsExtracts = XLSX.utils.json_to_sheet(extracts.map(ex => ({ 'التاريخ': ex.date, 'المشروع': ex.projectId, 'المستخلص': ex.extractNo, 'البيان': ex.workDescription, 'قيمة الأعمال': ex.totalWork, 'الاستقطاع': ex.deductions, 'الصافي': ex.net, 'بواسطة': ex.createdBy }))); XLSX.utils.book_append_sheet(wb, wsExtracts, "المستخلصات");
         const wsPayments = XLSX.utils.json_to_sheet(payments.map(p => ({ 'التاريخ': p.date, 'المشروع': p.projectId, 'المبلغ': p.amount, 'البيان': p.notes, 'بواسطة': p.createdBy }))); XLSX.utils.book_append_sheet(wb, wsPayments, "الدفعات");
         XLSX.writeFile(wb, `MOMOHY_ERP_Report_${todayDate}.xlsx`);
-        showAlert("تم تصدير ملف الإكسل بنجاح! 📥");
+        showToast("تم تحميل ملف الإكسل بنجاح! 📥");
       };
 
       if (authLoading) {
-        return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold text-base">جاري التحقق من الهوية... 🔒</div>;
+        return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold text-sm">جاري التحقق من الهوية... 🔒</div>;
       }
 
       if (!user) {
         return (
           <div class="min-h-screen flex items-center justify-center bg-slate-900 px-4">
-            <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-sm text-center">
-              <div class="bg-indigo-100 text-indigo-600 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🏗️</div>
-              <h2 class="text-xl font-black text-slate-800 mb-1">بوابة الدخول السحابية</h2>
-              <p class="text-slate-500 text-xs mb-5 font-semibold">إدارة المعاملات الإنشائية</p>
+            <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center">
+              <div class="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-inner">🏗️</div>
+              <h2 class="text-2xl font-black text-slate-800 mb-1">بوابة الدخول السحابية</h2>
+              <p class="text-slate-500 text-xs mb-6 font-semibold">إدارة المعاملات الإنشائية - MOMOHY ERP</p>
 
-              {loginError && <div class="bg-rose-100 text-rose-700 p-2.5 rounded-lg text-xs font-bold mb-4">{loginError}</div>}
+              {loginError && <div class="bg-rose-100 text-rose-700 p-2.5 rounded-xl text-xs font-bold mb-4">{loginError}</div>}
 
               {loginMethod === "choose" && (
                 <div class="space-y-3">
-                  <button onClick={handleGoogleLogin} class="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2.5 rounded-xl transition shadow-sm text-xs">
+                  <button onClick={handleGoogleLogin} class="w-full flex items-center justify-center gap-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-2xl transition shadow-sm text-xs">
                     <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                     الدخول عبر Google
                   </button>
-                  <button onClick={() => setLoginMethod("phone")} class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl transition shadow text-xs">
+                  <button onClick={() => setLoginMethod("phone")} class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-2xl transition shadow text-xs">
                     📱 الدخول عبر الهاتف
                   </button>
                 </div>
@@ -372,17 +385,17 @@
 
               {loginMethod === "phone" && !verificationId && (
                 <form onSubmit={handleSendOtp} class="space-y-3">
-                  <input type="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)} placeholder="01xxxxxxxxx" class="w-full border p-2.5 rounded-lg text-center font-bold text-xs outline-none" dir="ltr" required />
+                  <input type="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)} placeholder="01xxxxxxxxx" class="w-full border p-3 rounded-xl text-center font-bold text-xs outline-none" dir="ltr" required />
                   <div id="recaptcha-container"></div>
-                  <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs">إرسال كود التحقق</button>
-                  <button type="button" onClick={() => setLoginMethod("choose")} class="w-full text-slate-500 text-[11px]">الرجوع</button>
+                  <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl text-xs shadow-md">إرسال كود التحقق</button>
+                  <button type="button" onClick={() => setLoginMethod("choose")} class="w-full text-slate-500 text-xs">الرجوع</button>
                 </form>
               )}
 
               {loginMethod === "phone" && verificationId && (
                 <form onSubmit={handleVerifyOtp} class="space-y-3">
-                  <input type="text" value={otpCode} onChange={e=>setOtpCode(e.target.value)} placeholder="کود التحقق (OTP)" class="w-full border p-2.5 rounded-lg text-center font-black tracking-widest text-sm outline-none" dir="ltr" required />
-                  <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs">تأكيد ودخول</button>
+                  <input type="text" value={otpCode} onChange={e=>setOtpCode(e.target.value)} placeholder="کود التحقق (OTP)" class="w-full border p-3 rounded-xl text-center font-black tracking-widest text-sm outline-none" dir="ltr" required />
+                  <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-2xl text-xs shadow-md">تأكيد ودخول</button>
                 </form>
               )}
             </div>
@@ -422,96 +435,153 @@
       });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
+      const navTabs = [
+        { id: "dashboard", label: "الرئيسية", icon: "📊" },
+        { id: "add_data", label: "إدخال", icon: "➕" },
+        { id: "expenses", label: "المصروفات", icon: "💸" },
+        { id: "extracts", label: "المستخلصات", icon: "📄" },
+        { id: "statement", label: "كشف حساب", icon: "📑" }
+      ];
+
       return (
-        <div class="min-h-screen pb-10">
-          <header class="bg-slate-900 text-white shadow sticky top-0 z-30 print-hidden">
-            <div class="max-w-7xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
-              <div class="flex items-center gap-2">
-                <span class="text-xl">🏗️</span>
+        <div class="min-h-screen pb-24 md:pb-10">
+          
+          {/* Header نظيف ومتوافق مع الهواتف */}
+          <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 print-hidden border-b border-slate-800">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5">
+                <span class="text-2xl p-1 bg-blue-600/30 rounded-xl">🏗️</span>
                 <div>
                   <h1 class="text-sm sm:text-base font-black leading-tight">إدارة المعاملات الإنشائية</h1>
-                  <div class="text-[10px] text-slate-300 flex items-center gap-1">
-                    <span>{user.name}</span>
-                    {isAdmin && <span class="bg-amber-500/20 text-amber-300 px-1 rounded font-bold">👑 مدير</span>}
-                    <button onClick={handleLogout} class="text-rose-400 underline font-bold mr-1">خروج</button>
+                  <div class="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">
+                    <span class="truncate max-w-[140px] sm:max-w-none">{user.name}</span>
+                    {isAdmin && <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">👑 مدير</span>}
                   </div>
                 </div>
               </div>
-              <button onClick={exportToExcel} class="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] px-2.5 py-1.5 rounded font-bold flex items-center gap-1 shadow">
-                📤 إكسل
-              </button>
+
+              <div class="flex items-center gap-2">
+                <button onClick={exportToExcel} class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 shadow-sm transition">
+                  📤 <span class="hidden sm:inline">تصدير</span> إكسل
+                </button>
+                <button onClick={() => setDrawerOpen(true)} class="bg-slate-800 hover:bg-slate-700 p-2 rounded-xl text-slate-200 border border-slate-700 text-sm">
+                  ☰
+                </button>
+              </div>
             </div>
-            
-            <div class="bg-slate-800 border-t border-slate-700 px-2 py-1 overflow-x-auto scrollbar-hide flex gap-1 text-xs">
+
+            {/* شريط التبويبات لسطح المكتب فقط */}
+            <div class="hidden md:flex bg-slate-800/90 border-t border-slate-700 px-4 py-1.5 overflow-x-auto scrollbar-hide gap-1 text-xs">
               {[
-                { id: "dashboard", label: "📊 التحكم" },
-                { id: "add_data", label: "➕ إدخال" },
-                { id: "projects", label: "📁 المشاريع" },
+                { id: "dashboard", label: "📊 لوحة التحكم" },
+                { id: "add_data", label: "➕ إدخال بيانات" },
+                { id: "projects", label: "📁 دليل المشاريع" },
                 { id: "expenses", label: "💸 المصروفات" },
                 { id: "payments", label: "💰 الدفعات" },
                 { id: "extracts", label: "📄 المستخلصات" },
                 { id: "statement", label: "📑 كشف حساب شامل" },
-                ...(isAdmin ? [{ id: "audit_log", label: "🛡️ الدخول" }] : []),
+                ...(isAdmin ? [{ id: "audit_log", label: "🛡️ سجل الدخول" }] : []),
                 { id: "settings", label: "⚙️ الإعدادات" }
               ].map(t => (
-                <button key={t.id} onClick={() => setActiveTab(t.id)} class={`px-2.5 py-1 rounded font-bold whitespace-nowrap transition ${activeTab === t.id ? "bg-blue-600 text-white shadow" : "text-slate-300 hover:bg-slate-700"}`}>
+                <button key={t.id} onClick={() => setActiveTab(t.id)} class={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition ${activeTab === t.id ? "bg-blue-600 text-white shadow" : "text-slate-300 hover:bg-slate-700"}`}>
                   {t.label}
                 </button>
               ))}
             </div>
           </header>
 
-          {alertMsg && <div class="print-hidden max-w-sm mx-auto mt-3 px-3 py-1.5 bg-emerald-100 border border-emerald-400 text-emerald-800 rounded text-center font-bold text-xs">{alertMsg}</div>}
-
-          {["dashboard", "add_data", "statement"].includes(activeTab) && (
-            <div class="print-hidden max-w-7xl mx-auto px-3 mt-3">
-              <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 text-xs">
-                <div class="flex items-center gap-2">
-                  <span class="font-bold text-slate-700 whitespace-nowrap">المشروع النشط:</span>
-                  <select value={selectedProjId} onChange={(e) => setSelectedProjId(e.target.value)} class="bg-slate-100 border border-slate-300 font-bold text-blue-900 rounded p-1.5 outline-none w-full sm:w-auto">
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
-                  </select>
+          {/* القائمة الجانبية المنبثقة (Drawer) */}
+          {drawerOpen && (
+            <div class="fixed inset-0 z-50 flex">
+              <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onClick={() => setDrawerOpen(false)}></div>
+              <div class="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-5 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+                    <span class="font-black text-sm">قائمة النظام الإداري</span>
+                    <button onClick={() => setDrawerOpen(false)} class="text-slate-400 hover:text-white text-lg">✕</button>
+                  </div>
+                  <nav class="space-y-1.5 text-xs font-bold">
+                    {[
+                      { id: "dashboard", label: "📊 لوحة التحكم" },
+                      { id: "add_data", label: "➕ إدخال بيانات" },
+                      { id: "projects", label: "📁 دليل المشاريع" },
+                      { id: "expenses", label: "💸 المصروفات" },
+                      { id: "payments", label: "💰 الدفعات" },
+                      { id: "extracts", label: "📄 المستخلصات المعتمدة" },
+                      { id: "statement", label: "📑 كشف حساب شامل" },
+                      ...(isAdmin ? [{ id: "audit_log", label: "🛡️ سجل نشاط الدخول" }] : []),
+                      { id: "settings", label: "⚙️ إعدادات وشعار الشركة" }
+                    ].map(item => (
+                      <button key={item.id} onClick={() => { setActiveTab(item.id); setDrawerOpen(false); }} class={`w-full text-right p-3 rounded-xl transition flex items-center justify-between ${activeTab === item.id ? "bg-blue-600 text-white font-black" : "text-slate-300 hover:bg-slate-800"}`}>
+                        <span>{item.label}</span>
+                        {activeTab === item.id && <span>•</span>}
+                      </button>
+                    ))}
+                  </nav>
                 </div>
-                <div class="flex items-center justify-between sm:justify-end gap-3 text-slate-600 font-semibold text-[11px]">
-                  <span>العميل: <strong class="text-slate-900">{currentProj.name || '-'}</strong></span>
-                  <span>الموقع: <strong class="text-slate-900">{currentProj.location || '-'}</strong></span>
+                <div class="pt-4 border-t border-slate-800">
+                  <button onClick={handleLogout} class="w-full bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+                    🚪 تسجيل الخروج
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          <main class="max-w-7xl mx-auto px-3 mt-3">
+          {/* إعادة هيكلة بطاقة المشروع النشط (Responsive Stack) */}
+          {["dashboard", "add_data", "statement"].includes(activeTab) && (
+            <div class="print-hidden max-w-7xl mx-auto px-4 mt-3.5">
+              <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <span class="font-extrabold text-slate-700 whitespace-nowrap">المشروع النشط:</span>
+                  <div class="relative w-full sm:w-64">
+                    <select value={selectedProjId} onChange={(e) => setSelectedProjId(e.target.value)} class="w-full bg-slate-100 border border-slate-300 font-extrabold text-blue-900 rounded-xl px-3 py-2 outline-none appearance-none focus:ring-2 focus:ring-blue-500">
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
+                    </select>
+                    <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">▼</div>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 bg-slate-50 md:bg-transparent p-2.5 md:p-0 rounded-xl text-slate-600 text-[11px] sm:text-xs">
+                  <div>العميل: <strong class="text-slate-900 block sm:inline font-bold">{currentProj.name || '-'}</strong></div>
+                  <div>الموقع: <strong class="text-slate-900 block sm:inline font-bold">{currentProj.location || '-'}</strong></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <main class="max-w-7xl mx-auto px-4 mt-3.5">
             {activeTab === "dashboard" && (
-              <div class="space-y-3">
+              <div class="space-y-3.5">
                 {projBudget > 0 && (
-                  <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-xs">
-                    <div class="flex justify-between items-center mb-1 font-bold">
-                      <span class="text-slate-700">ميزانية المشروع التقديرية: {projBudget.toLocaleString()} ج.م</span>
+                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
+                    <div class="flex justify-between items-center mb-1.5 font-bold">
+                      <span class="text-slate-700">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span>
                       <span class={budgetConsumedPercent > 90 ? "text-rose-600" : "text-blue-700"}>{budgetConsumedPercent}% مستهلك</span>
                     </div>
                     <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                      <div class={`h-2.5 rounded-full transition-all ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-blue-600"}`} style={{ width: `${budgetConsumedPercent}%` }}></div>
+                      <div class={`h-2.5 rounded-full transition-all duration-500 ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-blue-600"}`} style={{ width: `${budgetConsumedPercent}%` }}></div>
                     </div>
                   </div>
                 )}
 
                 <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
 
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-                  <div class="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm"><span class="text-[10px] text-slate-500 font-bold">المستخلصات (الصافي)</span><div class="text-base font-black text-slate-800">{totalWorkNet.toLocaleString()} ج.م</div></div>
-                  <div class="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm"><span class="text-[10px] text-slate-500 font-bold">إجمالي المصروفات</span><div class="text-base font-black text-rose-600">{totalCost.toLocaleString()} ج.م</div></div>
-                  <div class="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm"><span class="text-[10px] text-slate-500 font-bold">صافي الربح الفعلي</span><div class={`text-base font-black ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div></div>
-                  <div class="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm"><span class="text-[10px] text-slate-500 font-bold">مديونية العميل</span><div class={`text-base font-black ${clientDebt > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{clientDebt.toLocaleString()} ج.م</div></div>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                  <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span><div class="text-base font-black text-slate-800 mt-0.5">{totalWorkNet.toLocaleString()} ج.م</div></div>
+                  <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي المصروفات</span><div class="text-base font-black text-rose-600 mt-0.5">{totalCost.toLocaleString()} ج.م</div></div>
+                  <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span><div class={`text-base font-black mt-0.5 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div></div>
+                  <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">مديونية العميل</span><div class={`text-base font-black mt-0.5 ${clientDebt > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{clientDebt.toLocaleString()} ج.م</div></div>
                 </div>
 
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-300 text-xs">
-                  <h3 class="font-bold text-indigo-900 mb-2">🔍 محرك البحث في مصروفات المشروع النشط</h3>
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
-                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="border rounded p-1.5 bg-white"><option value="">كل البنود الرئيسية</option>{settings.mainCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="border rounded p-1.5 bg-white"><option value="">كل البنود الفرعية</option>{settings.subCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                    <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="border rounded p-1.5 bg-white"><option value="">كل أنواع التكلفة</option>{settings.costTypes.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-300 text-xs">
+                  <h3 class="font-bold text-indigo-900 mb-2.5">🔍 محرك البحث في مصروفات المشروع النشط</h3>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2.5">
+                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="border rounded-xl p-2 bg-white"><option value="">كل البنود الرئيسية</option>{settings.mainCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="border rounded-xl p-2 bg-white"><option value="">كل البنود الفرعية</option>{settings.subCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                    <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="border rounded-xl p-2 bg-white"><option value="">كل أنواع التكلفة</option>{settings.costTypes.map(c => <option key={c} value={c}>{c}</option>)}</select>
                   </div>
-                  <div class="bg-indigo-100 text-indigo-900 px-3 py-1.5 rounded flex justify-between font-bold">
+                  <div class="bg-indigo-100 text-indigo-900 px-3.5 py-2 rounded-xl flex justify-between font-bold">
                     <span>إجمالي المطابق:</span>
                     <span>{filteredSearchTotal.toLocaleString()} ج.م</span>
                   </div>
@@ -520,9 +590,9 @@
             )}
 
             {activeTab === "add_data" && (
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <h3 class="font-bold text-slate-800 mb-2 border-b pb-1 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة</h3>
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                  <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة</h3>
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     if(!newExp.unitPrice || !newExp.quantity) return;
@@ -533,31 +603,31 @@
                     setExpenses(updated);
                     if (db) db.ref('expenses').set(updated);
                     setNewExp({...newExp, quantity: 1, unitPrice: "", date: todayDate, receiptImg: ""});
-                    showAlert(`تم حفظ المصروف للمشروع (${selectedProjId}) بنجاح!`);
-                  }} class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div><label class="block font-bold mb-0.5 text-blue-700">التاريخ</label><input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} class="w-full border rounded p-1.5 bg-blue-50 font-bold" required/></div>
-                    <div><label class="block font-bold mb-0.5">البند الرئيسي</label><select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border rounded p-1.5" required><option value="">اختر...</option>{settings.mainCategories.map(c => <option key={c}>{c}</option>)}</select></div>
-                    <div><label class="block font-bold mb-0.5">البند الفرعي</label><select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border rounded p-1.5" required><option value="">اختر...</option>{settings.subCategories.map(c => <option key={c}>{c}</option>)}</select></div>
-                    <div><label class="block font-bold mb-0.5">نوع التكلفة</label><select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border rounded p-1.5"><option value="">اختر...</option>{settings.costTypes.map(c => <option key={c}>{c}</option>)}</select></div>
-                    <div><label class="block font-bold mb-0.5">المورد</label><select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border rounded p-1.5"><option value="">اختر...</option>{settings.suppliers.map(c => <option key={c}>{c}</option>)}</select></div>
-                    <div><label class="block font-bold mb-0.5">طريقة الدفع</label><select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} class="w-full border rounded p-1.5"><option>كاش</option><option>تحويل بنكي</option><option>شيك</option></select></div>
-                    <div><label class="block font-bold mb-0.5">الكمية</label><input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border rounded p-1.5 bg-amber-50 font-bold" required/></div>
-                    <div><label class="block font-bold mb-0.5">سعر الوحدة</label><input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border rounded p-1.5 bg-amber-50 font-bold" required/></div>
+                    showToast(`تم حفظ المصروف للمشروع (${selectedProjId}) بنجاح!`);
+                  }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
+                    <div><label class="block font-bold mb-1">البند الرئيسي</label><select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border rounded-xl p-2" required><option value="">اختر...</option>{settings.mainCategories.map(c => <option key={c}>{c}</option>)}</select></div>
+                    <div><label class="block font-bold mb-1">البند الفرعي</label><select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border rounded-xl p-2" required><option value="">اختر...</option>{settings.subCategories.map(c => <option key={c}>{c}</option>)}</select></div>
+                    <div><label class="block font-bold mb-1">نوع التكلفة</label><select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border rounded-xl p-2"><option value="">اختر...</option>{settings.costTypes.map(c => <option key={c}>{c}</option>)}</select></div>
+                    <div><label class="block font-bold mb-1">المورد</label><select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border rounded-xl p-2"><option value="">اختر...</option>{settings.suppliers.map(c => <option key={c}>{c}</option>)}</select></div>
+                    <div><label class="block font-bold mb-1">طريقة الدفع</label><select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} class="w-full border rounded-xl p-2"><option>كاش</option><option>تحويل بنكي</option><option>شيك</option></select></div>
+                    <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/></div>
+                    <div><label class="block font-bold mb-1">سعر الوحدة</label><input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/></div>
                     
                     <div class="sm:col-span-2">
-                      <label class="block font-bold mb-0.5 text-slate-700">📸 إرفاق صورة الفاتورة / الإيصال</label>
-                      <input type="file" accept="image/*" capture="environment" onChange={handleReceiptUpload} class="w-full text-[11px] border border-dashed border-slate-300 p-1.5 rounded bg-slate-50"/>
-                      {newExp.receiptImg && <span class="text-[10px] text-emerald-600 font-bold mt-1 inline-block">✅ تم إرفاق الفاتورة</span>}
+                      <label class="block font-bold mb-1 text-slate-700">📸 إرفاق صورة الفاتورة / الإيصال</label>
+                      <input type="file" accept="image/*" capture="environment" onChange={handleReceiptUpload} class="w-full text-xs border border-dashed border-slate-300 p-2 rounded-xl bg-slate-50"/>
+                      {newExp.receiptImg && <span class="text-[11px] text-emerald-600 font-bold mt-1 inline-block">✅ تم اختيار الفاتورة</span>}
                     </div>
 
-                    <div class="sm:col-span-2 bg-rose-50 border border-rose-200 p-2 rounded flex justify-between items-center"><span class="font-bold text-rose-900">إجمالي المصروف:</span><span class="text-sm font-black text-rose-600">{((Number(newExp.quantity)||0) * (Number(newExp.unitPrice)||0)).toLocaleString()} ج.م</span></div>
-                    <div class="sm:col-span-2"><button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded shadow">حفظ المصروف للمشروع ({selectedProjId})</button></div>
+                    <div class="sm:col-span-2 bg-rose-50 border border-rose-200 p-2.5 rounded-xl flex justify-between items-center"><span class="font-bold text-rose-900">إجمالي المصروف:</span><span class="text-sm font-black text-rose-600">{((Number(newExp.quantity)||0) * (Number(newExp.unitPrice)||0)).toLocaleString()} ج.م</span></div>
+                    <div class="sm:col-span-2"><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المصروف ({selectedProjId})</button></div>
                   </form>
                 </div>
 
-                <div class="space-y-3">
-                  <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 class="font-bold text-slate-800 mb-2 border-b pb-1 text-xs sm:text-sm">📄 اعتماد مستخلص أعمال</h3>
+                <div class="space-y-3.5">
+                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">📄 اعتماد مستخلص أعمال</h3>
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       const totalWork = Number(newExt.quantity) * Number(newExt.unitPrice);
@@ -568,21 +638,21 @@
                       setExtracts(updated);
                       if (db) db.ref('extracts').set(updated);
                       setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""});
-                      showAlert("تم حفظ المستخلص!");
-                    }} class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      <div><label class="block font-bold mb-0.5 text-blue-700">التاريخ</label><input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} class="w-full border rounded p-1.5 bg-blue-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-0.5">رقم المستخلص</label><input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} class="w-full border rounded p-1.5" required placeholder="مستخلص 1"/></div>
-                      <div class="sm:col-span-2"><label class="block font-bold mb-0.5">بيان الأعمال</label><input type="text" value={newExt.workDescription} onChange={e=>setNewExt({...newExt, workDescription: e.target.value})} class="w-full border rounded p-1.5" required placeholder="تكسير، حفر، مباني..."/></div>
-                      <div><label class="block font-bold mb-0.5">الكمية</label><input type="number" step="any" value={newExt.quantity} onChange={e=>setNewExt({...newExt, quantity: e.target.value})} class="w-full border rounded p-1.5 bg-indigo-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-0.5">الفئة</label><input type="number" step="any" value={newExt.unitPrice} onChange={e=>setNewExt({...newExt, unitPrice: e.target.value})} class="w-full border rounded p-1.5 bg-indigo-50 font-bold" required/></div>
-                      <div class="sm:col-span-2"><label class="block font-bold mb-0.5">الاستقطاعات</label><input type="number" step="any" value={newExt.deductions} onChange={e=>setNewExt({...newExt, deductions: e.target.value})} class="w-full border rounded p-1.5 text-rose-600"/></div>
-                      <div class="sm:col-span-2 bg-indigo-50 border border-indigo-200 p-2 rounded flex justify-between items-center"><span class="font-bold text-indigo-900">الصافي:</span><span class="text-sm font-black text-indigo-700">{(((Number(newExt.quantity)||0) * (Number(newExt.unitPrice)||0)) - (Number(newExt.deductions)||0)).toLocaleString()} ج.م</span></div>
-                      <div class="sm:col-span-2"><button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 rounded">حفظ المستخلص</button></div>
+                      showToast("تم اعتماد المستخلص وحفظه!");
+                    }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                      <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
+                      <div><label class="block font-bold mb-1">رقم المستخلص</label><input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} class="w-full border rounded-xl p-2" required placeholder="مستخلص 1"/></div>
+                      <div class="sm:col-span-2"><label class="block font-bold mb-1">بيان الأعمال</label><input type="text" value={newExt.workDescription} onChange={e=>setNewExt({...newExt, workDescription: e.target.value})} class="w-full border rounded-xl p-2" required placeholder="تكسير، حفر، مباني..."/></div>
+                      <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={newExt.quantity} onChange={e=>setNewExt({...newExt, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-indigo-50 font-bold" required/></div>
+                      <div><label class="block font-bold mb-1">الفئة</label><input type="number" step="any" value={newExt.unitPrice} onChange={e=>setNewExt({...newExt, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-indigo-50 font-bold" required/></div>
+                      <div class="sm:col-span-2"><label class="block font-bold mb-1">الاستقطاعات</label><input type="number" step="any" value={newExt.deductions} onChange={e=>setNewExt({...newExt, deductions: e.target.value})} class="w-full border rounded-xl p-2 text-rose-600"/></div>
+                      <div class="sm:col-span-2 bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl flex justify-between items-center"><span class="font-bold text-indigo-900">الصافي:</span><span class="text-sm font-black text-indigo-700">{(((Number(newExt.quantity)||0) * (Number(newExt.unitPrice)||0)) - (Number(newExt.deductions)||0)).toLocaleString()} ج.م</span></div>
+                      <div class="sm:col-span-2"><button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المستخلص</button></div>
                     </form>
                   </div>
 
-                  <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 class="font-bold text-slate-800 mb-2 border-b pb-1 text-xs sm:text-sm">💰 تسجيل دفعة عميل</h3>
+                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💰 تسجيل دفعة عميل</h3>
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       const targetProj = cleanId(selectedProjId);
@@ -591,12 +661,12 @@
                       setPayments(updated);
                       if (db) db.ref('payments').set(updated);
                       setNewPay({date: todayDate, amount: "", paymentMethod: "كاش", notes: ""});
-                      showAlert("تم حفظ الدفعة بنجاح!");
-                    }} class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      <div><label class="block font-bold mb-0.5 text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border rounded p-1.5 bg-blue-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-0.5">المبلغ</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded p-1.5 font-bold text-emerald-600 bg-emerald-50" required/></div>
-                      <div class="sm:col-span-2"><label class="block font-bold mb-0.5">البيان</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded p-1.5" placeholder="دفعة تحت الحساب..."/></div>
-                      <div class="sm:col-span-2"><button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2 rounded">حفظ الدفعة</button></div>
+                      showToast("تم تسجيل الدفعة بنجاح! 💵");
+                    }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                      <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
+                      <div><label class="block font-bold mb-1">المبلغ</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-emerald-600 bg-emerald-50" required/></div>
+                      <div class="sm:col-span-2"><label class="block font-bold mb-1">البيان</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded-xl p-2" placeholder="دفعة تحت الحساب..."/></div>
+                      <div class="sm:col-span-2"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ الدفعة</button></div>
                     </form>
                   </div>
                 </div>
@@ -604,21 +674,21 @@
             )}
 
             {activeTab === "expenses" && (
-              <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto p-3 text-xs">
+              <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
                 <table class="w-full text-right">
-                  <thead><tr class="bg-slate-100 text-slate-600"><th class="p-2">التاريخ</th><th class="p-2">المشروع</th><th class="p-2">البيان</th><th class="p-2">المورد</th><th class="p-2">الإجمالي</th><th class="p-2">الفاتورة</th><th class="p-2">بواسطة</th>{isAdmin && <th class="p-2">حذف</th>}</tr></thead>
+                  <thead><tr class="bg-slate-100 text-slate-600"><th class="p-2.5">التاريخ</th><th class="p-2.5">المشروع</th><th class="p-2.5">البيان</th><th class="p-2.5">المورد</th><th class="p-2.5">الإجمالي</th><th class="p-2.5">الفاتورة</th><th class="p-2.5">بواسطة</th>{isAdmin && <th class="p-2.5">حذف</th>}</tr></thead>
                   <tbody>
                     {expenses.map((e) => (
                       <tr key={e.id} class="border-t hover:bg-slate-50">
-                        <td class="p-2 text-slate-600">{e.date}</td><td class="p-2 font-bold text-blue-700">{e.projectId}</td><td class="p-2">{e.mainCategory} - {e.subCategory}</td><td class="p-2">{e.supplier}</td>
-                        <td class="p-2 font-bold text-rose-600">{(e.amount || 0).toLocaleString()}</td>
-                        <td class="p-2">
+                        <td class="p-2.5 text-slate-600">{e.date}</td><td class="p-2.5 font-bold text-blue-700">{e.projectId}</td><td class="p-2.5">{e.mainCategory} - {e.subCategory}</td><td class="p-2.5">{e.supplier}</td>
+                        <td class="p-2.5 font-bold text-rose-600">{(e.amount || 0).toLocaleString()}</td>
+                        <td class="p-2.5">
                           {e.receiptImg ? (
-                            <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-bold hover:bg-blue-100">عرض 🖼️</button>
+                            <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold hover:bg-blue-100">عرض 🖼️</button>
                           ) : <span class="text-slate-400">لا يوجد</span>}
                         </td>
-                        <td class="p-2 text-slate-500">{e.createdBy || '-'}</td>
-                        {isAdmin && <td class="p-2"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500">🗑</button></td>}
+                        <td class="p-2.5 text-slate-500">{e.createdBy || '-'}</td>
+                        {isAdmin && <td class="p-2.5"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500">🗑</button></td>}
                       </tr>
                     ))}
                   </tbody>
@@ -627,17 +697,17 @@
             )}
 
             {activeTab === "statement" && (
-              <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm print-area text-xs">
+              <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm print-area text-xs">
                 <div class="flex justify-between items-center mb-4 border-b pb-3 print-hidden">
                   <div>
                     <h3 class="font-black text-slate-800 text-sm">📑 كشف حساب وتحليل مالي شامل للمشروع</h3>
                     <p class="text-slate-500 text-[11px]">يجمع بين مستحقات العميل والمصروفات وصافي الأرباح الفعلية.</p>
                   </div>
-                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded font-bold shadow">🖨️ طباعة كشف الحساب</button>
+                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨️ طباعة كشف الحساب</button>
                 </div>
 
-                <div class="border border-slate-300 p-3.5 rounded mb-4">
-                  <div class="flex justify-between items-center mb-2">
+                <div class="border border-slate-300 p-3.5 rounded-2xl mb-4">
+                  <div class="flex justify-between items-center mb-2.5">
                     <div>
                       <h2 class="text-base font-black text-slate-900">الموقف المالي لمشروع: {currentProj.name} ({currentProj.id})</h2>
                       <p class="font-bold text-slate-600 text-[11px]">الموقع: {currentProj.location || '-'} | الميزانية: {(Number(currentProj.budget)||0).toLocaleString()} ج.م</p>
@@ -645,44 +715,44 @@
                     {settings.logo && <img src={settings.logo} class="h-10 object-contain"/>}
                   </div>
                   
-                  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded text-center border">
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-50 p-3 rounded-xl text-center border">
                     <div><span class="text-slate-500 block text-[10px]">إجمالي المستخلصات:</span><strong class="text-indigo-700 text-sm">{totalWorkNet.toLocaleString()} ج.م</strong></div>
                     <div><span class="text-slate-500 block text-[10px]">إجمالي التحصيلات:</span><strong class="text-emerald-600 text-sm">{totalReceived.toLocaleString()} ج.م</strong></div>
-                    <div><span class="text-slate-500 block text-[10px]">إجمالي المصروفات (التكلفة):</span><strong class="text-rose-600 text-sm">{totalCost.toLocaleString()} ج.م</strong></div>
+                    <div><span class="text-slate-500 block text-[10px]">إجمالي المصروفات:</span><strong class="text-rose-600 text-sm">{totalCost.toLocaleString()} ج.م</strong></div>
                     <div><span class="text-slate-500 block text-[10px]">صافي الربح الفعلي:</span><strong class={`text-sm ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{netProfit.toLocaleString()} ج.م</strong></div>
                   </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <h4 class="font-bold text-slate-700 mb-1 border-b pb-1">1. المستخلصات المعتمدة</h4>
+                    <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">1. المستخلصات المعتمدة</h4>
                     <table class="w-full text-right border">
-                      <thead><tr class="bg-slate-100"><th class="p-1 border">التاريخ</th><th class="p-1 border">البيان</th><th class="p-1 border">الصافي</th></tr></thead>
+                      <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">البيان</th><th class="p-1.5 border">الصافي</th></tr></thead>
                       <tbody>
                         {projExtracts.length === 0 ? <tr><td colSpan="3" class="text-center p-2 text-slate-400">لا يوجد مستخلصات</td></tr> :
-                        projExtracts.map(ex => <tr key={ex.id}><td class="p-1 border">{ex.date}</td><td class="p-1 border">{ex.workDescription}</td><td class="p-1 border font-bold text-indigo-700">{ex.net.toLocaleString()}</td></tr>)}
+                        projExtracts.map(ex => <tr key={ex.id}><td class="p-1.5 border">{ex.date}</td><td class="p-1.5 border">{ex.workDescription}</td><td class="p-1.5 border font-bold text-indigo-700">{ex.net.toLocaleString()}</td></tr>)}
                       </tbody>
                     </table>
                   </div>
 
                   <div>
-                    <h4 class="font-bold text-slate-700 mb-1 border-b pb-1">2. الدفعات المستلمة</h4>
+                    <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">2. الدفعات المستلمة</h4>
                     <table class="w-full text-right border">
-                      <thead><tr class="bg-slate-100"><th class="p-1 border">التاريخ</th><th class="p-1 border">البيان</th><th class="p-1 border">المبلغ</th></tr></thead>
+                      <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">البيان</th><th class="p-1.5 border">المبلغ</th></tr></thead>
                       <tbody>
                         {projPayments.length === 0 ? <tr><td colSpan="3" class="text-center p-2 text-slate-400">لا يوجد دفعات</td></tr> :
-                        projPayments.map(p => <tr key={p.id}><td class="p-1 border">{p.date}</td><td class="p-1 border">{p.notes || 'دفعة'}</td><td class="p-1 border font-bold text-emerald-600">{p.amount.toLocaleString()}</td></tr>)}
+                        projPayments.map(p => <tr key={p.id}><td class="p-1.5 border">{p.date}</td><td class="p-1.5 border">{p.notes || 'دفعة'}</td><td class="p-1.5 border font-bold text-emerald-600">{p.amount.toLocaleString()}</td></tr>)}
                       </tbody>
                     </table>
                   </div>
 
                   <div>
-                    <h4 class="font-bold text-slate-700 mb-1 border-b pb-1">3. المصروفات والتكاليف المسجلة</h4>
+                    <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">3. المصروفات المسجلة</h4>
                     <table class="w-full text-right border">
-                      <thead><tr class="bg-slate-100"><th class="p-1 border">التاريخ</th><th class="p-1 border">البند</th><th class="p-1 border">المبلغ</th></tr></thead>
+                      <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">البند</th><th class="p-1.5 border">المبلغ</th></tr></thead>
                       <tbody>
                         {projExpenses.length === 0 ? <tr><td colSpan="3" class="text-center p-2 text-slate-400">لا توجد مصروفات</td></tr> :
-                        projExpenses.map(e => <tr key={e.id}><td class="p-1 border">{e.date}</td><td class="p-1 border">{e.mainCategory} - {e.subCategory}</td><td class="p-1 border font-bold text-rose-600">{e.amount.toLocaleString()}</td></tr>)}
+                        projExpenses.map(e => <tr key={e.id}><td class="p-1.5 border">{e.date}</td><td class="p-1.5 border">{e.mainCategory} - {e.subCategory}</td><td class="p-1.5 border font-bold text-rose-600">{e.amount.toLocaleString()}</td></tr>)}
                       </tbody>
                     </table>
                   </div>
@@ -691,9 +761,9 @@
             )}
 
             {activeTab === "projects" && (
-              <div class="space-y-3">
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-xs">
-                  <h3 class="font-bold mb-2 border-b pb-1 text-xs sm:text-sm">📁 إضافة مشروع جديد</h3>
+              <div class="space-y-3.5">
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
+                  <h3 class="font-bold mb-2.5 border-b pb-1.5 text-xs sm:text-sm">📁 إضافة مشروع جديد</h3>
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     if (!newProj.id || !newProj.name) return;
@@ -709,29 +779,29 @@
                     if (db) db.ref('projects').set(updatedProjects);
                     setSelectedProjId(clean);
                     setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
-                    showAlert(`تمت إضافة المشروع (${clean}) بنجاح!`);
-                  }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2 items-end">
+                    showToast(`تمت إضافة المشروع (${clean}) بنجاح!`);
+                  }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
                     <div>
-                      <label class="block font-bold mb-0.5">كود المشروع</label>
-                      <input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded p-1.5 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required />
+                      <label class="block font-bold mb-1">كود المشروع</label>
+                      <input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded-xl p-2 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required />
                     </div>
-                    <div><label class="block font-bold mb-0.5">اسم العميل</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded p-1.5" required /></div>
-                    <div><label class="block font-bold mb-0.5">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded p-1.5" /></div>
-                    <div><label class="block font-bold mb-0.5">الميزانية المعتمدة</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded p-1.5 text-blue-700 font-bold" placeholder="500000" /></div>
-                    <div><label class="block font-bold mb-0.5">تاريخ البدء</label><input type="date" value={newProj.startDate} onChange={e=>setNewProj({...newProj, startDate: e.target.value})} class="w-full border rounded p-1.5" /></div>
-                    <div><button type="submit" class="w-full bg-blue-600 text-white font-bold py-1.5 rounded">➕ حفظ المشروع</button></div>
+                    <div><label class="block font-bold mb-1">اسم العميل</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded-xl p-2" required /></div>
+                    <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded-xl p-2" /></div>
+                    <div><label class="block font-bold mb-1">الميزانية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded-xl p-2 text-blue-700 font-bold" placeholder="500000" /></div>
+                    <div><label class="block font-bold mb-1">تاريخ البدء</label><input type="date" value={newProj.startDate} onChange={e=>setNewProj({...newProj, startDate: e.target.value})} class="w-full border rounded-xl p-2" /></div>
+                    <div><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl transition">➕ حفظ المشروع</button></div>
                   </form>
                 </div>
-                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm overflow-x-auto text-xs">
+                <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
                   <table class="w-full text-right">
-                    <thead><tr class="bg-slate-100 text-slate-700"><th class="p-2">الكود</th><th class="p-2">العميل</th><th class="p-2">الموقع</th><th class="p-2">الميزانية</th><th class="p-2">الحالة</th>{isAdmin && <th class="p-2 text-center">إجراء</th>}</tr></thead>
+                    <thead><tr class="bg-slate-100 text-slate-700"><th class="p-2.5">الكود</th><th class="p-2.5">العميل</th><th class="p-2.5">الموقع</th><th class="p-2.5">الميزانية</th><th class="p-2.5">الحالة</th>{isAdmin && <th class="p-2.5 text-center">إجراء</th>}</tr></thead>
                     <tbody>
                       {projects.map(p => (
                         <tr key={p.id} class="border-b hover:bg-slate-50">
-                          <td class="p-2 font-bold text-blue-700 font-mono">{p.id}</td><td class="p-2 font-semibold">{p.name}</td><td class="p-2">{p.location || '-'}</td>
-                          <td class="p-2 font-bold text-slate-700">{(Number(p.budget)||0).toLocaleString()} ج.م</td>
-                          <td class="p-2"><span class="bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded text-[10px]">{p.status || 'جاري'}</span></td>
-                          {isAdmin && <td class="p-2 text-center"><button onClick={()=>deleteItem('projects', p.id, projects)} class="text-rose-500">🗑️</button></td>}
+                          <td class="p-2.5 font-bold text-blue-700 font-mono">{p.id}</td><td class="p-2.5 font-semibold">{p.name}</td><td class="p-2.5">{p.location || '-'}</td>
+                          <td class="p-2.5 font-bold text-slate-700">{(Number(p.budget)||0).toLocaleString()} ج.م</td>
+                          <td class="p-2.5"><span class="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-lg text-[10px]">{p.status || 'جاري'}</span></td>
+                          {isAdmin && <td class="p-2.5 text-center"><button onClick={()=>deleteItem('projects', p.id, projects)} class="text-rose-500">🗑️</button></td>}
                         </tr>
                       ))}
                     </tbody>
@@ -741,21 +811,21 @@
             )}
 
             {activeTab === "payments" && (
-              <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto p-3 text-xs">
+              <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
                 <table class="w-full text-right">
-                  <thead><tr class="bg-slate-100 text-slate-600"><th class="p-2">التاريخ</th><th class="p-2">المشروع</th><th class="p-2">المبلغ</th><th class="p-2">البيان</th><th class="p-2">بواسطة</th>{isAdmin && <th class="p-2">حذف</th>}</tr></thead>
+                  <thead><tr class="bg-slate-100 text-slate-600"><th class="p-2.5">التاريخ</th><th class="p-2.5">المشروع</th><th class="p-2.5">المبلغ</th><th class="p-2.5">البيان</th><th class="p-2.5">بواسطة</th>{isAdmin && <th class="p-2.5">حذف</th>}</tr></thead>
                   <tbody>{payments.map((p) => (
-                    <tr key={p.id} class="border-b hover:bg-slate-50"><td class="p-2 text-slate-600">{p.date}</td><td class="p-2 font-bold text-blue-700">{p.projectId}</td><td class="p-2 text-emerald-600 font-bold">{(p.amount || 0).toLocaleString()}</td><td class="p-2">{p.notes}</td><td class="p-2 text-slate-500">{p.createdBy || '-'}</td>{isAdmin && <td class="p-2"><button onClick={()=>deleteItem('payments',p.id,payments)} class="text-rose-500">🗑️</button></td>}</tr>
+                    <tr key={p.id} class="border-b hover:bg-slate-50"><td class="p-2.5 text-slate-600">{p.date}</td><td class="p-2.5 font-bold text-blue-700">{p.projectId}</td><td class="p-2.5 text-emerald-600 font-bold">{(p.amount || 0).toLocaleString()}</td><td class="p-2.5">{p.notes}</td><td class="p-2.5 text-slate-500">{p.createdBy || '-'}</td>{isAdmin && <td class="p-2.5"><button onClick={()=>deleteItem('payments',p.id,payments)} class="text-rose-500">🗑️</button></td>}</tr>
                   ))}</tbody>
                 </table>
               </div>
             )}
 
             {activeTab === "extracts" && (
-              <div class="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm overflow-x-auto print-area text-xs">
+              <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto print-area text-xs">
                 <div class="flex justify-between items-center mb-4 print-hidden">
                   <h3 class="font-bold text-slate-800 text-sm">سجل المستخلصات المعتمدة</h3>
-                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded font-bold shadow text-xs">🖨️ طباعة المستخلص كـ PDF</button>
+                  <button onClick={() => window.print()} class="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs">🖨️ طباعة المستخلص كـ PDF</button>
                 </div>
                 <div class="flex justify-between items-center border-b-2 border-slate-800 pb-3 mb-3">
                   <div>
@@ -765,23 +835,23 @@
                   {settings.logo && <img src={settings.logo} class="h-14 object-contain"/>}
                 </div>
                 <table class="w-full text-right border-collapse border border-slate-300">
-                  <thead><tr class="bg-slate-200 text-slate-800"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">رقم المستخلص</th><th class="p-1.5 border">بيان الأعمال</th><th class="p-1.5 border">الكمية</th><th class="p-1.5 border">الفئة</th><th class="p-1.5 border">الإجمالي</th><th class="p-1.5 border">الاستقطاع</th><th class="p-1.5 border">الصافي</th>{isAdmin && <th class="p-1.5 print-hidden border">حذف</th>}</tr></thead>
+                  <thead><tr class="bg-slate-200 text-slate-800"><th class="p-2 border border-slate-300">التاريخ</th><th class="p-2 border border-slate-300">رقم المستخلص</th><th class="p-2 border border-slate-300">بيان الأعمال</th><th class="p-2 border border-slate-300 text-center">الكمية</th><th class="p-2 border border-slate-300 text-center">الفئة</th><th class="p-2 border border-slate-300 text-center">الإجمالي</th><th class="p-2 border border-slate-300 text-center">الاستقطاع</th><th class="p-2 border border-slate-300 text-center">الصافي</th>{isAdmin && <th class="p-2 print-hidden border text-center">حذف</th>}</tr></thead>
                   <tbody>{projExtracts.map((ex, i) => (
-                    <tr key={ex.id} class="hover:bg-slate-50"><td class="p-1.5 border">{ex.date}</td><td class="p-1.5 border font-bold">{ex.extractNo}</td><td class="p-1.5 border">{ex.workDescription}</td><td class="p-1.5 border text-center">{ex.quantity}</td><td class="p-1.5 border text-center">{ex.unitPrice}</td><td class="p-1.5 border text-center font-bold">{ex.totalWork.toLocaleString()}</td><td class="p-1.5 border text-center text-rose-600">{ex.deductions}</td><td class="p-1.5 border text-center font-black text-indigo-700 bg-indigo-50">{ex.net.toLocaleString()}</td>{isAdmin && <td class="p-1.5 print-hidden border text-center"><button onClick={() => deleteItem('extracts', ex.id, extracts)} class="text-rose-500">🗑️</button></td>}</tr>
+                    <tr key={ex.id} class="hover:bg-slate-50"><td class="p-2 border border-slate-300">{ex.date}</td><td class="p-2 border border-slate-300 font-bold">{ex.extractNo}</td><td class="p-2 border border-slate-300">{ex.workDescription}</td><td class="p-2 border border-slate-300 text-center">{ex.quantity}</td><td class="p-2 border border-slate-300 text-center">{ex.unitPrice}</td><td class="p-2 border border-slate-300 text-center font-bold">{ex.totalWork.toLocaleString()}</td><td class="p-2 border border-slate-300 text-center text-rose-600">{ex.deductions}</td><td class="p-2 border border-slate-300 text-center font-black text-indigo-700 bg-indigo-50">{ex.net.toLocaleString()}</td>{isAdmin && <td class="p-2 print-hidden border text-center"><button onClick={() => deleteItem('extracts', ex.id, extracts)} class="text-rose-500">🗑️</button></td>}</tr>
                   ))}</tbody>
-                  <tfoot><tr class="bg-slate-800 text-white font-bold"><td class="p-2 text-left" colSpan="7">إجمالي المستخلصات:</td><td class="p-2 text-center text-sm" colSpan={isAdmin ? 2 : 1}>{totalWorkNet.toLocaleString()} ج.م</td></tr></tfoot>
+                  <tfoot><tr class="bg-slate-800 text-white font-bold"><td class="p-2.5 text-left" colSpan="7">إجمالي المستخلصات:</td><td class="p-2.5 text-center text-sm" colSpan={isAdmin ? 2 : 1}>{totalWorkNet.toLocaleString()} ج.م</td></tr></tfoot>
                 </table>
               </div>
             )}
 
             {activeTab === "audit_log" && isAdmin && (
-              <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-xs">
-                <h3 class="font-bold text-slate-800 mb-2 border-b pb-2">🛡 سجل دخول المستخدمين</h3>
+              <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
+                <h3 class="font-bold text-slate-800 mb-2.5 border-b pb-2">🛡️ سجل دخول المستخدمين</h3>
                 <div class="overflow-x-auto">
                   <table class="w-full text-right">
-                    <thead><tr class="bg-slate-100 text-slate-700 border-b"><th class="p-2">المستخدم</th><th class="p-2">المعرف</th><th class="p-2">الرتبة</th><th class="p-2">الجهاز</th><th class="p-2">الوقت</th></tr></thead>
+                    <thead><tr class="bg-slate-100 text-slate-700 border-b"><th class="p-2.5">المستخدم</th><th class="p-2.5">المعرف</th><th class="p-2.5">الرتبة</th><th class="p-2.5">الجهاز</th><th class="p-2.5">الوقت</th></tr></thead>
                     <tbody>{loginLogs.map((log, i) => (
-                      <tr key={i} class="border-b hover:bg-slate-50"><td class="p-2 font-bold">{log.name}</td><td class="p-2 font-mono text-slate-600">{log.identifier}</td><td class="p-2"><span class={`px-1.5 py-0.5 rounded ${log.role.includes("Admin") ? "bg-amber-100 text-amber-800 font-bold" : "bg-slate-100"}`}>{log.role}</span></td><td class="p-2">{log.device}</td><td class="p-2 text-slate-500 font-mono">{log.formattedDate}</td></tr>
+                      <tr key={i} class="border-b hover:bg-slate-50"><td class="p-2.5 font-bold">{log.name}</td><td class="p-2.5 font-mono text-slate-600">{log.identifier}</td><td class="p-2.5"><span class={`px-2 py-0.5 rounded-lg ${log.role.includes("Admin") ? "bg-amber-100 text-amber-800 font-bold" : "bg-slate-100"}`}>{log.role}</span></td><td class="p-2.5">{log.device}</td><td class="p-2.5 text-slate-500 font-mono">{log.formattedDate}</td></tr>
                     ))}</tbody>
                   </table>
                 </div>
@@ -789,8 +859,8 @@
             )}
 
             {activeTab === "settings" && (
-              <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-xs">
-                <h3 class="font-bold mb-2">🖼️ شعار الشركة المعتمد للمستندات والتقارير</h3>
+              <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs max-w-xl">
+                <h3 class="font-bold mb-3 text-sm">🖼️ شعار الشركة المعتمد للمستندات والتقارير</h3>
                 <input type="file" accept="image/*" onChange={(e)=>{
                   const file = e.target.files && e.target.files[0];
                   if(!file) return;
@@ -799,24 +869,55 @@
                     const base64 = evt.target.result;
                     if(db) db.ref('settings/logo').set(base64);
                     setSettings(prev=>({...prev, logo: base64}));
-                    showAlert("تم حفظ اللوجو بنجاح!");
+                    showToast("تم تحديث وحفظ اللوجو بنجاح! 🖼️");
                   };
                   reader.readAsDataURL(file);
-                }} class="text-xs"/>
-                {settings.logo && <div class="mt-3"><img src={settings.logo} class="h-16 object-contain border p-1 rounded" /></div>}
+                }} class="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
+                {settings.logo && <div class="mt-4"><img src={settings.logo} class="h-20 object-contain border p-2 rounded-2xl" /></div>}
               </div>
             )}
           </main>
 
-          {activeInvoiceModal && (
-            <div class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-              <div class="bg-white p-3 rounded-xl max-w-lg w-full flex flex-col items-center">
-                <h4 class="font-bold mb-2 text-xs">صورة الفاتورة المرفقة</h4>
-                <img src={activeInvoiceModal} class="max-h-[70vh] object-contain rounded border mb-3 w-full" />
-                <button onClick={()=>setActiveInvoiceModal(null)} class="w-full bg-slate-800 text-white font-bold py-1.5 rounded text-xs">إغلاق المعاينة</button>
+          {/* شريط التنقل السفلي للهواتف الذكية (Bottom Navigation Bar) */}
+          <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-lg z-40 px-2 py-1.5 flex justify-around items-center">
+            {navTabs.map(tab => (
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id)} 
+                class={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition duration-200 ${activeTab === tab.id ? "text-blue-600 font-black scale-105" : "text-slate-400 hover:text-slate-600"}`}>
+                <span class="text-base">{tab.icon}</span>
+                <span class="text-[10px] mt-0.5">{tab.label}</span>
+              </button>
+            ))}
+            <button 
+              onClick={() => setDrawerOpen(true)} 
+              class="flex flex-col items-center justify-center py-1 px-2.5 text-slate-400 hover:text-slate-600">
+              <span class="text-base">☰</span>
+              <span class="text-[10px] mt-0.5">المزيد</span>
+            </button>
+          </nav>
+
+          {/* نافذة التنبيهات المنبثقة التفاعلية (Toast Notification) */}
+          {toast.show && (
+            <div class="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
+              <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
+                <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
+                <span>{toast.message}</span>
               </div>
             </div>
           )}
+
+          {/* نافذة معاينة الفاتورة */}
+          {activeInvoiceModal && (
+            <div class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+              <div class="bg-white p-4 rounded-3xl max-w-lg w-full flex flex-col items-center shadow-2xl">
+                <h4 class="font-bold mb-3 text-xs text-slate-800">صورة الفاتورة المرفقة</h4>
+                <img src={activeInvoiceModal} class="max-h-[65vh] object-contain rounded-2xl border mb-4 w-full" />
+                <button onClick={()=>setActiveInvoiceModal(null)} class="w-full bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-2xl text-xs transition">إغلاق المعاينة</button>
+              </div>
+            </div>
+          )}
+
         </div>
       );
     }
