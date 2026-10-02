@@ -45,7 +45,7 @@
     };
 
     const ADMIN_IDENTIFIERS = [
-      "mohamedmohy676676@gmail.com",
+      "momohy2030@gmail.com",
       "+201000000000"
     ];
 
@@ -60,13 +60,23 @@
       auth.languageCode = 'ar';
     } catch (e) { console.error("Firebase init error:", e); }
 
-    const initialProjects = [{"id": "PRJ-01", "name": "مشروع تجريبي", "location": "الموقع", "budget": 500000, "startDate": "2026-01-01", "deliveryDate": "2026-12-31", "status": "جاري العمل", "createdBy": "النظام"}];
+    // الكود الدائم الأساسي للمشاريع يبدأ بـ cons-01
+    const initialProjects = [
+      {"id": "cons-01", "name": "مشروع رئيسي 01", "location": "الموقع العام", "budget": 500000, "startDate": "2026-01-01", "deliveryDate": "2026-12-31", "status": "جاري العمل", "createdBy": "النظام"}
+    ];
+
     const initialSettings = {
       mainCategories: ["مباني", "صبة خرسانه", "كهرباء", "سباكة", "محارة", "نقاشة"],
       subCategories: ["طوب", "اسمنت", "رملة", "عمالة", "الاكل", "نجار", "حداد", "خلاطة"],
       costTypes: ["مصنعيات", "بضاعة/مواد", "أكل", "مواصلات", "إيجار معدات", "نثريات وإكراميات"],
       suppliers: ["مورد الأسمنت", "مورد الرمل", "مقاول النجارة", "مصنع الطوب"],
       logo: ""
+    };
+
+    // دالة لتنظيف كود المشروع والتأكد من توافقه تماماً مع Firebase
+    const sanitizeProjectId = (id) => {
+      if (!id) return "cons-01";
+      return id.replace(/[.#$\[\]\/]/g, "-").replace(/\s+/g, "-").trim();
     };
 
     function DashboardCharts({ allWork, allExp, allPay, projExpLabels, projExpData, projName }) {
@@ -112,7 +122,7 @@
             <div class="flex-1 relative w-full"><canvas ref={chart1Ref}></canvas></div>
           </div>
           <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm h-64 flex flex-col">
-            <h4 class="font-bold text-slate-700 mb-2 text-center text-xs">📊 توزيع بنود تكلفة ({projName})</h4>
+            <h4 class="font-bold text-slate-700 mb-2 text-center text-xs">📊 توزيع تكلفة ({projName})</h4>
             <div class="flex-1 relative w-full"><canvas ref={chart2Ref}></canvas></div>
           </div>
         </div>
@@ -137,7 +147,7 @@
       const [loginLogs, setLoginLogs] = useState([]);
       const [settings, setSettings] = useState(initialSettings);
       
-      const [selectedProjId, setSelectedProjId] = useState("PRJ-01");
+      const [selectedProjId, setSelectedProjId] = useState("cons-01");
       const [activeTab, setActiveTab] = useState("dashboard");
       const [alertMsg, setAlertMsg] = useState("");
       const [activeInvoiceModal, setActiveInvoiceModal] = useState(null);
@@ -148,10 +158,28 @@
 
       const todayDate = new Date().toISOString().split('T')[0];
 
-      const [newProj, setNewProj] = useState({ id: "", name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
+      // توليد الكود التلقائي التالي للمشاريع
+      const nextSuggestedProjectId = useMemo(() => {
+        const consNumbers = projects
+          .map(p => {
+            const m = String(p.id).match(/^cons-(\d+)$/i);
+            return m ? parseInt(m[1], 10) : 0;
+          })
+          .filter(n => n > 0);
+        const maxNum = consNumbers.length > 0 ? Math.max(...consNumbers) : 0;
+        const next = maxNum + 1;
+        return `cons-${next < 10 ? '0' + next : next}`;
+      }, [projects]);
+
+      const [newProj, setNewProj] = useState({ id: "cons-01", name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
       const [newExp, setNewExp] = useState({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", quantity: 1, unitPrice: "", paymentMethod: "كاش", receiptImg: "" });
       const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "كاش", notes: "" });
       const [newExt, setNewExt] = useState({ date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: "" });
+
+      // تحديث كود المشروع المقترح عند إضافة مشروع جديد
+      useEffect(() => {
+        setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId }));
+      }, [nextSuggestedProjectId]);
 
       const recordLoginLog = (currentUser, adminStatus) => {
         if (!db) return;
@@ -225,7 +253,11 @@
               suppliers: toArr(savedSettings.suppliers).length ? toArr(savedSettings.suppliers) : initialSettings.suppliers,
               logo: savedSettings.logo || ""
             });
-            setSelectedProjId(prev => prev || (finalProjects[0]?.id || "PRJ-01"));
+
+            setSelectedProjId(prev => {
+              if (prev && finalProjects.some(p => p.id === prev)) return prev;
+              return finalProjects[0]?.id || "cons-01";
+            });
           } catch (err) { console.error(err); } finally { setLoading(false); }
         };
 
@@ -501,7 +533,8 @@
                     e.preventDefault();
                     if(!newExp.unitPrice || !newExp.quantity) return;
                     const totalAmt = Number(newExp.quantity) * Number(newExp.unitPrice);
-                    const newItem = { id: Date.now(), projectId: selectedProjId, ...newExp, amount: totalAmt, createdBy: user.name };
+                    const targetProj = sanitizeProjectId(selectedProjId);
+                    const newItem = { id: Date.now(), projectId: targetProj, ...newExp, amount: totalAmt, createdBy: user.name };
                     const updated = [newItem, ...expenses];
                     setExpenses(updated);
                     if (db) db.ref('expenses').set(updated);
@@ -524,7 +557,7 @@
                     </div>
 
                     <div class="sm:col-span-2 bg-rose-50 border border-rose-200 p-2 rounded flex justify-between items-center"><span class="font-bold text-rose-900">إجمالي المصروف:</span><span class="text-sm font-black text-rose-600">{((Number(newExp.quantity)||0) * (Number(newExp.unitPrice)||0)).toLocaleString()} ج.م</span></div>
-                    <div class="sm:col-span-2"><button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded shadow">حفظ المصروف</button></div>
+                    <div class="sm:col-span-2"><button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded shadow">حفظ المصروف للمشروع ({selectedProjId})</button></div>
                   </form>
                 </div>
 
@@ -535,7 +568,8 @@
                       e.preventDefault();
                       const totalWork = Number(newExt.quantity) * Number(newExt.unitPrice);
                       const net = totalWork - Number(newExt.deductions || 0);
-                      const newItem = { id: Date.now(), projectId: selectedProjId, ...newExt, totalWork, deductions: Number(newExt.deductions||0), net, createdBy: user.name };
+                      const targetProj = sanitizeProjectId(selectedProjId);
+                      const newItem = { id: Date.now(), projectId: targetProj, ...newExt, totalWork, deductions: Number(newExt.deductions||0), net, createdBy: user.name };
                       const updated = [newItem, ...extracts];
                       setExtracts(updated);
                       if (db) db.ref('extracts').set(updated);
@@ -557,7 +591,8 @@
                     <h3 class="font-bold text-slate-800 mb-2 border-b pb-1 text-xs sm:text-sm">💰 تسجيل دفعة عميل</h3>
                     <form onSubmit={(e) => {
                       e.preventDefault();
-                      const newItem = {id: Date.now(), projectId: selectedProjId, ...newPay, amount: Number(newPay.amount), createdBy: user.name};
+                      const targetProj = sanitizeProjectId(selectedProjId);
+                      const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: Number(newPay.amount), createdBy: user.name};
                       const updated = [newItem, ...payments];
                       setPayments(updated);
                       if (db) db.ref('payments').set(updated);
@@ -648,15 +683,24 @@
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     if (!newProj.id || !newProj.name) return;
-                    const projectToAdd = { ...newProj, budget: Number(newProj.budget) || 0, createdBy: user.name };
+                    const cleanId = sanitizeProjectId(newProj.id);
+                    const projectToAdd = { 
+                      ...newProj, 
+                      id: cleanId, 
+                      budget: Number(newProj.budget) || 0, 
+                      createdBy: user.name 
+                    };
                     const updatedProjects = [...projects, projectToAdd];
                     setProjects(updatedProjects);
                     if (db) db.ref('projects').set(updatedProjects);
-                    setSelectedProjId(newProj.id);
-                    setNewProj({ id: "", name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
-                    showAlert("تمت إضافة المشروع!");
+                    setSelectedProjId(cleanId);
+                    setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
+                    showAlert(`تمت إضافة المشروع (${cleanId}) بنجاح!`);
                   }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2 items-end">
-                    <div><label class="block font-bold mb-0.5">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded p-1.5 font-bold" placeholder="PRJ-03" required /></div>
+                    <div>
+                      <label class="block font-bold mb-0.5">كود المشروع</label>
+                      <input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded p-1.5 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required />
+                    </div>
                     <div><label class="block font-bold mb-0.5">اسم العميل</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded p-1.5" required /></div>
                     <div><label class="block font-bold mb-0.5">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded p-1.5" /></div>
                     <div><label class="block font-bold mb-0.5">الميزانية المعتمدة</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded p-1.5 text-blue-700 font-bold" placeholder="500000" /></div>
@@ -670,7 +714,7 @@
                     <tbody>
                       {projects.map(p => (
                         <tr key={p.id} class="border-b hover:bg-slate-50">
-                          <td class="p-2 font-bold text-blue-700">{p.id}</td><td class="p-2 font-semibold">{p.name}</td><td class="p-2">{p.location || '-'}</td>
+                          <td class="p-2 font-bold text-blue-700 font-mono">{p.id}</td><td class="p-2 font-semibold">{p.name}</td><td class="p-2">{p.location || '-'}</td>
                           <td class="p-2 font-bold text-slate-700">{(Number(p.budget)||0).toLocaleString()} ج.م</td>
                           <td class="p-2"><span class="bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded text-[10px]">{p.status || 'جاري'}</span></td>
                           {isAdmin && <td class="p-2 text-center"><button onClick={()=>deleteItem('projects', p.id, projects)} class="text-rose-500">🗑️</button></td>}
