@@ -147,9 +147,9 @@
       const [projects, setProjects] = useState(initialProjects);
       const [expenses, setExpenses] = useState([]);
       const [extracts, setExtracts] = useState([]);
-      const [payments, setPayments] = useState([]); // دفعات العميل
+      const [payments, setPayments] = useState([]);
       const [advances, setAdvances] = useState([]);
-      const [supplierPayments, setSupplierPayments] = useState([]); // دفعات الموردين الجديدة
+      const [supplierPayments, setSupplierPayments] = useState([]);
       const [loginLogs, setLoginLogs] = useState([]);
       const [settings, setSettings] = useState(initialSettings);
       
@@ -179,7 +179,7 @@
       const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "كاش", notes: "" });
       const [newExt, setNewExt] = useState({ date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: "" });
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
-      const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" }); // فورم الموردين
+      const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
 
       useEffect(() => { setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId })); }, [nextSuggestedProjectId]);
       useEffect(() => { 
@@ -244,7 +244,7 @@
             setExtracts([...toArr(data.extracts)].reverse());
             setPayments([...toArr(data.payments)].reverse());
             setAdvances([...toArr(data.advances)].reverse());
-            setSupplierPayments([...toArr(data.supplier_payments)].reverse()); // جلب دفعات الموردين
+            setSupplierPayments([...toArr(data.supplier_payments)].reverse());
             setLoginLogs([...toArr(data.login_logs)].reverse());
 
             const savedSettings = data.settings || {};
@@ -309,7 +309,12 @@
         if (window.confirm("هل أنت متأكد من الحذف نهائياً؟")) {
           const newList = list.filter(item => item.id !== id);
           if (db) db.ref(path).set(newList);
-          if (path === 'expenses') setExpenses(newList); if (path === 'extracts') setExtracts(newList); if (path === 'payments') setPayments(newList); if (path === 'projects') setProjects(newList); if (path === 'advances') setAdvances(newList); if (path === 'supplier_payments') setSupplierPayments(newList);
+          if (path === 'expenses') setExpenses(newList); 
+          if (path === 'extracts') setExtracts(newList); 
+          if (path === 'payments') setPayments(newList); 
+          if (path === 'projects') setProjects(newList); 
+          if (path === 'advances') setAdvances(newList); 
+          if (path === 'supplier_payments') setSupplierPayments(newList);
           showToast("تم الحذف بنجاح! 🗑");
         }
       };
@@ -387,7 +392,6 @@
       const projExpLabels = Object.keys(projExpMap);
       const projExpData = Object.values(projExpMap);
 
-      // محرك البحث في المصروفات
       const filteredSearchExpenses = projExpenses.filter(e => { 
         return (searchMainCat === "" || e.mainCategory === searchMainCat) && 
                (searchSubCat === "" || e.subCategory === searchSubCat) && 
@@ -395,11 +399,8 @@
       });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-      // حسابات الموردين (إجمالي مسحوبات، إجمالي مدفوعات، الرصيد)
       const suppliersLedger = settings.suppliers.map(supp => {
-        // المسحوبات من المورد = الفواتير المسجلة باسمه في المصروفات
         const totalPurchases = expenses.filter(e => e.supplier === supp).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-        // الدفعات النقدية اللي أديتهاله
         const totalPaid = supplierPayments.filter(p => p.supplier === supp).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
         const balance = totalPaid - totalPurchases;
         return { name: supp, purchases: totalPurchases, paid: totalPaid, balance };
@@ -455,7 +456,6 @@
                   <h1 class="text-sm sm:text-base font-black leading-tight">إدارة المعاملات الإنشائية</h1>
                   <div class="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">
                     <span class="truncate max-w-[130px] sm:max-w-none">{user.name}</span>
-                    
                     {isDirector ? (
                       <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold text-[10px]">👑 مدير النظام</span>
                     ) : isProjectEng ? (
@@ -496,7 +496,7 @@
             </div>
           )}
 
-          {["dashboard", "add_data", "projects", "payments", "extracts", "statement", "my_custody", "expenses"].includes(activeTab) && (
+          {["dashboard", "add_data", "projects", "payments", "extracts", "statement", "my_custody", "expenses", "suppliers"].includes(activeTab) && (
             <div class="print-hidden max-w-7xl mx-auto px-4 mt-3.5">
               <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -597,10 +597,11 @@
               </div>
             )}
 
-            {/* 3. إدخال البيانات (متاح للجميع) */}
+            {/* 3. إدخال البيانات (متاح للجميع مع جدول السلف وزر الحذف) */}
             {activeTab === "add_data" && (
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-                {/* نموذج العهدة المالية (متاح للجميع) */}
+                
+                {/* نموذج وقائمة العهد المالية والسلف مع زر الحذف */}
                 <div class="bg-emerald-50 p-4 sm:p-5 rounded-2xl border border-emerald-200 shadow-sm lg:col-span-2">
                   <h3 class="font-bold text-emerald-900 mb-3 border-b border-emerald-200 pb-2 text-xs sm:text-sm flex items-center gap-1.5">
                     <span>💵</span> تسجيل استلام / تسليم عهدة مالية أو سلفة
@@ -615,7 +616,7 @@
                     if(db) db.ref('advances').set(updated);
                     setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" });
                     showToast(`تم تسجيل العهدة للموظف بنجاح!`);
-                  }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
+                  }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs mb-4">
                     <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold bg-white" required/></div>
                     <div class="sm:col-span-1">
                       <label class="block font-bold mb-1">اسم الموظف (المستلم)</label>
@@ -628,9 +629,51 @@
                     <div><label class="block font-bold mb-1">البيان / ملاحظات</label><input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="سلفة لتمويل مشتريات..." class="w-full border border-emerald-300 rounded-xl p-2 bg-white"/></div>
                     <div class="sm:col-span-4"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ العهدة في حساب الموظف</button></div>
                   </form>
+
+                  {/* جدول سجل العهدات السابقة مع زر الحذف 🗑️ */}
+                  <div class="mt-4 pt-3 border-t border-emerald-200">
+                    <h4 class="font-bold text-emerald-950 mb-2 text-xs">سجل العهد والسلف المسجلة للمشروع النشط:</h4>
+                    <div class="overflow-x-auto bg-white rounded-xl border border-emerald-200">
+                      <table class="w-full text-right text-xs">
+                        <thead>
+                          <tr class="bg-emerald-100/60 text-emerald-900 border-b border-emerald-200">
+                            <th class="p-2">التاريخ</th>
+                            <th class="p-2">اسم الموظف</th>
+                            <th class="p-2">المبلغ</th>
+                            <th class="p-2">البيان / الملاحظات</th>
+                            <th class="p-2">بواسطة</th>
+                            {isAdmin && <th class="p-2 text-center">حذف</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {projAdvances.length === 0 ? (
+                            <tr><td colSpan={isAdmin ? 6 : 5} class="text-center p-3 text-slate-400">لا توجد سلف مسجلة لهذا المشروع</td></tr>
+                          ) : (
+                            projAdvances.map(a => (
+                              <tr key={a.id} class="border-b hover:bg-emerald-50/50">
+                                <td class="p-2 text-slate-600">{a.date}</td>
+                                <td class="p-2 font-bold text-emerald-950">{a.employeeName}</td>
+                                <td class="p-2 font-black text-emerald-700 font-mono">{(Number(a.amount)||0).toLocaleString()} ج.م</td>
+                                <td class="p-2 text-slate-600">{a.notes || '-'}</td>
+                                <td class="p-2 text-slate-500">{a.createdBy || '-'}</td>
+                                {isAdmin && (
+                                  <td class="p-2 text-center">
+                                    <button onClick={() => deleteItem('advances', a.id, advances)} class="text-rose-500 hover:text-rose-700 font-bold px-2 py-0.5 rounded transition">
+                                      🗑️
+                                    </button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                {/* نموذج تسجيل المصروف */}
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm lg:col-span-2">
                   <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة</h3>
                   <form onSubmit={(e) => {
                     e.preventDefault();
@@ -721,7 +764,6 @@
             {/* 4. المصروفات ومحرك البحث الدقيق */}
             {activeTab === "expenses" && (
               <div class="space-y-4">
-                {/* محرك البحث الدقيق في صفحة المصروفات */}
                 <div class="bg-slate-50 p-4 rounded-2xl border border-slate-300 text-xs shadow-sm">
                   <h3 class="font-bold text-indigo-900 mb-3 flex items-center gap-1.5">
                     <span>🔍</span> محرك البحث والفلترة الدقيقة لمصروفات المشروع
@@ -779,7 +821,7 @@
                             {e.receiptImg ? <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold">عرض</button> : <span class="text-slate-400">لا</span>}
                           </td>
                           <td class="p-2.5 text-slate-500 whitespace-nowrap">{e.createdBy || '-'}</td>
-                          {isAdmin && <td class="p-2.5 text-center"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500 hover:text-rose-700">🗑️️</button></td>}
+                          {isAdmin && <td class="p-2.5 text-center"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500 hover:text-rose-700">🗑</button></td>}
                         </tr>
                       ))}
                     </tbody>
@@ -791,7 +833,6 @@
             {/* 5. حسابات الموردين (خاص للإدارة) */}
             {activeTab === "suppliers" && isAdmin && (
               <div class="space-y-4">
-                {/* فورم دفع فلوس للمورد */}
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
                   <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 flex items-center gap-1.5">
                     <span>💵</span> تسجيل دفعة نقدية / تحويل لمورد
@@ -817,7 +858,6 @@
                   </form>
                 </div>
 
-                {/* كشف الحساب التلقائي للموردين */}
                 <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
                   <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">
                     <span>🚚</span> خلاصة أرصدة الموردين النشطين
@@ -851,7 +891,6 @@
                   </table>
                 </div>
 
-                {/* جدول الدفعات السابقة */}
                 <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs mt-4">
                   <h4 class="font-bold text-slate-700 mb-2">سجل الدفعات المدفوعة للموردين</h4>
                   <table class="w-full text-right border-collapse">
@@ -990,7 +1029,7 @@
               </div>
             )}
 
-            {/* 9. كشف الحساب الشامل (للإدارة فقط) */}
+            {/* 9. كشف الحساب الشامل */}
             {activeTab === "statement" && isAdmin && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm print-area text-xs">
                 <div class="flex justify-between items-center mb-4 border-b pb-3 print-hidden">
@@ -1115,7 +1154,7 @@
             {/* 11. الإعدادات */}
             {activeTab === "settings" && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs max-w-xl">
-                <h3 class="font-bold mb-3 text-sm">🖼️ شعار الشركة المعتمد للمستندات والتقارير</h3>
+                <h3 class="font-bold mb-3 text-sm">🖼️️ شعار الشركة المعتمد للمستندات والتقارير</h3>
                 <input type="file" accept="image/*" onChange={(e)=>{
                   const file = e.target.files && e.target.files[0];
                   if(!file) return;
