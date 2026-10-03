@@ -1586,16 +1586,6 @@
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
-
-  <!-- تسجيل خدمة العمل بدون إنترنت تلقائياً -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-          .then(reg => console.log('✅ Offline Mode Ready:', reg.scope))
-          .catch(err => console.log('SW Registration Failed:', err));
-      });
-    }
   </script>
 </body>
 </html>
