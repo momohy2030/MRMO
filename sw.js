@@ -1,4 +1,4 @@
-const CACHE_NAME = 'momohy-static-v4';
+const CACHE_NAME = 'momohy-static-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
