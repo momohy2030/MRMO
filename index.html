@@ -1332,5 +1332,14 @@
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('Service Worker مسجل وجاهز'))
+        .catch((err) => console.log('خطأ في تسجيل Service Worker:', err));
+    });
+  }
+</script>
 </body>
 </html>
