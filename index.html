@@ -64,7 +64,9 @@
       auth.languageCode = 'ar';
     } catch (e) { console.error("Firebase init error:", e); }
 
-    const initialProjects = [{"id": "cons-01", "name": "مشروع رئيسي 01", "location": "الموقع العام", "budget": 500000, "consultant": "مكتب الاستشارات الهندسية", "startDate": "2026-01-01", "deliveryDate": "2026-12-31", "status": "جاري العمل", "createdBy": "النظام"}];
+    const initialProjects = [
+      {"id": "cons-01", "name": "مشروع رئيسي 01", "location": "الموقع العام", "budget": 500000, "consultant": "مكتب الاستشارات الهندسية", "startDate": "2026-01-01", "deliveryDate": "2026-12-31", "status": "جاري العمل", "createdBy": "النظام"}
+    ];
 
     const initialSettings = {
       mainCategories: ["مباني", "صبة خرسانه", "كهرباء", "سباكة", "محارة", "نقاشة"],
@@ -75,7 +77,6 @@
       logo: ""
     };
 
-    // دوال مساعدة موحدة لمنع الأخطاء الحسابية وتطهير الأرقام
     const cleanId = (id) => (id ? String(id).trim().toLowerCase().replace(/[.#$\[\]\/]/g, "-") : "");
     const parseNum = (val) => {
       if (typeof val === "number") return isNaN(val) ? 0 : val;
@@ -162,11 +163,14 @@
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
       const [activeTab, setActiveTab] = useState("add_data");
       const [myEmpName, setMyEmpName] = useState(localStorage.getItem('myEmpName') || "");
-      const [suppScope, setSuppScope] = useState("project"); // نطاق المورد: project أو company
+      const [suppScope, setSuppScope] = useState("project");
       
       const [toast, setToast] = useState({ show: false, message: "", type: "success" });
       const [activeInvoiceModal, setActiveInvoiceModal] = useState(null);
       const [drawerOpen, setDrawerOpen] = useState(false);
+
+      // حالة نافذة التعديل الموحدة
+      const [editItemData, setEditItemData] = useState(null);
 
       const [searchMainCat, setSearchMainCat] = useState("");
       const [searchSubCat, setSearchSubCat] = useState("");
@@ -220,12 +224,19 @@
             else if (isEng) { detectedRole = "مهندس المشاريع"; setActiveTab("dashboard"); } 
             else { setActiveTab("add_data"); }
 
-            setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", identifier: identifier });
+            setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", identifier });
             setIsAdmin(hasFullAccess); setIsDirector(isManager); setIsProjectEng(isEng); setUserRole(detectedRole);
 
             if (!sessionStorage.getItem('login_recorded')) { recordLoginLog(currentUser, detectedRole); sessionStorage.setItem('login_recorded', 'true'); }
           } else {
-            setUser(null); setIsAdmin(false); setIsDirector(false); setIsProjectEng(false); setUserRole("Staff"); sessionStorage.removeItem('login_recorded');
+            const cachedUser = JSON.parse(localStorage.getItem('cached_user') || 'null');
+            if (cachedUser) {
+              setUser(cachedUser);
+              setIsAdmin(cachedUser.isAdmin);
+              setUserRole(cachedUser.role);
+            } else {
+              setUser(null); setIsAdmin(false); setIsDirector(false); setIsProjectEng(false); setUserRole("Staff");
+            }
           }
           setAuthLoading(false);
         });
@@ -235,14 +246,37 @@
       useEffect(() => {
         if (!user) return;
         setLoading(true);
-        if (!db) { setLoading(false); return; }
+
+        const loadFromCache = () => {
+          const raw = localStorage.getItem('cached_erp_data');
+          if (raw) {
+            try {
+              const data = JSON.parse(raw);
+              const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
+              if (data.projects) setProjects(toArr(data.projects));
+              if (data.expenses) setExpenses([...toArr(data.expenses)].reverse());
+              if (data.extracts) setExtracts([...toArr(data.extracts)].reverse());
+              if (data.payments) setPayments([...toArr(data.payments)].reverse());
+              if (data.advances) setAdvances([...toArr(data.advances)].reverse());
+              if (data.supplier_payments) setSupplierPayments([...toArr(data.supplier_payments)].reverse());
+            } catch(e) {}
+          }
+          setLoading(false);
+        };
+
+        if (!navigator.onLine || !db) {
+          loadFromCache();
+          return;
+        }
 
         const rootRef = db.ref('/');
         const handleValue = (snapshot) => {
           try {
             const data = snapshot.val() || {};
-            const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
+            localStorage.setItem('cached_erp_data', JSON.stringify(data));
+            localStorage.setItem('cached_user', JSON.stringify({ uid: user.uid, name: user.name, isAdmin, role: userRole }));
 
+            const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
             const loadedProjects = toArr(data.projects);
             const finalProjects = loadedProjects.length > 0 ? loadedProjects : initialProjects;
             setProjects(finalProjects);
@@ -268,10 +302,13 @@
               if (prev && finalProjects.some(p => cleanId(p.id) === cleanId(prev))) return prev;
               return finalProjects[0]?.id || "cons-01";
             });
-          } catch (err) { console.error(err); } finally { setLoading(false); }
+          } catch (err) {
+            console.error(err);
+            loadFromCache();
+          } finally { setLoading(false); }
         };
 
-        rootRef.on('value', handleValue, (error) => { console.error(error); setLoading(false); });
+        rootRef.on('value', handleValue, () => loadFromCache());
         return () => { rootRef.off('value', handleValue); };
       }, [user]);
 
@@ -283,13 +320,6 @@
           const updatedArray = [...currentArray, cleanVal];
           setSettings(prev => ({ ...prev, [settingKey]: updatedArray }));
           if (db) db.ref(`settings/${settingKey}`).set(updatedArray);
-          
-          if (settingKey === 'mainCategories') setNewExp(prev => ({...prev, mainCategory: cleanVal}));
-          if (settingKey === 'subCategories') setNewExp(prev => ({...prev, subCategory: cleanVal}));
-          if (settingKey === 'costTypes') setNewExp(prev => ({...prev, costType: cleanVal}));
-          if (settingKey === 'suppliers') { setNewExp(prev => ({...prev, supplier: cleanVal})); setNewSuppPay(prev => ({...prev, supplier: cleanVal})); }
-          if (settingKey === 'employees') { setNewExp(prev => ({...prev, custodyEmployee: cleanVal})); setNewAdv(prev => ({...prev, employeeName: cleanVal})); }
-
           showToast(`تم إضافة "${cleanVal}" للقائمة بنجاح!`);
         }
       };
@@ -302,7 +332,7 @@
         auth.signInWithPhoneNumber(formattedPhone, appVerifier).then((confirmationResult) => { window.confirmationResult = confirmationResult; setVerificationId(true); showToast("تم إرسال كود التحقق 📩"); }).catch(() => { setLoginError("تعذر إرسال الرمز. يرجى مراجعة رقم الهاتف."); if(window.recaptchaVerifier) window.recaptchaVerifier.render().then(widgetId => grecaptcha.reset(widgetId)); });
       };
       const handleVerifyOtp = (e) => { e.preventDefault(); setLoginError(""); window.confirmationResult.confirm(otpCode).catch(() => { setLoginError("الرمز غير صحيح."); }); };
-      const handleLogout = () => { auth.signOut(); setLoginMethod("choose"); setVerificationId(null); setDrawerOpen(false); };
+      const handleLogout = () => { localStorage.removeItem('cached_user'); auth.signOut(); setLoginMethod("choose"); setVerificationId(null); setDrawerOpen(false); };
 
       const handleReceiptUpload = (e) => {
         const file = e.target.files && e.target.files[0]; if (!file) return;
@@ -326,6 +356,47 @@
         }
       };
 
+      // دالة حفظ التعديل الموحدة
+      const handleSaveEditedItem = (e) => {
+        e.preventDefault();
+        if (!editItemData) return;
+        const { type, data } = editItemData;
+        let path = '';
+        let list = [];
+
+        if (type === 'expense') {
+          path = 'expenses';
+          const qty = parseNum(data.quantity);
+          const price = parseNum(data.unitPrice);
+          const updatedItem = { ...data, quantity: qty, unitPrice: price, amount: qty * price };
+          list = expenses.map(item => item.id === data.id ? updatedItem : item);
+          setExpenses(list);
+        } else if (type === 'advance') {
+          path = 'advances';
+          const updatedItem = { ...data, amount: parseNum(data.amount) };
+          list = advances.map(item => item.id === data.id ? updatedItem : item);
+          setAdvances(list);
+        } else if (type === 'extract') {
+          path = 'extracts';
+          const qty = parseNum(data.quantity);
+          const price = parseNum(data.unitPrice);
+          const ded = parseNum(data.deductions);
+          const totalWork = qty * price;
+          const updatedItem = { ...data, quantity: qty, unitPrice: price, deductions: ded, totalWork, net: totalWork - ded };
+          list = extracts.map(item => item.id === data.id ? updatedItem : item);
+          setExtracts(list);
+        } else if (type === 'supp_payment') {
+          path = 'supplier_payments';
+          const updatedItem = { ...data, amount: parseNum(data.amount) };
+          list = supplierPayments.map(item => item.id === data.id ? updatedItem : item);
+          setSupplierPayments(list);
+        }
+
+        if (db && path) db.ref(path).set(list);
+        setEditItemData(null);
+        showToast("تم تحديث وحفظ البيانات بنجاح! ✏️");
+      };
+
       const exportToExcel = () => {
         const wb = XLSX.utils.book_new();
         const wsProjects = XLSX.utils.json_to_sheet(projects); XLSX.utils.book_append_sheet(wb, wsProjects, "المشاريع");
@@ -343,7 +414,7 @@
         return (
           <div class="min-h-screen flex items-center justify-center bg-slate-900 px-4">
             <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center">
-              <div class="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-inner">🏗️️</div>
+              <div class="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-inner">🏗</div>
               <h2 class="text-2xl font-black text-slate-800 mb-1">بوابة الدخول السحابية</h2>
               <p class="text-slate-500 text-xs mb-6 font-semibold">إدارة المعاملات الإنشائية - MOMOHY ERP</p>
               {loginError && <div class="bg-rose-100 text-rose-700 p-2.5 rounded-xl text-xs font-bold mb-4">{loginError}</div>}
@@ -381,23 +452,16 @@
       const projAdvances = advances.filter(a => cleanId(a.projectId) === cleanId(currentProj.id));
       const projSuppPayments = supplierPayments.filter(p => cleanId(p.projectId) === cleanId(currentProj.id));
 
-      // 1. حسابات المستخلصات والمصروفات الحقيقية
       const totalWorkNet = projExtracts.reduce((sum, item) => sum + parseNum(item.net), 0);
       const totalCost = projExpenses.reduce((sum, item) => sum + parseNum(item.amount), 0);
       const totalReceived = projPayments.reduce((sum, item) => sum + parseNum(item.amount), 0);
       const netProfit = totalWorkNet - totalCost;
-      const clientDebt = totalWorkNet - totalReceived;
 
-      // 2. حل مشكلة السيولة النقدية ومنع Double Spending:
-      // النقدية المركزية الحقيقية = التحصيلات - المصروفات النقدية المباشرة - العهد المسلمة للموظفين - الدفعات النقدية للموردين
       const projDirectCashExp = projExpenses.filter(e => e.paymentMethod !== 'خصم من العهدة' && (e.billStatus || 'مدفوعة') === 'مدفوعة').reduce((sum, e) => sum + parseNum(e.amount), 0);
       const projTotalAdvancesGiven = projAdvances.reduce((sum, a) => sum + parseNum(a.amount), 0);
       const projTotalSuppPaid = projSuppPayments.reduce((sum, p) => sum + parseNum(p.amount), 0);
-
-      // السيولة المتبقية بالخزينة الرئيسية
       const centralCashRemaining = totalReceived - projDirectCashExp - projTotalAdvancesGiven - projTotalSuppPaid;
 
-      // مجموع العهد النقدية الحالية التي ما زالت في يد الموظفين بالموقع
       const allEmpCustodyBalance = settings.employees.reduce((acc, emp) => {
         const adv = projAdvances.filter(a => a.employeeName === emp).reduce((sum, a) => sum + parseNum(a.amount), 0);
         const spent = projExpenses.filter(e => e.paymentMethod === 'خصم من العهدة' && e.custodyEmployee === emp).reduce((sum, e) => sum + parseNum(e.amount), 0);
@@ -416,7 +480,6 @@
       const projExpLabels = Object.keys(projExpMap);
       const projExpData = Object.values(projExpMap);
 
-      // محرك البحث الدقيق
       const filteredSearchExpenses = projExpenses.filter(e => { 
         return (searchMainCat === "" || e.mainCategory === searchMainCat) && 
                (searchSubCat === "" || e.subCategory === searchSubCat) && 
@@ -424,16 +487,43 @@
       });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + parseNum(e.amount), 0);
 
-      // حسابات الموردين مع دعم العزل (مشروع محدد مقابل كل الشركة)
-      const suppliersLedger = settings.suppliers.map(supp => {
+      // حسابات الموردين المعالجة محاسبياً (الفواتير الآجلة فقط هي المديونية)
+      const allSupplierNames = Array.from(new Set([
+        ...settings.suppliers,
+        ...expenses.map(e => e.supplier).filter(Boolean),
+        ...supplierPayments.map(p => p.supplier).filter(Boolean)
+      ])).map(s => s.trim()).filter(Boolean);
+
+      const cleanSuppliersList = Array.from(new Set(allSupplierNames));
+
+      const suppliersLedger = cleanSuppliersList.map(supp => {
         const targetExp = suppScope === "project" ? projExpenses : expenses;
         const targetSuppPay = suppScope === "project" ? projSuppPayments : supplierPayments;
-        
-        const totalPurchases = targetExp.filter(e => e.supplier === supp).reduce((sum, e) => sum + parseNum(e.amount), 0);
-        const totalPaid = targetSuppPay.filter(p => p.supplier === supp).reduce((sum, p) => sum + parseNum(p.amount), 0);
-        const balance = totalPaid - totalPurchases;
-        return { name: supp, purchases: totalPurchases, paid: totalPaid, balance };
-      }).filter(s => s.purchases > 0 || s.paid > 0);
+
+        const allInvoices = targetExp.filter(e => (e.supplier || '').trim() === supp);
+        const totalPurchases = allInvoices.reduce((sum, e) => sum + parseNum(e.amount), 0);
+
+        const creditPurchases = allInvoices
+          .filter(e => (e.billStatus || 'مدفوعة') === 'آجلة')
+          .reduce((sum, e) => sum + parseNum(e.amount), 0);
+
+        const paidPurchases = totalPurchases - creditPurchases;
+
+        const totalPaidToCreditor = targetSuppPay
+          .filter(p => (p.supplier || '').trim() === supp)
+          .reduce((sum, p) => sum + parseNum(p.amount), 0);
+
+        const balance = totalPaidToCreditor - creditPurchases;
+
+        return { 
+          name: supp, 
+          totalPurchases, 
+          creditPurchases, 
+          paidPurchases, 
+          totalPaid: totalPaidToCreditor, 
+          balance 
+        };
+      }).filter(s => s.totalPurchases > 0 || s.totalPaid > 0);
 
       const getCustodyStats = (empName) => {
         const empAdv = projAdvances.filter(a => a.employeeName === empName).reduce((sum, a) => sum + parseNum(a.amount), 0);
@@ -563,20 +653,17 @@
 
                 <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
 
-                {/* كروت السيولة والحسابات الدقيقة المحمية من الازدواجية */}
                 <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                   <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span><div class="text-sm font-black text-slate-800 mt-1">{totalWorkNet.toLocaleString()} ج.م</div></div>
                   <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">إجمالي التحصيلات</span><div class="text-sm font-black text-emerald-600 mt-1">{totalReceived.toLocaleString()} ج.م</div></div>
                   <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm"><span class="text-[10px] text-slate-500 font-bold block">المصروفات الفعلية</span><div class="text-sm font-black text-rose-600 mt-1">{totalCost.toLocaleString()} ج.م</div></div>
                   
-                  {/* الخزينة المركزية المحسوبة بدقة */}
                   <div class="bg-indigo-50/70 p-3 rounded-2xl border border-indigo-200 shadow-sm">
                     <span class="text-[10px] text-indigo-800 font-extrabold block">🏦 خزينة الشركة الحرة</span>
                     <div class={`text-base font-black mt-1 ${centralCashRemaining >= 0 ? 'text-indigo-700' : 'text-rose-600'}`}>{centralCashRemaining.toLocaleString()} ج.م</div>
                     <span class="text-[9px] text-indigo-500 font-semibold block mt-0.5">(نقدية مركزية متاحة)</span>
                   </div>
 
-                  {/* نقدية العهد المعلقة بالموقع */}
                   <div class="bg-amber-50/70 p-3 rounded-2xl border border-amber-200 shadow-sm">
                     <span class="text-[10px] text-amber-800 font-extrabold block">💼 عهد معلقة بالموقع</span>
                     <div class="text-base font-black text-amber-700 mt-1">{allEmpCustodyBalance.toLocaleString()} ج.م</div>
@@ -678,7 +765,7 @@
                             <th class="p-2">المبلغ</th>
                             <th class="p-2">البيان</th>
                             <th class="p-2">بواسطة</th>
-                            {isAdmin && <th class="p-2 text-center">حذف</th>}
+                            {isAdmin && <th class="p-2 text-center">إجراءات</th>}
                           </tr>
                         </thead>
                         <tbody>
@@ -693,8 +780,9 @@
                                 <td class="p-2 text-slate-600">{a.notes || '-'}</td>
                                 <td class="p-2 text-slate-500">{a.createdBy || '-'}</td>
                                 {isAdmin && (
-                                  <td class="p-2 text-center">
-                                    <button onClick={() => deleteItem('advances', a.id, advances)} class="text-rose-500 hover:text-rose-700 font-bold px-2 py-0.5 rounded transition">🗑️</button>
+                                  <td class="p-2 text-center flex items-center justify-center gap-1">
+                                    <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
+                                    <button onClick={() => deleteItem('advances', a.id, advances)} class="text-rose-500 hover:text-rose-700 font-bold px-1.5 py-0.5 rounded transition">🗑️</button>
                                   </td>
                                 )}
                               </tr>
@@ -775,10 +863,10 @@
                     </div>
 
                     <div>
-                      <label class="block font-bold mb-1">حالة الفاتورة (مشتريات)</label>
-                      <select value={newExp.billStatus} onChange={e=>setNewExp({...newExp, billStatus: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-slate-700 bg-slate-50">
-                        <option value="مدفوعة">مدفوعة ومسددة</option>
-                        <option value="آجلة">آجلة (ذمة دائنة على الشركة)</option>
+                      <label class="block font-bold mb-1 text-indigo-700">حالة الفاتورة (مشتريات)</label>
+                      <select value={newExp.billStatus} onChange={e=>setNewExp({...newExp, billStatus: e.target.value})} class="w-full border-2 border-indigo-200 p-2 rounded-xl font-bold bg-indigo-50/40">
+                        <option value="مدفوعة">✅ مسددة فوراً (لا دين على الشركة)</option>
+                        <option value="آجلة">⏳ آجلة (تسجل كمديونية للمورد)</option>
                       </select>
                     </div>
 
@@ -856,14 +944,15 @@
                         <th class="p-2.5 text-center">الكمية</th>
                         <th class="p-2.5 text-center">السعر</th>
                         <th class="p-2.5 text-center">الإجمالي</th>
+                        <th class="p-2.5">الحالة</th>
                         <th class="p-2.5">السداد</th>
                         <th class="p-2.5">الفاتورة</th>
                         <th class="p-2.5">بواسطة</th>
-                        {isAdmin && <th class="p-2.5 text-center">حذف</th>}
+                        {isAdmin && <th class="p-2.5 text-center">إجراءات</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredSearchExpenses.length === 0 ? <tr><td colSpan={isAdmin ? 12 : 11} class="text-center p-4 text-slate-500">لا توجد نتائج مطابقة</td></tr> : 
+                      {filteredSearchExpenses.length === 0 ? <tr><td colSpan={isAdmin ? 13 : 12} class="text-center p-4 text-slate-500">لا توجد نتائج مطابقة</td></tr> : 
                       filteredSearchExpenses.map((e) => (
                         <tr key={e.id} class="border-b hover:bg-slate-50">
                           <td class="p-2.5 text-slate-600 whitespace-nowrap">{e.date}</td>
@@ -875,6 +964,11 @@
                           <td class="p-2.5 text-center font-mono">{parseNum(e.unitPrice).toLocaleString()}</td>
                           <td class="p-2.5 text-center font-black text-rose-600 font-mono">{parseNum(e.amount).toLocaleString()}</td>
                           <td class="p-2.5">
+                            <span class={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${e.billStatus === 'آجلة' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {e.billStatus || 'مدفوعة'}
+                            </span>
+                          </td>
+                          <td class="p-2.5">
                             <span class={`px-1.5 py-0.5 rounded-lg text-[10px] ${e.paymentMethod === 'خصم من العهدة' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-600'}`}>
                               {e.paymentMethod} {e.custodyEmployee && `(${e.custodyEmployee})`}
                             </span>
@@ -883,7 +977,12 @@
                             {e.receiptImg ? <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold">عرض</button> : <span class="text-slate-400">لا</span>}
                           </td>
                           <td class="p-2.5 text-slate-500 whitespace-nowrap">{e.createdBy || '-'}</td>
-                          {isAdmin && <td class="p-2.5 text-center"><button onClick={() => deleteItem('expenses', e.id, expenses)} class="text-rose-500 hover:text-rose-700">🗑</button></td>}
+                          {isAdmin && (
+                            <td class="p-2.5 text-center flex items-center justify-center gap-1.5">
+                              <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-lg font-bold">✏️ تعديل</button>
+                              <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-50 text-rose-600 hover:bg-rose-100 px-2 py-1 rounded-lg font-bold">🗑️</button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -892,7 +991,7 @@
               </div>
             )}
 
-            {/* 5. حسابات الموردين (مع عزل المشروع عن الشركة) */}
+            {/* 5. حسابات الموردين (مع عزل المشروع عن الشركة وتصحيح المديونية) */}
             {activeTab === "suppliers" && isAdmin && (
               <div class="space-y-4">
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
@@ -929,31 +1028,69 @@
 
                 <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
                   <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">
-                    <span>🚚</span> موقف الموردين - {suppScope === "project" ? `خاص بالمشروع الحالي (${selectedProjId})` : "مجمع لكل مشاريع الشركة"}
+                    <span>🚚</span> موقف الموردين المحاسبي - {suppScope === "project" ? `خاص بالمشروع الحالي (${selectedProjId})` : "مجمع لكل مشاريع الشركة"}
                   </h3>
                   <table class="w-full text-right border-collapse">
                     <thead>
                       <tr class="bg-slate-100 text-slate-700 border-b">
                         <th class="p-2.5">اسم المورد</th>
                         <th class="p-2.5 text-center">إجمالي المسحوبات (فواتير)</th>
-                        <th class="p-2.5 text-center">إجمالي المسدد</th>
+                        <th class="p-2.5 text-center">مسدد فوراً (لا دين)</th>
+                        <th class="p-2.5 text-center text-amber-700">فواتير آجلة (مديونية)</th>
+                        <th class="p-2.5 text-center text-emerald-700">دفعات سداد للمورد</th>
                         <th class="p-2.5 text-center">الرصيد الصافي</th>
                         <th class="p-2.5 text-center">الموقف المحاسبي</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {suppliersLedger.length === 0 ? <tr><td colSpan="5" class="text-center p-4 text-slate-500">لا توجد حركات مسجلة لهذا النطاق</td></tr> :
+                      {suppliersLedger.length === 0 ? <tr><td colSpan="7" class="text-center p-4 text-slate-500">لا توجد حركات مسجلة لهذا النطاق</td></tr> :
                       suppliersLedger.map((s, i) => (
                         <tr key={i} class="border-b hover:bg-slate-50">
                           <td class="p-2.5 font-bold text-indigo-900">{s.name}</td>
-                          <td class="p-2.5 text-center font-bold text-rose-600">{s.purchases.toLocaleString()}</td>
-                          <td class="p-2.5 text-center font-bold text-emerald-600">{s.paid.toLocaleString()}</td>
+                          <td class="p-2.5 text-center font-bold text-slate-700">{s.totalPurchases.toLocaleString()}</td>
+                          <td class="p-2.5 text-center text-slate-500">{s.paidPurchases.toLocaleString()}</td>
+                          <td class="p-2.5 text-center font-black text-amber-600 font-mono">{s.creditPurchases.toLocaleString()}</td>
+                          <td class="p-2.5 text-center font-black text-emerald-600 font-mono">{s.totalPaid.toLocaleString()}</td>
                           <td class={`p-2.5 text-center font-black text-sm ${s.balance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{Math.abs(s.balance).toLocaleString()} ج.م</td>
                           <td class="p-2.5 text-center">
                             {s.balance === 0 ? <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-bold text-[10px]">خالص الحساب</span> :
                              s.balance > 0 ? <span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg font-bold text-[10px]">دفعة مقدمة للمورد</span> :
                              <span class="bg-rose-100 text-rose-800 px-2 py-1 rounded-lg font-bold text-[10px]">مستحق للمورد (مديونية)</span>}
                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* سجل الدفعات المسددة للموردين */}
+                <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
+                  <h4 class="font-bold text-slate-700 mb-2">سجل الدفعات المسددة للموردين:</h4>
+                  <table class="w-full text-right border-collapse">
+                    <thead>
+                      <tr class="bg-slate-50 text-slate-600 border-b">
+                        <th class="p-2">التاريخ</th>
+                        <th class="p-2">المورد</th>
+                        <th class="p-2">المبلغ المسدد</th>
+                        <th class="p-2">رقم الإيصال / البيان</th>
+                        <th class="p-2">بواسطة</th>
+                        {isAdmin && <th class="p-2 text-center">إجراءات</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projSuppPayments.map(p => (
+                        <tr key={p.id} class="border-b hover:bg-slate-50">
+                          <td class="p-2">{p.date}</td>
+                          <td class="p-2 font-bold text-indigo-950">{p.supplier}</td>
+                          <td class="p-2 text-emerald-600 font-bold font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
+                          <td class="p-2">{p.notes || '-'}</td>
+                          <td class="p-2 text-slate-500">{p.createdBy || '-'}</td>
+                          {isAdmin && (
+                            <td class="p-2 text-center flex items-center justify-center gap-1.5">
+                              <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
+                              <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="text-rose-500 hover:text-rose-700 font-bold px-1.5 py-0.5">🗑️</button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -1086,7 +1223,6 @@
                     <button onClick={() => window.print()} class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-bold shadow text-xs flex items-center gap-1.5">🖨️ طباعة المستخلص الرسمي (PDF)</button>
                   </div>
 
-                  {/* الترويسة الهندسية المعتمدة */}
                   <div class="border-b-2 border-slate-900 pb-4 mb-4">
                     <div class="flex justify-between items-start">
                       <div>
@@ -1115,7 +1251,7 @@
                         <th class="p-2 border border-slate-300 text-center">إجمالي القيمة</th>
                         <th class="p-2 border border-slate-300 text-center">الاستقطاعات</th>
                         <th class="p-2 border border-slate-300 text-center">الصافي المستحق</th>
-                        {isAdmin && <th class="p-2 print-hidden border text-center">حذف</th>}
+                        {isAdmin && <th class="p-2 print-hidden border text-center">إجراءات</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -1130,7 +1266,12 @@
                           <td class="p-2 border border-slate-300 text-center font-bold">{parseNum(ex.totalWork).toLocaleString()}</td>
                           <td class="p-2 border border-slate-300 text-center text-rose-600">{parseNum(ex.deductions).toLocaleString()}</td>
                           <td class="p-2 border border-slate-300 text-center font-black text-indigo-700 bg-indigo-50/50">{parseNum(ex.net).toLocaleString()}</td>
-                          {isAdmin && <td class="p-2 print-hidden border text-center"><button onClick={() => deleteItem('extracts', ex.id, extracts)} class="text-rose-500">🗑️</button></td>}
+                          {isAdmin && (
+                            <td class="p-2 print-hidden border text-center flex items-center justify-center gap-1">
+                              <button onClick={() => setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
+                              <button onClick={() => deleteItem('extracts', ex.id, extracts)} class="text-rose-500 font-bold px-1.5 py-0.5">🗑️</button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -1142,7 +1283,6 @@
                     </tfoot>
                   </table>
 
-                  {/* خانات التوقيعات المعتمدة */}
                   <div class="grid grid-cols-3 gap-6 text-center mt-12 pt-6 border-t border-slate-300 print-break-inside font-bold text-xs">
                     <div>
                       <p class="text-slate-500 mb-8">مهندس التنفيذ بالموقع</p>
@@ -1161,7 +1301,7 @@
               </div>
             )}
 
-            {/* 9. كشف الحساب الشامل والتحليل المالي */}
+            {/* 9. كشف الحساب الشامل */}
             {activeTab === "statement" && isAdmin && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm print-area text-xs">
                 <div class="flex justify-between items-center mb-4 border-b pb-3 print-hidden">
@@ -1235,8 +1375,8 @@
                               <td class="p-1.5 border font-semibold">{e.mainCategory} - {e.subCategory}</td>
                               <td class="p-1.5 border text-slate-700">{e.description || '-'}</td>
                               <td class="p-1.5 border text-center font-bold">{parseNum(e.quantity)}</td>
-                              <td class="p-1.5 border text-center">{parseNum(e.unitPrice).toLocaleString()}</td>
-                              <td class="p-1.5 border text-center font-black text-rose-600">{parseNum(e.amount).toLocaleString()}</td>
+                              <td class="p-1.5 border text-center font-mono">{parseNum(e.unitPrice).toLocaleString()}</td>
+                              <td class="p-1.5 border text-center font-black text-rose-600 font-mono">{parseNum(e.amount).toLocaleString()}</td>
                               <td class="p-1.5 border text-slate-600">{e.supplier || '-'}</td>
                             </tr>
                           ))}
@@ -1276,7 +1416,7 @@
               </div>
             )}
 
-            {/* 11. الإعدادات وشعار الشركة */}
+            {/* 11. الإعدادات */}
             {activeTab === "settings" && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs max-w-xl">
                 <h3 class="font-bold mb-3 text-sm">🖼️ شعار الشركة المعتمد للترويسة الهندسية والطباعة</h3>
@@ -1297,6 +1437,91 @@
             )}
           </main>
 
+          {/* نافذة التعديل المنبثقة الموحدة لكافة الجداول */}
+          {editItemData && (
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+              <div class="bg-white rounded-3xl p-5 w-full max-w-lg shadow-2xl border text-xs max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center border-b pb-3 mb-3">
+                  <h3 class="font-bold text-sm text-slate-800">
+                    ✏️ تعديل {editItemData.type === 'expense' ? 'فاتورة مصروف' : editItemData.type === 'advance' ? 'سلفة / عهدة' : editItemData.type === 'extract' ? 'مستخلص أعمال' : 'دفعة مورد'}
+                  </h3>
+                  <button onClick={() => setEditItemData(null)} class="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
+                </div>
+
+                <form onSubmit={handleSaveEditedItem} class="space-y-3">
+                  {/* تعديل المصروف */}
+                  {editItemData.type === 'expense' && (
+                    <>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                        <div><label class="block font-bold mb-1">المورد</label><select value={editItemData.data.supplier} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, supplier: e.target.value}})} class="w-full border p-2 rounded-xl"><option value="">اختر...</option>{settings.suppliers.map(s=><option key={s}>{s}</option>)}</select></div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="block font-bold mb-1 text-indigo-700">حالة الفاتورة</label>
+                          <select value={editItemData.data.billStatus || 'مدفوعة'} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, billStatus: e.target.value}})} class="w-full border-2 border-indigo-200 bg-indigo-50 p-2 rounded-xl font-bold">
+                            <option value="مدفوعة">✅ مسددة فوراً (لا دين على الشركة)</option>
+                            <option value="آجلة">⏳ آجلة (مديونية مستحقة للمورد)</option>
+                          </select>
+                        </div>
+                        <div><label class="block font-bold mb-1">طريقة الدفع</label><select value={editItemData.data.paymentMethod} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, paymentMethod: e.target.value}})} class="w-full border p-2 rounded-xl"><option value="خصم من العهدة">خصم من العهدة</option><option value="كاش">كاش</option><option value="تحويل بنكي">تحويل بنكي</option></select></div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={editItemData.data.quantity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, quantity: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                        <div><label class="block font-bold mb-1">سعر الوحدة</label><input type="number" step="any" value={editItemData.data.unitPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, unitPrice: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                      </div>
+
+                      <div><label class="block font-bold mb-1">البيان / الوصف</label><input type="text" value={editItemData.data.description || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, description: e.target.value}})} class="w-full border p-2 rounded-xl"/></div>
+                    </>
+                  )}
+
+                  {/* تعديل السلفة / العهدة */}
+                  {editItemData.type === 'advance' && (
+                    <>
+                      <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                      <div><label class="block font-bold mb-1">اسم الموظف</label><select value={editItemData.data.employeeName} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, employeeName: e.target.value}})} class="w-full border p-2 rounded-xl" required>{settings.employees.map(c => <option key={c}>{c}</option>)}</select></div>
+                      <div><label class="block font-bold mb-1">المبلغ (ج.م)</label><input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border p-2 rounded-xl font-bold text-emerald-700" required/></div>
+                      <div><label class="block font-bold mb-1">البيان / ملاحظات</label><input type="text" value={editItemData.data.notes || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, notes: e.target.value}})} class="w-full border p-2 rounded-xl"/></div>
+                    </>
+                  )}
+
+                  {/* تعديل المستخلص */}
+                  {editItemData.type === 'extract' && (
+                    <>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                        <div><label class="block font-bold mb-1">رقم المستخلص</label><input type="text" value={editItemData.data.extractNo} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, extractNo: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                      </div>
+                      <div><label class="block font-bold mb-1">توصيف الأعمال</label><input type="text" value={editItemData.data.workDescription} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, workDescription: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={editItemData.data.quantity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, quantity: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                        <div><label class="block font-bold mb-1">الفئة (السعر)</label><input type="number" step="any" value={editItemData.data.unitPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, unitPrice: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                      </div>
+                      <div><label class="block font-bold mb-1">الاستقطاعات (ج.م)</label><input type="number" step="any" value={editItemData.data.deductions} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, deductions: e.target.value}})} class="w-full border p-2 rounded-xl text-rose-600"/></div>
+                    </>
+                  )}
+
+                  {/* تعديل دفعة المورد */}
+                  {editItemData.type === 'supp_payment' && (
+                    <>
+                      <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/></div>
+                      <div><label class="block font-bold mb-1">المورد</label><select value={editItemData.data.supplier} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, supplier: e.target.value}})} class="w-full border p-2 rounded-xl" required>{settings.suppliers.map(s => <option key={s}>{s}</option>)}</select></div>
+                      <div><label class="block font-bold mb-1">المبلغ المسدد (ج.م)</label><input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border p-2 rounded-xl font-bold text-emerald-600" required/></div>
+                      <div><label class="block font-bold mb-1">البيان / الإيصال</label><input type="text" value={editItemData.data.notes || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, notes: e.target.value}})} class="w-full border p-2 rounded-xl"/></div>
+                    </>
+                  )}
+
+                  <div class="flex gap-2 pt-2 border-t">
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow">تأكيد وحفظ التعديلات</button>
+                    <button type="button" onClick={() => setEditItemData(null)} class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl">إلغاء</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {/* شريط التنقل السفلي للهواتف الذكية */}
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-lg z-40 px-2 py-1.5 flex justify-around items-center">
             {navTabs.slice(0, 4).map(tab => (
@@ -1305,7 +1530,7 @@
             <button onClick={() => setDrawerOpen(true)} class="flex flex-col items-center justify-center py-1 px-2.5 text-slate-400 hover:text-slate-600"><span class="text-base">☰</span><span class="text-[10px] mt-0.5">المزيد</span></button>
           </nav>
 
-          {/* نافذة التنبيهات المنبثقة التفاعلية */}
+          {/* نافذة التنبيهات التفاعلية */}
           {toast.show && (
             <div class="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
               <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
@@ -1332,14 +1557,16 @@
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
+
+  <!-- تسجيل خدمة العمل بدون إنترنت تلقائياً -->
   <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('Service Worker مسجل وجاهز'))
-        .catch((err) => console.log('خطأ في تسجيل Service Worker:', err));
-    });
-  }
-</script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('✅ Offline Mode Ready:', reg.scope))
+          .catch(err => console.log('SW Registration Failed:', err));
+      });
+    }
+  </script>
 </body>
 </html>
