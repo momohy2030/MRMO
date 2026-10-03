@@ -36,7 +36,6 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // نفس قاعدة بياناتك المركزية (بيانات المساحة معزولة في مسار survey_data)
     const firebaseConfig = {
       apiKey: "AIzaSyDHjQTNfAh3wQ8tSOXOIewJNXaDCHADrR8",
       authDomain: "mrmo-d8760.firebaseapp.com",
@@ -75,34 +74,32 @@
 
       const [activeTab, setActiveTab] = useState("dashboard");
       const [operations, setOperations] = useState([]);
-      const [transactions, setTransactions] = useState([]); // الوارد والمنصرف اليومي
+      const [transactions, setTransactions] = useState([]);
       const [toast, setToast] = useState({ show: false, message: "" });
       const [editItemData, setEditItemData] = useState(null);
 
       const todayDate = new Date().toISOString().split('T')[0];
 
-      // نموذج عملية مساحية جديدة
       const [newOp, setNewOp] = useState({
         date: todayDate,
         clientName: "",
-        opType: "rtk_full", // rtk_full, rtk_half, sketch_meas
+        opType: "rtk_full",
         engineerName: "م. محمد",
         sketchesCount: 1,
-        totalPrice: 6500, // السعر المتفق عليه مع العميل
-        paidAmount: 0,   // ما تم تحصيله فورا
-        laborCost: 0,    // مصاريف عمال
-        carCost: 0,      // مصاريف سيارة
+        totalPrice: 6500,
+        paidAmount: 0,
+        laborCost: 0,
+        carCost: 0,
         notes: ""
       });
 
-      // نموذج حركة نقدية سريعة (وارد أو صادر)
       const [newTx, setNewTx] = useState({
         date: todayDate,
-        type: "income", // income (وارد تحصيل) أو expense (صادر مصاريف)
+        type: "income",
         clientOrEntity: "",
-        category: "تحصيل من عميل", // بنزين، سيارة، عمال، باقة نت، تحصيل...
+        category: "تحصيل من عميل",
         amount: "",
-        paymentMethod: "كاش", // كاش، فودافون كاش، إنستاباي، تحويل بنكي
+        paymentMethod: "كاش",
         notes: ""
       });
 
@@ -138,7 +135,6 @@
         });
       }, []);
 
-      // محرك التوزيع المالي المحاسبي الدقيق
       const calculateShares = (op) => {
         const total = parseNum(op.totalPrice);
         const opType = op.opType;
@@ -155,22 +151,19 @@
           deviceFee = 1750;
           officeFee = Math.max(0, total - engFee - deviceFee - parseNum(op.laborCost) - parseNum(op.carCost));
         } else {
-          // قياس وكروكي
           officeFee = total * 0.20;
           engFee = total * 0.80;
           deviceFee = 0;
         }
 
-        // توزيعات الجهاز
         const mandourShare = deviceFee * 0.50;
         const deviceTrioTotal = deviceFee * 0.50;
-        const perPartnerDevice = deviceTrioTotal / 3; // علاء، أيمن، أسامة
+        const perPartnerDevice = deviceTrioTotal / 3;
 
-        // توزيعات أرباح المكتب
-        const charityShare = officeFee * 0.10; // لوجه الله
-        const ahmedShare = officeFee * 0.10;   // م. أحمد
+        const charityShare = officeFee * 0.10;
+        const ahmedShare = officeFee * 0.10;
         const officeTrioTotal = officeFee * 0.80;
-        const perPartnerOffice = officeTrioTotal / 3; // علاء، أيمن، أسامة
+        const perPartnerOffice = officeTrioTotal / 3;
 
         return {
           engFee,
@@ -205,7 +198,6 @@
         setOperations(updated);
         if (db) db.ref('survey_data/operations').set(updated);
 
-        // إذا سدد العميل دفعة فورية، تُسجل تلقائياً في الواردات
         if (parseNum(newOp.paidAmount) > 0) {
           const autoTx = {
             id: Date.now() + 1,
@@ -252,7 +244,36 @@
         }
       };
 
-      // حسابات مصفوفة العملاء المجمعة
+      const handleSaveEditedItem = (e) => {
+        e.preventDefault();
+        if (!canEditOrDelete || !editItemData) return;
+        const { type, data } = editItemData;
+
+        if (type === 'operation') {
+          const shares = calculateShares(data);
+          const updatedData = {
+            ...data,
+            totalPrice: parseNum(data.totalPrice),
+            paidAmount: parseNum(data.paidAmount),
+            laborCost: parseNum(data.laborCost),
+            carCost: parseNum(data.carCost),
+            sketchesCount: parseInt(data.sketchesCount) || 1,
+            shares
+          };
+          const updated = operations.map(it => it.id === data.id ? updatedData : it);
+          setOperations(updated);
+          if (db) db.ref('survey_data/operations').set(updated);
+        } else if (type === 'transaction') {
+          const updatedData = { ...data, amount: parseNum(data.amount) };
+          const updated = transactions.map(it => it.id === data.id ? updatedData : it);
+          setTransactions(updated);
+          if (db) db.ref('survey_data/transactions').set(updated);
+        }
+
+        setEditItemData(null);
+        showToast("تم حفظ التعديلات بنجاح! ✏️");
+      };
+
       const clientMatrix = useMemo(() => {
         const map = {};
         operations.forEach(op => {
@@ -268,11 +289,9 @@
           map[c].totalPaid += parseNum(op.paidAmount);
         });
 
-        // إضافة التحصيلات اللاحقة للعملاء من جدول الواردات
         transactions.filter(t => t.type === 'income').forEach(t => {
           const c = (t.clientOrEntity || '').trim();
           if (map[c]) {
-            // تجنب تكرار الدفعة المقدمة التلقائية
             if (!t.category?.includes("دفعة مقدمة لعملية مساحية")) {
               map[c].totalPaid += parseNum(t.amount);
             }
@@ -282,12 +301,10 @@
         return Object.values(map);
       }, [operations, transactions]);
 
-      // حسابات الخزينة والتصفية اللحظية
       const totalCashIn = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + parseNum(t.amount), 0);
       const totalCashOut = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + parseNum(t.amount), 0);
       const currentVaultBalance = totalCashIn - totalCashOut;
 
-      // محفظة أرباح الشركاء المجمعة من كافة العمليات
       const partnerWallets = useMemo(() => {
         const w = { mandour: 0, ahmed: 0, charity: 0, alaa: 0, ayman: 0, osama: 0, totalEngineers: 0 };
         operations.forEach(op => {
@@ -322,7 +339,6 @@
 
       return (
         <div class="min-h-screen pb-20">
-          {/* شريط علوي */}
           <header class="bg-slate-900 text-white p-3.5 sticky top-0 z-30 shadow flex justify-between items-center text-xs">
             <div class="flex items-center gap-2">
               <span class="text-xl">📐</span>
@@ -331,11 +347,14 @@
                 <span class="text-[10px] text-slate-400">{canEditOrDelete ? "👑 مدير النظام / مهندس المشاريع" : "موظف"}</span>
               </div>
             </div>
-            <div class="flex gap-1 overflow-x-auto scrollbar-hide">
-              <button onClick={()=>setActiveTab('dashboard')} class={`px-3 py-1.5 rounded-xl font-bold ${activeTab==='dashboard'?'bg-indigo-600 text-white':'bg-slate-800 text-slate-300'}`}>📊 لوحة التحكم</button>
-              <button onClick={()=>setActiveTab('new_op')} class={`px-3 py-1.5 rounded-xl font-bold ${activeTab==='new_op'?'bg-indigo-600 text-white':'bg-slate-800 text-slate-300'}`}>➕ عملية مساحية</button>
-              <button onClick={()=>setActiveTab('cash')} class={`px-3 py-1.5 rounded-xl font-bold ${activeTab==='cash'?'bg-indigo-600 text-white':'bg-slate-800 text-slate-300'}`}>💵 الخزينة والتصفية</button>
-              <button onClick={()=>setActiveTab('partners')} class={`px-3 py-1.5 rounded-xl font-bold ${activeTab==='partners'?'bg-indigo-600 text-white':'bg-slate-800 text-slate-300'}`}>🤝 محفظة الشركاء</button>
+            <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+              <a href="/" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 shadow-sm transition whitespace-nowrap">
+                🏗️ <span class="hidden sm:inline">قطاع الإنشاءات</span>
+              </a>
+              <button onClick={()=>setActiveTab('dashboard')} class={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${activeTab==='dashboard'?'bg-indigo-600 text-white':'bg-slate-800 text-slate-300'}`}>📊 لوحة التحكم</button>
+              <button onClick={()=>setActiveTab('new_op')} class={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${activeTab==='new_op'?'bg-indigo-600 text-white':'bg-slate-800 text-slate-300'}`}>➕ عملية مساحية</button>
+              <button onClick={()=>setActiveTab('cash')} class={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${activeTab==='cash'?'bg-indigo-600 text-white':'bg-slate-800 text-slate-300'}`}>💵 الخزينة والتصفية</button>
+              <button onClick={()=>setActiveTab('partners')} class={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${activeTab==='partners'?'bg-indigo-600 text-white':'bg-slate-800 text-slate-300'}`}>🤝 محفظة الشركاء</button>
             </div>
           </header>
 
@@ -343,7 +362,6 @@
             {/* 1. لوحة التحكم ومصفوفة العملاء */}
             {activeTab === 'dashboard' && (
               <div class="space-y-4">
-                {/* كروت السيولة السريعة */}
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   <div class="bg-white p-3.5 rounded-2xl border shadow-sm"><span class="text-slate-400 font-bold block text-[10px]">إجمالي الواردات (التحصيلات)</span><strong class="text-emerald-600 text-base font-black">{totalCashIn.toLocaleString()} ج.م</strong></div>
                   <div class="bg-white p-3.5 rounded-2xl border shadow-sm"><span class="text-slate-400 font-bold block text-[10px]">إجمالي المصاريف الحقلية</span><strong class="text-rose-600 text-base font-black">{totalCashOut.toLocaleString()} ج.م</strong></div>
@@ -351,7 +369,6 @@
                   <div class="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl shadow-sm"><span class="text-amber-800 font-bold block text-[10px]">صندوق الخير (لوجه الله)</span><strong class="text-amber-900 text-base font-black">{Math.round(partnerWallets.charity).toLocaleString()} ج.م</strong></div>
                 </div>
 
-                {/* مصفوفة أعمال العملاء التفصيلية */}
                 <div class="bg-white p-4 rounded-2xl border shadow-sm text-xs">
                   <h3 class="font-black text-slate-800 text-sm mb-3 border-b pb-2 flex items-center justify-between">
                     <span>👥 مصفوفة الأعمال والتحصيلات لكل عميل</span>
@@ -397,7 +414,7 @@
               </div>
             )}
 
-            {/* 2. تسجيل عملية مساحية جديدة مع محرك التوزيع التلقائي */}
+            {/* 2. تسجيل عملية مساحية */}
             {activeTab === 'new_op' && (
               <div class="space-y-4">
                 <div class="bg-white p-5 rounded-2xl border shadow-sm text-xs">
@@ -456,7 +473,6 @@
                   </form>
                 </div>
 
-                {/* جدول العمليات المسجلة */}
                 <div class="bg-white p-4 rounded-2xl border shadow-sm text-xs overflow-x-auto">
                   <h4 class="font-bold text-slate-800 mb-2">سجل العمليات المساحية:</h4>
                   <table class="w-full text-right border-collapse">
@@ -470,7 +486,7 @@
                         <th class="p-2 text-center">أتعاب المهندس</th>
                         <th class="p-2 text-center">حصة الجهاز</th>
                         <th class="p-2 text-center">حصة المكتب</th>
-                        {canEditOrDelete && <th class="p-2 text-center bg-slate-200 font-black">إجراءات</th>}
+                        {canEditOrDelete && <th class="p-2 text-center bg-slate-200 font-black sticky left-0 z-10 shadow-xs">إجراءات</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -487,8 +503,11 @@
                             <td class="p-2 text-center text-purple-700 font-bold">{s.deviceFee?.toLocaleString()}</td>
                             <td class="p-2 text-center text-emerald-700 font-bold">{Math.round(s.officeFee || 0).toLocaleString()}</td>
                             {canEditOrDelete && (
-                              <td class="p-2 text-center whitespace-nowrap bg-slate-50">
-                                <button onClick={()=>deleteItem('operations', op.id, operations, setOperations)} class="bg-rose-100 text-rose-700 px-2 py-1 rounded font-bold text-[10px]">🗑️ حذف</button>
+                              <td class="p-2 text-center whitespace-nowrap bg-slate-50 sticky left-0 z-10 shadow-xs">
+                                <div class="flex items-center justify-center gap-1.5">
+                                  <button onClick={()=>setEditItemData({ type: 'operation', data: { ...op } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-1 rounded font-bold text-[10px]">✏️ تعديل</button>
+                                  <button onClick={()=>deleteItem('operations', op.id, operations, setOperations)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded font-bold text-[10px]">🗑️ حذف</button>
+                                </div>
                               </td>
                             )}
                           </tr>
@@ -500,10 +519,9 @@
               </div>
             )}
 
-            {/* 3. الخزينة والوارد والصادر والتصفية اللحظية */}
+            {/* 3. الخزينة والسيولة والتصفية */}
             {activeTab === 'cash' && (
               <div class="space-y-4">
-                {/* كارت التصفية */}
                 <div class="bg-slate-900 text-white p-5 rounded-3xl shadow-xl flex flex-col sm:flex-row justify-between items-center gap-4 text-xs">
                   <div>
                     <h3 class="text-sm font-black text-indigo-300">موقف تصفية الخزينة اللحظي</h3>
@@ -518,7 +536,6 @@
                   </div>
                 </div>
 
-                {/* نموذج تسجيل حركة نقدية */}
                 <div class="bg-white p-4 rounded-2xl border shadow-sm text-xs">
                   <h4 class="font-bold text-slate-800 mb-3 border-b pb-2">💵 تسجيل إيراد / مصروف سريع في الخزينة:</h4>
                   <form onSubmit={handleAddTransaction} class="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
@@ -556,7 +573,6 @@
                   </form>
                 </div>
 
-                {/* سجل المعاملات النقدية */}
                 <div class="bg-white p-4 rounded-2xl border shadow-sm text-xs overflow-x-auto">
                   <h4 class="font-bold text-slate-800 mb-2">سجل حركات الخزينة والسيولة:</h4>
                   <table class="w-full text-right border-collapse">
@@ -568,7 +584,7 @@
                         <th class="p-2">البند</th>
                         <th class="p-2 text-center">المبلغ</th>
                         <th class="p-2">طريقة الدفع</th>
-                        {canEditOrDelete && <th class="p-2 text-center bg-slate-200 font-bold">إجراءات</th>}
+                        {canEditOrDelete && <th class="p-2 text-center bg-slate-200 font-bold sticky left-0 z-10 shadow-xs">إجراءات</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -581,8 +597,11 @@
                           <td class={`p-2 text-center font-black ${t.type==='income'?'text-emerald-600':'text-rose-600'}`}>{parseNum(t.amount).toLocaleString()} ج.م</td>
                           <td class="p-2">{t.paymentMethod}</td>
                           {canEditOrDelete && (
-                            <td class="p-2 text-center whitespace-nowrap bg-slate-50">
-                              <button onClick={()=>deleteItem('transactions', t.id, transactions, setTransactions)} class="bg-rose-100 text-rose-700 px-2 py-1 rounded font-bold text-[10px]">🗑️ حذف</button>
+                            <td class="p-2 text-center whitespace-nowrap bg-slate-50 sticky left-0 z-10 shadow-xs">
+                              <div class="flex items-center justify-center gap-1.5">
+                                <button onClick={()=>setEditItemData({ type: 'transaction', data: { ...t } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-1 rounded font-bold text-[10px]">✏️ تعديل</button>
+                                <button onClick={()=>deleteItem('transactions', t.id, transactions, setTransactions)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded font-bold text-[10px]">🗑️ حذف</button>
+                              </div>
                             </td>
                           )}
                         </tr>
@@ -603,42 +622,36 @@
                   </h3>
 
                   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                    {/* أ. مندور */}
                     <div class="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50">
                       <div class="flex justify-between items-center mb-2"><span class="font-black text-sm text-indigo-950">أ. مندور</span><span class="text-[10px] bg-indigo-200 px-2 py-0.5 rounded font-bold">50% من الجهاز</span></div>
                       <span class="text-slate-500 block text-[11px]">إجمالي الأرباح المستحقة:</span>
                       <strong class="text-xl font-black text-indigo-900">{Math.round(partnerWallets.mandour).toLocaleString()} ج.م</strong>
                     </div>
 
-                    {/* م. أحمد */}
                     <div class="p-4 rounded-2xl border border-blue-200 bg-blue-50/50">
                       <div class="flex justify-between items-center mb-2"><span class="font-black text-sm text-blue-950">م. أحمد</span><span class="text-[10px] bg-blue-200 px-2 py-0.5 rounded font-bold">10% من المكتب</span></div>
                       <span class="text-slate-500 block text-[11px]">إجمالي الأرباح المستحقة:</span>
                       <strong class="text-xl font-black text-blue-900">{Math.round(partnerWallets.ahmed).toLocaleString()} ج.م</strong>
                     </div>
 
-                    {/* صندوق الخير */}
                     <div class="p-4 rounded-2xl border border-amber-200 bg-amber-50/50">
                       <div class="flex justify-between items-center mb-2"><span class="font-black text-sm text-amber-950">صندوق الخير 🤲</span><span class="text-[10px] bg-amber-200 px-2 py-0.5 rounded font-bold">10% لوجه الله</span></div>
                       <span class="text-slate-500 block text-[11px]">المبلغ المجمع للصدقات:</span>
                       <strong class="text-xl font-black text-amber-900">{Math.round(partnerWallets.charity).toLocaleString()} ج.م</strong>
                     </div>
 
-                    {/* م. علاء */}
                     <div class="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50">
                       <div class="flex justify-between items-center mb-2"><span class="font-black text-sm text-emerald-950">م. علاء</span><span class="text-[10px] bg-emerald-200 px-2 py-0.5 rounded font-bold">شريك</span></div>
                       <span class="text-slate-500 block text-[11px]">حصة الجهاز والمكتب:</span>
                       <strong class="text-xl font-black text-emerald-900">{Math.round(partnerWallets.alaa).toLocaleString()} ج.م</strong>
                     </div>
 
-                    {/* م. أيمن */}
                     <div class="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50">
                       <div class="flex justify-between items-center mb-2"><span class="font-black text-sm text-emerald-950">م. أيمن</span><span class="text-[10px] bg-emerald-200 px-2 py-0.5 rounded font-bold">شريك</span></div>
                       <span class="text-slate-500 block text-[11px]">حصة الجهاز والمكتب:</span>
                       <strong class="text-xl font-black text-emerald-900">{Math.round(partnerWallets.ayman).toLocaleString()} ج.م</strong>
                     </div>
 
-                    {/* م. أسامة */}
                     <div class="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50">
                       <div class="flex justify-between items-center mb-2"><span class="font-black text-sm text-emerald-950">م. أسامة</span><span class="text-[10px] bg-emerald-200 px-2 py-0.5 rounded font-bold">شريك</span></div>
                       <span class="text-slate-500 block text-[11px]">حصة الجهاز والمكتب:</span>
@@ -650,7 +663,117 @@
             )}
           </main>
 
-          {/* تنبيه Toast */}
+          {/* نافذة التعديل المنبثقة */}
+          {editItemData && canEditOrDelete && (
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+              <div class="bg-white rounded-3xl p-5 w-full max-w-lg shadow-2xl border text-xs max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center border-b pb-3 mb-3">
+                  <h3 class="font-bold text-sm text-slate-800">
+                    ✏️ تعديل {editItemData.type === 'operation' ? 'العملية المساحية' : 'حركة الخزينة'}
+                  </h3>
+                  <button onClick={() => setEditItemData(null)} class="bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 rounded-full w-8 h-8 flex items-center justify-center font-bold transition">✕</button>
+                </div>
+
+                <form onSubmit={handleSaveEditedItem} class="space-y-3">
+                  {editItemData.type === 'operation' && (
+                    <>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="block font-bold mb-1">التاريخ</label>
+                          <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                        </div>
+                        <div>
+                          <label class="block font-bold mb-1">اسم العميل</label>
+                          <input type="text" value={editItemData.data.clientName} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, clientName: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="block font-bold mb-1">نوع العمل</label>
+                          <select value={editItemData.data.opType} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, opType: e.target.value}})} class="w-full border p-2 rounded-xl font-bold bg-indigo-50">
+                            <option value="rtk_full">يوم جهاز RTK كامل</option>
+                            <option value="rtk_half">نصف يوم جهاز RTK</option>
+                            <option value="sketch_meas">قياس وكروكي</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label class="block font-bold mb-1">المهندس</label>
+                          <input type="text" value={editItemData.data.engineerName} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, engineerName: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="block font-bold mb-1">المبلغ الإجمالي</label>
+                          <input type="number" step="any" value={editItemData.data.totalPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, totalPrice: e.target.value}})} class="w-full border p-2 rounded-xl font-black text-emerald-700" required/>
+                        </div>
+                        <div>
+                          <label class="block font-bold mb-1">المدفوع من العميل</label>
+                          <input type="number" step="any" value={editItemData.data.paidAmount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, paidAmount: e.target.value}})} class="w-full border p-2 rounded-xl"/>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="block font-bold mb-1">مصاريف العمالة</label>
+                          <input type="number" step="any" value={editItemData.data.laborCost} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, laborCost: e.target.value}})} class="w-full border p-2 rounded-xl"/>
+                        </div>
+                        <div>
+                          <label class="block font-bold mb-1">مصاريف السيارة</label>
+                          <input type="number" step="any" value={editItemData.data.carCost} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, carCost: e.target.value}})} class="w-full border p-2 rounded-xl"/>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {editItemData.type === 'transaction' && (
+                    <>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="block font-bold mb-1">التاريخ</label>
+                          <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                        </div>
+                        <div>
+                          <label class="block font-bold mb-1">النوع</label>
+                          <select value={editItemData.data.type} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, type: e.target.value}})} class="w-full border p-2 rounded-xl font-bold">
+                            <option value="income">وارد 📥</option>
+                            <option value="expense">صادر 📤</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label class="block font-bold mb-1">الجهة / العميل</label>
+                        <input type="text" value={editItemData.data.clientOrEntity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, clientOrEntity: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="block font-bold mb-1">المبلغ</label>
+                          <input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border p-2 rounded-xl font-black text-emerald-600" required/>
+                        </div>
+                        <div>
+                          <label class="block font-bold mb-1">طريقة الدفع</label>
+                          <select value={editItemData.data.paymentMethod} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, paymentMethod: e.target.value}})} class="w-full border p-2 rounded-xl">
+                            <option value="كاش">كاش</option>
+                            <option value="فودافون كاش">فودافون كاش</option>
+                            <option value="إنستاباي">إنستاباي</option>
+                            <option value="تحويل بنكي">تحويل بنكي</option>
+                          </select>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div class="flex gap-2 pt-2 border-t mt-4">
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow transition">تأكيد وحفظ التعديلات</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {toast.show && (
             <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-2xl text-xs font-bold shadow-2xl z-50">
               {toast.message}
