@@ -11,6 +11,8 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- مكتبة تحويل HTML إلى PDF فورياً -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
@@ -76,7 +78,8 @@
       measurementId: "G-N9DW5R28H0"
     };
 
-    const DIRECTOR_EMAILS = ["mohamedmohy676676@gmail.com", "+201000000000"];
+    const ADMIN_WHATSAPP_NUMBER = "201095545982";
+    const DIRECTOR_EMAILS = ["mohamedmohy676676@gmail.com", "+201000000000", "+201095545982"];
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
 
     let db = null;
@@ -124,17 +127,34 @@
       return isNaN(n) ? 0 : n;
     };
 
-    // دالة فتح محادثة الواتساب مع نص الرسالة التلقائي
-    const sendWhatsAppMessage = (defaultPhone, textMessage) => {
-      let phone = window.prompt("أدخل رقم هاتف المستلم (أو اتركه فارغاً لاختيار المحادثة من واتساب مباشرة):", defaultPhone || "");
-      if (phone === null) return;
-      phone = phone.replace(/[^0-9]/g, '');
-      if (phone.startsWith('01')) {
-        phone = '20' + phone.substring(1);
+    // دالة إنشاء وتحميل PDF فورياً ثم فتح شات الواتساب مع الأدمن
+    const generatePdfAndOpenWhatsApp = (elementId, filename, textMessage, targetPhone = ADMIN_WHATSAPP_NUMBER) => {
+      const element = document.getElementById(elementId);
+      if (!element) {
+        alert("تعذر العثور على العنصر لإنشاء الـ PDF");
+        return;
       }
-      const baseUrl = phone ? `https://wa.me/${phone}` : `https://wa.me/`;
-      const finalUrl = `${baseUrl}?text=${encodeURIComponent(textMessage)}`;
-      window.open(finalUrl, '_blank');
+
+      const opt = {
+        margin: [8, 8, 8, 8],
+        filename: filename || 'document.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      // توليد الـ PDF وتحميله
+      html2pdf().set(opt).from(element).save().then(() => {
+        // فتح شات واتساب الأدمن المباشر بعد التحميل
+        const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
+        const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMessage + "\n\n📎 (تم استخراج ملف الـ PDF وتحميله بجهازك، برجاء إرفاقه هنا)")}`;
+        window.open(url, '_blank');
+      }).catch(err => {
+        console.error("PDF generation failed:", err);
+        // في حال فشل المكتبة لأي سبب يفتح الواتساب مباشرة
+        const url = `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}`;
+        window.open(url, '_blank');
+      });
     };
 
     function DashboardCharts({ allWork, allExp, allPay, projExpLabels, projExpData, projName }) {
@@ -979,7 +999,7 @@
                       <div><label class="block font-bold mb-1">المكتب الاستشاري</label><input type="text" value={newProj.consultant} onChange={e=>setNewProj({...newProj, consultant: e.target.value})} placeholder="الاستشاري المشرف" class="w-full border rounded-xl p-2" /></div>
                       <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded-xl p-2" /></div>
                       <div><label class="block font-bold mb-1">الميزانية التقديرية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded-xl p-2 text-blue-700 font-bold" /></div>
-                      <div><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl transition">حفظ المشروع</button></div>
+                      <div><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition">حفظ المشروع</button></div>
                     </form>
                   </div>
                 )}
@@ -1122,7 +1142,7 @@
               </div>
             )}
 
-            {/* 4. إدخال المصروفات فقط */}
+            {/* 4. إدخال المصروفات */}
             {activeTab === "add_data" && (
               <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
                 <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة توريد</h3>
@@ -1381,7 +1401,10 @@
                               {e.receiptImg ? <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold">عرض</button> : <span class="text-slate-400">لا</span>}
                             </td>
                             <td class="p-2.5 text-center whitespace-nowrap">
-                              <button onClick={() => sendWhatsAppMessage("", expMsg)} class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded-lg font-bold text-[10px] flex items-center justify-center gap-1 shadow-xs">
+                              <button onClick={() => {
+                                const url = `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(expMsg)}`;
+                                window.open(url, '_blank');
+                              }} class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded-lg font-bold text-[10px] flex items-center justify-center gap-1 shadow-xs">
                                 <span>📲</span> إرسال
                               </button>
                             </td>
@@ -1512,7 +1535,10 @@
                             <td class="p-2 text-center text-emerald-600 font-bold font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
                             <td class="p-2">{p.notes || '-'}</td>
                             <td class="p-2 text-center whitespace-nowrap">
-                              <button onClick={() => sendWhatsAppMessage("", suppMsg)} class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-0.5 rounded-lg font-bold text-[10px] shadow-xs">
+                              <button onClick={() => {
+                                const url = `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(suppMsg)}`;
+                                window.open(url, '_blank');
+                              }} class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-0.5 rounded-lg font-bold text-[10px] shadow-xs">
                                 📲 إرسال
                               </button>
                             </td>
@@ -1545,92 +1571,94 @@
                       <p class="text-slate-500 text-[11px]">مقارنة المستخلصات والتحصيلات بالمنصرف والسيولة النقدية الحقيقية.</p>
                     </div>
                     <div class="flex items-center gap-2">
-                      <button onClick={() => sendWhatsAppMessage("", statementMsg)} class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs flex items-center gap-1.5 transition">
-                        📲 إرسال الموقف للمالك واتساب
+                      <button onClick={() => generatePdfAndOpenWhatsApp('statement-pdf-target', `كشف_حساب_${currentProj.id}.pdf`, statementMsg)} class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs flex items-center gap-1.5 transition">
+                        📲 إرسال PDF + واتساب للأدمن
                       </button>
                       <button onClick={() => window.print()} class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs transition">
-                        🖨️ طباعة كشف الحساب
+                        🖨️ طباعة عادية
                       </button>
                     </div>
                   </div>
 
-                  <div class="border border-slate-300 p-3.5 rounded-2xl mb-4">
-                    <div class="flex justify-between items-center mb-2.5">
-                      <div>
-                        <h2 class="text-base font-black text-slate-900">الموقف المالي لمشروع: {currentProj.name} ({currentProj.id})</h2>
-                        <p class="font-bold text-slate-600 text-[11px]">الموقع: {currentProj.location || '-'} | الميزانية: {parseNum(currentProj.budget).toLocaleString()} ج.م</p>
+                  <div id="statement-pdf-target" class="p-2 bg-white">
+                    <div class="border border-slate-300 p-3.5 rounded-2xl mb-4">
+                      <div class="flex justify-between items-center mb-2.5">
+                        <div>
+                          <h2 class="text-base font-black text-slate-900">الموقف المالي لمشروع: {currentProj.name} ({currentProj.id})</h2>
+                          <p class="font-bold text-slate-600 text-[11px]">الموقع: {currentProj.location || '-'} | الميزانية: {parseNum(currentProj.budget).toLocaleString()} ج.م</p>
+                        </div>
+                        {settings.logo && <img src={settings.logo} class="h-10 object-contain"/>}
                       </div>
-                      {settings.logo && <img src={settings.logo} class="h-10 object-contain"/>}
-                    </div>
-                    
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl text-center border">
-                      <div><span class="text-slate-500 block text-[10px]">إجمالي المستخلصات:</span><strong class="text-indigo-700 text-sm">{totalWorkNet.toLocaleString()} ج.م</strong></div>
-                      <div><span class="text-slate-500 block text-[10px]">إجمالي التحصيلات:</span><strong class="text-emerald-600 text-sm">{totalReceived.toLocaleString()} ج.م</strong></div>
-                      <div><span class="text-slate-500 block text-[10px]">المصروفات الفعلية:</span><strong class="text-rose-600 text-sm">{totalCost.toLocaleString()} ج.م</strong></div>
-                      <div><span class="text-slate-500 block text-[10px]">خزينة الشركة الحرة:</span><strong class="text-indigo-700 text-sm">{centralCashRemaining.toLocaleString()} ج.م</strong></div>
-                      <div><span class="text-slate-500 block text-[10px]">صافي الربح الفعلي:</span><strong class={`text-sm ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{netProfit.toLocaleString()} ج.م</strong></div>
-                    </div>
-                  </div>
-
-                  <div class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">1. المستخلصات المعتمدة</h4>
-                        <table class="w-full text-right border">
-                          <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">رقم المستخلص</th><th class="p-1.5 border text-center">الصافي</th></tr></thead>
-                          <tbody>
-                            {projExtracts.map(ex => <tr key={ex.id}><td class="p-1.5 border">{ex.date}</td><td class="p-1.5 border font-bold">{ex.extractNo}</td><td class="p-1.5 border text-center font-bold text-indigo-700">{parseNum(ex.net).toLocaleString()}</td></tr>)}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div>
-                        <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">2. التحصيلات المستلمة</h4>
-                        <table class="w-full text-right border">
-                          <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">البيان</th><th class="p-1.5 border text-center">المبلغ</th></tr></thead>
-                          <tbody>
-                            {projPayments.map(p => <tr key={p.id}><td class="p-1.5 border">{p.date}</td><td class="p-1.5 border">{p.notes || 'تحصيل'}</td><td class="p-1.5 border text-center font-bold text-emerald-600">{parseNum(p.amount).toLocaleString()}</td></tr>)}
-                          </tbody>
-                        </table>
+                      
+                      <div class="grid grid-cols-2 md:grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl text-center border">
+                        <div><span class="text-slate-500 block text-[10px]">إجمالي المستخلصات:</span><strong class="text-indigo-700 text-sm">{totalWorkNet.toLocaleString()} ج.م</strong></div>
+                        <div><span class="text-slate-500 block text-[10px]">إجمالي التحصيلات:</span><strong class="text-emerald-600 text-sm">{totalReceived.toLocaleString()} ج.م</strong></div>
+                        <div><span class="text-slate-500 block text-[10px]">المصروفات الفعلية:</span><strong class="text-rose-600 text-sm">{totalCost.toLocaleString()} ج.م</strong></div>
+                        <div><span class="text-slate-500 block text-[10px]">خزينة الشركة الحرة:</span><strong class="text-indigo-700 text-sm">{centralCashRemaining.toLocaleString()} ج.م</strong></div>
+                        <div><span class="text-slate-500 block text-[10px]">صافي الربح الفعلي:</span><strong class={`text-sm ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{netProfit.toLocaleString()} ج.م</strong></div>
                       </div>
                     </div>
 
-                    <div>
-                      <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">3. بيان تفصيلي بالمصروفات المنفذة بالمشروع</h4>
-                      <div class="overflow-x-auto">
-                        <table class="w-full text-right border border-slate-300">
-                          <thead>
-                            <tr class="bg-slate-100 text-slate-800">
-                              <th class="p-1.5 border">التاريخ</th>
-                              <th class="p-1.5 border">البند</th>
-                              <th class="p-1.5 border">الوصف</th>
-                              <th class="p-1.5 border text-center">الكمية</th>
-                              <th class="p-1.5 border text-center">الفئة</th>
-                              <th class="p-1.5 border text-center">الإجمالي</th>
-                              <th class="p-1.5 border">المورد</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {projExpenses.map(e => (
-                              <tr key={e.id} class="hover:bg-slate-50">
-                                <td class="p-1.5 border text-slate-600">{e.date}</td>
-                                <td class="p-1.5 border font-semibold">{e.mainCategory} - {e.subCategory}</td>
-                                <td class="p-1.5 border text-slate-700">{e.description || '-'}</td>
-                                <td class="p-1.5 border text-center font-bold">{parseNum(e.quantity)}</td>
-                                <td class="p-1.5 border text-center font-mono">{parseNum(e.unitPrice).toLocaleString()}</td>
-                                <td class="p-1.5 border text-center font-black text-rose-600 font-mono">{parseNum(e.amount).toLocaleString()}</td>
-                                <td class="p-1.5 border text-slate-600">{e.supplier || '-'}</td>
+                    <div class="space-y-4">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">1. المستخلصات المعتمدة</h4>
+                          <table class="w-full text-right border">
+                            <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">رقم المستخلص</th><th class="p-1.5 border text-center">الصافي</th></tr></thead>
+                            <tbody>
+                              {projExtracts.map(ex => <tr key={ex.id}><td class="p-1.5 border">{ex.date}</td><td class="p-1.5 border font-bold">{ex.extractNo}</td><td class="p-1.5 border text-center font-bold text-indigo-700">{parseNum(ex.net).toLocaleString()}</td></tr>)}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div>
+                          <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">2. التحصيلات المستلمة</h4>
+                          <table class="w-full text-right border">
+                            <thead><tr class="bg-slate-100"><th class="p-1.5 border">التاريخ</th><th class="p-1.5 border">البيان</th><th class="p-1.5 border text-center">المبلغ</th></tr></thead>
+                            <tbody>
+                              {projPayments.map(p => <tr key={p.id}><td class="p-1.5 border">{p.date}</td><td class="p-1.5 border">{p.notes || 'تحصيل'}</td><td class="p-1.5 border text-center font-bold text-emerald-600">{parseNum(p.amount).toLocaleString()}</td></tr>)}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">3. بيان تفصيلي بالمصروفات المنفذة بالمشروع</h4>
+                        <div class="overflow-x-auto">
+                          <table class="w-full text-right border border-slate-300">
+                            <thead>
+                              <tr class="bg-slate-100 text-slate-800">
+                                <th class="p-1.5 border">التاريخ</th>
+                                <th class="p-1.5 border">البند</th>
+                                <th class="p-1.5 border">الوصف</th>
+                                <th class="p-1.5 border text-center">الكمية</th>
+                                <th class="p-1.5 border text-center">الفئة</th>
+                                <th class="p-1.5 border text-center">الإجمالي</th>
+                                <th class="p-1.5 border">المورد</th>
                               </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr class="bg-slate-200 font-bold">
-                              <td colSpan="5" class="p-1.5 text-left border">إجمالي المصروفات المنفذة للمشروع:</td>
-                              <td class="p-1.5 text-center border font-black text-rose-700">{totalCost.toLocaleString()} ج.م</td>
-                              <td class="border"></td>
-                            </tr>
-                          </tfoot>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {projExpenses.map(e => (
+                                <tr key={e.id} class="hover:bg-slate-50">
+                                  <td class="p-1.5 border text-slate-600">{e.date}</td>
+                                  <td class="p-1.5 border font-semibold">{e.mainCategory} - {e.subCategory}</td>
+                                  <td class="p-1.5 border text-slate-700">{e.description || '-'}</td>
+                                  <td class="p-1.5 border text-center font-bold">{parseNum(e.quantity)}</td>
+                                  <td class="p-1.5 border text-center font-mono">{parseNum(e.unitPrice).toLocaleString()}</td>
+                                  <td class="p-1.5 border text-center font-black text-rose-600 font-mono">{parseNum(e.amount).toLocaleString()}</td>
+                                  <td class="p-1.5 border text-slate-600">{e.supplier || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr class="bg-slate-200 font-bold">
+                                <td colSpan="5" class="p-1.5 text-left border">إجمالي المصروفات المنفذة للمشروع:</td>
+                                <td class="p-1.5 text-center border font-black text-rose-700">{totalCost.toLocaleString()} ج.م</td>
+                                <td class="border"></td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1681,99 +1709,110 @@
                 <div class="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto print-area text-xs">
                   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b pb-3 print-hidden">
                     <h3 class="font-black text-slate-800 text-sm">عرض مستخلص الأعمال المعتمد للطباعة والتوقيعات</h3>
-                    <button onClick={() => window.print()} class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-bold shadow text-xs flex items-center gap-1.5 transition">
-                      🖨️ طباعة المستخلص الرسمي (PDF)
-                    </button>
+                    <div class="flex items-center gap-2">
+                      <button onClick={() => {
+                        const firstExt = projExtracts[0] || {};
+                        const extSummaryMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📄 *مستخلص أعمال معتمد:* ${firstExt.extractNo || 'مستخلص رسمي'}\n🏗️ *المشروع:* ${currentProj.name} (${currentProj.id})\n💰 *الصافي الإجمالي:* ${totalWorkNet.toLocaleString()} ج.م\n🗓️ *التاريخ:* ${firstExt.date || todayDate}`;
+                        generatePdfAndOpenWhatsApp('extract-pdf-target', `مستخلص_${currentProj.id}.pdf`, extSummaryMsg);
+                      }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold shadow text-xs flex items-center gap-1.5 transition">
+                        📲 إرسال المستخلص PDF + واتساب للأدمن
+                      </button>
+                      <button onClick={() => window.print()} class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-bold shadow text-xs flex items-center gap-1.5 transition">
+                        🖨️ طباعة
+                      </button>
+                    </div>
                   </div>
 
-                  <div class="border-b-2 border-slate-900 pb-4 mb-4">
-                    <div class="flex justify-between items-start">
-                      <div>
-                        <h2 class="text-lg font-black text-slate-950">شركة مساحة للاستشارات والمقاولات العمومية</h2>
-                        <p class="text-[11px] text-slate-600 font-bold mt-0.5">قسم الإشراف والتنفيذ الهندسي وإدارة المشروعات</p>
+                  <div id="extract-pdf-target" class="p-2 bg-white">
+                    <div class="border-b-2 border-slate-900 pb-4 mb-4">
+                      <div class="flex justify-between items-start">
+                        <div>
+                          <h2 class="text-lg font-black text-slate-950">شركة مساحة للاستشارات والمقاولات العمومية</h2>
+                          <p class="text-[11px] text-slate-600 font-bold mt-0.5">قسم الإشراف والتنفيذ الهندسي وإدارة المشروعات</p>
+                        </div>
+                        {settings.logo ? <img src={settings.logo} class="h-16 object-contain" /> : <div class="text-2xl">🏗️</div>}
                       </div>
-                      {settings.logo ? <img src={settings.logo} class="h-16 object-contain" /> : <div class="text-2xl">🏗️</div>}
+
+                      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-2.5 rounded-xl mt-3 text-[11px]">
+                        <div><strong>كود المشروع:</strong> {currentProj.id}</div>
+                        <div><strong>اسم المالك:</strong> {currentProj.name}</div>
+                        <div><strong>الاستشاري المشرف:</strong> {currentProj.consultant || 'مكتب الإشراف الهندسي'}</div>
+                        <div><strong>موقع التنفيذ:</strong> {currentProj.location || '-'}</div>
+                      </div>
                     </div>
 
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-2.5 rounded-xl mt-3 text-[11px]">
-                      <div><strong>كود المشروع:</strong> {currentProj.id}</div>
-                      <div><strong>اسم المالك:</strong> {currentProj.name}</div>
-                      <div><strong>الاستشاري المشرف:</strong> {currentProj.consultant || 'مكتب الإشراف الهندسي'}</div>
-                      <div><strong>موقع التنفيذ:</strong> {currentProj.location || '-'}</div>
-                    </div>
-                  </div>
-
-                  <table class="w-full text-right border-collapse border border-slate-300">
-                    <thead>
-                      <tr class="bg-slate-200 text-slate-900 font-black">
-                        <th class="p-2 border border-slate-300">التاريخ</th>
-                        <th class="p-2 border border-slate-300">رقم المستخلص</th>
-                        <th class="p-2 border border-slate-300">بيان الأعمال</th>
-                        <th class="p-2 border border-slate-300 text-center">الكمية</th>
-                        <th class="p-2 border border-slate-300 text-center">الفئة</th>
-                        <th class="p-2 border border-slate-300 text-center">إجمالي القيمة</th>
-                        <th class="p-2 border border-slate-300 text-center">الاستقطاعات</th>
-                        <th class="p-2 border border-slate-300 text-center">الصافي المستحق</th>
-                        <th class="p-2 border border-slate-300 text-center print-hidden">واتساب</th>
-                        {canEditOrDelete && (
-                          <th class="p-2 border border-slate-300 text-center bg-slate-300 print-hidden sticky left-0 z-10 shadow-xs">إجراءات</th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {projExtracts.length === 0 ? <tr><td colSpan={canEditOrDelete ? 10 : 9} class="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
-                      projExtracts.map((ex) => {
-                        const extractMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📄 *إشعار اعتماد مستخلص أعمال رسمـي*\n🏗️ *المشروع:* ${currentProj.name} (${currentProj.id})\n🔢 *رقم المستخلص:* ${ex.extractNo}\n📝 *بيان الأعمال:* ${ex.workDescription}\n📐 *الكمية المنفذة:* ${ex.quantity} | *الفئة التعاقدية:* ${parseNum(ex.unitPrice).toLocaleString()} ج.م\n💵 *إجمالي قيمة الأعمال:* ${parseNum(ex.totalWork).toLocaleString()} ج.م\n📉 *الاستقطاعات وتأمين الأعمال:* ${parseNum(ex.deductions).toLocaleString()} ج.م\n✅ *الصافي المعتمد للصرف:* ${parseNum(ex.net).toLocaleString()} ج.م\n🗓️ *التاريخ:* ${ex.date}`;
-                        return (
-                          <tr key={ex.id} class="hover:bg-slate-50">
-                            <td class="p-2 border border-slate-300">{ex.date}</td>
-                            <td class="p-2 border border-slate-300 font-bold">{ex.extractNo}</td>
-                            <td class="p-2 border border-slate-300">{ex.workDescription}</td>
-                            <td class="p-2 border border-slate-300 text-center">{parseNum(ex.quantity)}</td>
-                            <td class="p-2 border border-slate-300 text-center">{parseNum(ex.unitPrice).toLocaleString()}</td>
-                            <td class="p-2 border border-slate-300 text-center font-bold">{parseNum(ex.totalWork).toLocaleString()}</td>
-                            <td class="p-2 border border-slate-300 text-center text-rose-600">{parseNum(ex.deductions).toLocaleString()}</td>
-                            <td class="p-2 border border-slate-300 text-center font-black text-indigo-700 bg-indigo-50/50">{parseNum(ex.net).toLocaleString()}</td>
-                            <td class="p-2 border border-slate-300 text-center whitespace-nowrap print-hidden">
-                              <button onClick={() => sendWhatsAppMessage("", extractMsg)} class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-0.5 rounded-lg font-bold text-[10px] shadow-xs flex items-center justify-center gap-1 mx-auto">
-                                <span>📲</span> إرسال
-                              </button>
-                            </td>
-                            {canEditOrDelete && (
-                              <td class="p-2 border border-slate-300 text-center whitespace-nowrap bg-slate-50 print-hidden sticky left-0 z-10 shadow-xs">
-                                <div class="flex items-center justify-center gap-1.5">
-                                  <button onClick={() => setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
-                                  <button onClick={() => deleteItem('extracts', ex.id, extracts)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
-                                </div>
+                    <table class="w-full text-right border-collapse border border-slate-300">
+                      <thead>
+                        <tr class="bg-slate-200 text-slate-900 font-black">
+                          <th class="p-2 border border-slate-300">التاريخ</th>
+                          <th class="p-2 border border-slate-300">رقم المستخلص</th>
+                          <th class="p-2 border border-slate-300">بيان الأعمال</th>
+                          <th class="p-2 border border-slate-300 text-center">الكمية</th>
+                          <th class="p-2 border border-slate-300 text-center">الفئة</th>
+                          <th class="p-2 border border-slate-300 text-center">إجمالي القيمة</th>
+                          <th class="p-2 border border-slate-300 text-center">الاستقطاعات</th>
+                          <th class="p-2 border border-slate-300 text-center">الصافي المستحق</th>
+                          <th class="p-2 border border-slate-300 text-center print-hidden">واتساب الأدمن</th>
+                          {canEditOrDelete && (
+                            <th class="p-2 border border-slate-300 text-center bg-slate-300 print-hidden sticky left-0 z-10 shadow-xs">إجراءات</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {projExtracts.length === 0 ? <tr><td colSpan={canEditOrDelete ? 10 : 9} class="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
+                        projExtracts.map((ex) => {
+                          const extractMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📄 *إشعار اعتماد مستخلص أعمال رسمـي*\n🏗️ *المشروع:* ${currentProj.name} (${currentProj.id})\n🔢 *رقم المستخلص:* ${ex.extractNo}\n📝 *بيان الأعمال:* ${ex.workDescription}\n📐 *الكمية المنفذة:* ${ex.quantity} | *الفئة التعاقدية:* ${parseNum(ex.unitPrice).toLocaleString()} ج.م\n💵 *إجمالي قيمة الأعمال:* ${parseNum(ex.totalWork).toLocaleString()} ج.م\n📉 *الاستقطاعات وتأمين الأعمال:* ${parseNum(ex.deductions).toLocaleString()} ج.م\n✅ *الصافي المعتمد للصرف:* ${parseNum(ex.net).toLocaleString()} ج.م\n🗓️ *التاريخ:* ${ex.date}`;
+                          return (
+                            <tr key={ex.id} class="hover:bg-slate-50">
+                              <td class="p-2 border border-slate-300">{ex.date}</td>
+                              <td class="p-2 border border-slate-300 font-bold">{ex.extractNo}</td>
+                              <td class="p-2 border border-slate-300">{ex.workDescription}</td>
+                              <td class="p-2 border border-slate-300 text-center">{parseNum(ex.quantity)}</td>
+                              <td class="p-2 border border-slate-300 text-center">{parseNum(ex.unitPrice).toLocaleString()}</td>
+                              <td class="p-2 border border-slate-300 text-center font-bold">{parseNum(ex.totalWork).toLocaleString()}</td>
+                              <td class="p-2 border border-slate-300 text-center text-rose-600">{parseNum(ex.deductions).toLocaleString()}</td>
+                              <td class="p-2 border border-slate-300 text-center font-black text-indigo-700 bg-indigo-50/50">{parseNum(ex.net).toLocaleString()}</td>
+                              <td class="p-2 border border-slate-300 text-center whitespace-nowrap print-hidden">
+                                <button onClick={() => generatePdfAndOpenWhatsApp('extract-pdf-target', `مستخلص_${ex.extractNo}_${currentProj.id}.pdf`, extractMsg)} class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-0.5 rounded-lg font-bold text-[10px] shadow-xs flex items-center justify-center gap-1 mx-auto">
+                                  <span>📲 PDF للأدمن</span>
+                                </button>
                               </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr class="bg-slate-800 text-white font-bold">
-                        <td class="p-2.5 text-left border print-hidden"></td>
-                        <td class="p-2.5 text-left" colSpan="6">إجمالي الصافي المعتمد لكافة المستخلصات:</td>
-                        <td class="p-2.5 text-center text-sm">{totalWorkNet.toLocaleString()} ج.م</td>
-                        <td class="border print-hidden"></td>
-                        {canEditOrDelete && <td class="p-2.5 print-hidden"></td>}
-                      </tr>
-                    </tfoot>
-                  </table>
+                              {canEditOrDelete && (
+                                <td class="p-2 border border-slate-300 text-center whitespace-nowrap bg-slate-50 print-hidden sticky left-0 z-10 shadow-xs">
+                                  <div class="flex items-center justify-center gap-1.5">
+                                    <button onClick={() => setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
+                                    <button onClick={() => deleteItem('extracts', ex.id, extracts)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr class="bg-slate-800 text-white font-bold">
+                          <td class="p-2.5 text-left border print-hidden"></td>
+                          <td class="p-2.5 text-left" colSpan="6">إجمالي الصافي المعتمد لكافة المستخلصات:</td>
+                          <td class="p-2.5 text-center text-sm">{totalWorkNet.toLocaleString()} ج.م</td>
+                          <td class="border print-hidden"></td>
+                          {canEditOrDelete && <td class="p-2.5 print-hidden"></td>}
+                        </tr>
+                      </tfoot>
+                    </table>
 
-                  <div class="grid grid-cols-3 gap-6 text-center mt-12 pt-6 border-t border-slate-300 print-break-inside font-bold text-xs">
-                    <div>
-                      <p class="text-slate-500 mb-8">مهندس التنفيذ بالموقع</p>
-                      <p class="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع: ............................</p>
-                    </div>
-                    <div>
-                      <p class="text-slate-500 mb-8">استشاري المشروع المعتمد</p>
-                      <p class="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع والختم: ............................</p>
-                    </div>
-                    <div>
-                      <p class="text-slate-500 mb-8">اعتماد الإدارة العامة</p>
-                      <p class="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع: ............................</p>
+                    <div class="grid grid-cols-3 gap-6 text-center mt-12 pt-6 border-t border-slate-300 print-break-inside font-bold text-xs">
+                      <div>
+                        <p class="text-slate-500 mb-8">مهندس التنفيذ بالموقع</p>
+                        <p class="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع: ............................</p>
+                      </div>
+                      <div>
+                        <p class="text-slate-500 mb-8">استشاري المشروع المعتمد</p>
+                        <p class="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع والختم: ............................</p>
+                      </div>
+                      <div>
+                        <p class="text-slate-500 mb-8">اعتماد الإدارة العامة</p>
+                        <p class="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع: ............................</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1826,7 +1865,7 @@
             )}
           </main>
 
-          {/* نافذة كشف حساب المورد التفاعلية مع خيار إرسال واتساب */}
+          {/* نافذة كشف حساب المورد التفاعلية */}
           {selectedSupplierDetail && (
             <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-5">
               <div class="bg-white rounded-3xl p-5 w-full max-w-4xl shadow-2xl border text-xs max-h-[90vh] flex flex-col justify-between">
@@ -1838,7 +1877,7 @@
                     <button onClick={()=>setSelectedSupplierDetail(null)} class="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full w-8 h-8 flex items-center justify-center font-bold">✕</button>
                   </div>
 
-                  <div class="overflow-y-auto max-h-[60vh]">
+                  <div id="supplier-statement-pdf-target" class="overflow-y-auto max-h-[60vh] p-2 bg-white">
                     <h4 class="font-bold text-slate-700 mb-2">1. الفواتير والمسحوبات:</h4>
                     <table class="w-full text-right border-collapse mb-4 border">
                       <thead>
@@ -1850,7 +1889,7 @@
                           <th class="p-2 border text-center">السعر</th>
                           <th class="p-2 border text-center">الإجمالي</th>
                           <th class="p-2 border">حالة الفاتورة</th>
-                          {canEditOrDelete && <th class="p-2 border text-center bg-slate-200 font-bold">إجراءات</th>}
+                          {canEditOrDelete && <th class="p-2 border text-center bg-slate-200 font-bold print-hidden">إجراءات</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1871,9 +1910,9 @@
                                 </span>
                               </td>
                               {canEditOrDelete && (
-                                <td class="p-2 border text-center whitespace-nowrap bg-slate-50">
+                                <td class="p-2 border text-center whitespace-nowrap bg-slate-50 print-hidden">
                                   <div class="flex items-center justify-center gap-1.5">
-                                    <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
+                                    <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏️️ تعديل</button>
                                     <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-0.5 rounded font-bold text-[10px]">🗑️ حذف</button>
                                   </div>
                                 </td>
@@ -1892,7 +1931,7 @@
                           <th class="p-2 border">المشروع</th>
                           <th class="p-2 border text-center">المبلغ المسدد</th>
                           <th class="p-2 border">البيان</th>
-                          {canEditOrDelete && <th class="p-2 border text-center bg-slate-200 font-bold">إجراءات</th>}
+                          {canEditOrDelete && <th class="p-2 border text-center bg-slate-200 font-bold print-hidden">إجراءات</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1906,7 +1945,7 @@
                               <td class="p-2 border text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
                               <td class="p-2 border">{p.notes || '-'}</td>
                               {canEditOrDelete && (
-                                <td class="p-2 border text-center whitespace-nowrap bg-slate-50">
+                                <td class="p-2 border text-center whitespace-nowrap bg-slate-50 print-hidden">
                                   <div class="flex items-center justify-center gap-1.5">
                                     <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
                                     <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-0.5 rounded font-bold text-[10px]">🗑️ حذف</button>
@@ -1929,9 +1968,9 @@
                     const totalPaid = suppPays.reduce((s, p) => s + parseNum(p.amount), 0);
                     const bal = totalPaid - totalPurch;
                     const suppStatementMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📑 *كشف حساب مورد:* ${selectedSupplierDetail}\n----------------------------------\n📦 *إجمالي المسحوبات والفواتير:* ${totalPurch.toLocaleString()} ج.م\n💵 *إجمالي الدفعات المسددة:* ${totalPaid.toLocaleString()} ج.م\n⚖️ *الرصيد الصافي:* ${Math.abs(bal).toLocaleString()} ج.م (${bal >= 0 ? 'رصيد دائن للمورد' : 'مستحق للمورد'})\n----------------------------------\n🗓️ *تاريخ الإشعار:* ${todayDate}`;
-                    sendWhatsAppMessage("", suppStatementMsg);
+                    generatePdfAndOpenWhatsApp('supplier-statement-pdf-target', `كشف_مورد_${selectedSupplierDetail}.pdf`, suppStatementMsg);
                   }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 transition">
-                    📲 إرسال كشف الحساب للمورد واتساب
+                    📲 إرسال كشف الحساب PDF للأدمن
                   </button>
                   <button onClick={()=>setSelectedSupplierDetail(null)} class="bg-slate-800 text-white px-5 py-2 rounded-xl font-bold">إغلاق</button>
                 </div>
