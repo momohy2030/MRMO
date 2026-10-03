@@ -342,6 +342,7 @@
       };
 
       const deleteItem = (path, id, list) => {
+        if (!isAdmin) { showToast("خاصية الحذف مصرحة للإدارة فقط 🔒", "error"); return; }
         if (window.confirm("هل أنت متأكد من الحذف نهائياً؟")) {
           const newList = list.filter(item => item.id !== id);
           if (db) db.ref(path).set(newList);
@@ -762,43 +763,6 @@
                     <div><label class="block font-bold mb-1">البيان / ملاحظات</label><input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="سلفة لتمويل مشتريات..." class="w-full border border-emerald-300 rounded-xl p-2 bg-white"/></div>
                     <div class="sm:col-span-4"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ العهدة في حساب الموظف</button></div>
                   </form>
-
-                  <div class="mt-4 pt-3 border-t border-emerald-200">
-                    <h4 class="font-bold text-emerald-950 mb-2 text-xs">سجل العهد والسلف المسجلة للمشروع النشط:</h4>
-                    <div class="overflow-x-auto bg-white rounded-xl border border-emerald-200">
-                      <table class="w-full text-right text-xs">
-                        <thead>
-                          <tr class="bg-emerald-100/60 text-emerald-900 border-b border-emerald-200">
-                            <th class="p-2">التاريخ</th>
-                            <th class="p-2">اسم الموظف</th>
-                            <th class="p-2">المبلغ</th>
-                            <th class="p-2">البيان</th>
-                            <th class="p-2">بواسطة</th>
-                            <th class="p-2 text-center">إجراءات</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {projAdvances.length === 0 ? (
-                            <tr><td colSpan={6} class="text-center p-3 text-slate-400">لا توجد سلف مسجلة لهذا المشروع</td></tr>
-                          ) : (
-                            projAdvances.map(a => (
-                              <tr key={a.id} class="border-b hover:bg-emerald-50/50">
-                                <td class="p-2 text-slate-600">{a.date}</td>
-                                <td class="p-2 font-bold text-emerald-950">{a.employeeName}</td>
-                                <td class="p-2 font-black text-emerald-700 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
-                                <td class="p-2 text-slate-600">{a.notes || '-'}</td>
-                                <td class="p-2 text-slate-500">{a.createdBy || '-'}</td>
-                                <td class="p-2 text-center flex items-center justify-center gap-1.5">
-                                  <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
-                                  <button onClick={() => deleteItem('advances', a.id, advances)} class="text-rose-500 hover:text-rose-700 font-bold px-1.5 py-0.5 rounded transition">🗑️</button>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
                 </div>
 
                 {/* نموذج تسجيل المصروف مع حالة الفاتورة ونوع السداد */}
@@ -943,6 +907,7 @@
                   <table class="w-full text-right border-collapse">
                     <thead>
                       <tr class="bg-slate-100 text-slate-700 border-b">
+                        <th class="p-2.5 bg-amber-500 text-white font-black text-center border-l border-amber-600">⚙️ إجراءات التعديل</th>
                         <th class="p-2.5">التاريخ</th>
                         <th class="p-2.5">المشروع</th>
                         <th class="p-2.5">البند</th>
@@ -955,13 +920,19 @@
                         <th class="p-2.5">السداد</th>
                         <th class="p-2.5">الفاتورة</th>
                         <th class="p-2.5">بواسطة</th>
-                        <th class="p-2.5 text-center">إجراءات</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredSearchExpenses.length === 0 ? <tr><td colSpan={13} class="text-center p-4 text-slate-500">لا توجد نتائج مطابقة</td></tr> : 
                       filteredSearchExpenses.map((e) => (
                         <tr key={e.id} class="border-b hover:bg-slate-50">
+                          {/* عمود الإجراءات الأول */}
+                          <td class="p-2.5 text-center bg-amber-50 border-l border-amber-100">
+                            <div class="flex items-center justify-center gap-1.5">
+                              <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg font-black shadow-sm flex items-center gap-1"><span>✏️</span> تعديل</button>
+                              {isAdmin && <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-600 hover:bg-rose-200 px-2 py-1.5 rounded-lg font-bold">🗑️</button>}
+                            </div>
+                          </td>
                           <td class="p-2.5 text-slate-600 whitespace-nowrap">{e.date}</td>
                           <td class="p-2.5 font-bold text-blue-700 font-mono">{e.projectId}</td>
                           <td class="p-2.5 font-semibold">{e.mainCategory} - {e.subCategory}</td>
@@ -984,10 +955,6 @@
                             {e.receiptImg ? <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold">عرض</button> : <span class="text-slate-400">لا</span>}
                           </td>
                           <td class="p-2.5 text-slate-500 whitespace-nowrap">{e.createdBy || '-'}</td>
-                          <td class="p-2.5 text-center flex items-center justify-center gap-1.5">
-                            <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-lg font-bold">✏️ تعديل</button>
-                            <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-50 text-rose-600 hover:bg-rose-100 px-2 py-1 rounded-lg font-bold">🗑️</button>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -997,7 +964,7 @@
             )}
 
             {/* 5. حسابات الموردين */}
-            {activeTab === "suppliers" && (
+            {activeTab === "suppliers" && isAdmin && (
               <div class="space-y-4">
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
                   <div class="flex justify-between items-center mb-3 border-b pb-2">
@@ -1068,32 +1035,34 @@
                   </table>
                 </div>
 
-                {/* سجل الدفعات المسددة للموردين مع زر التعديل */}
+                {/* سجل الدفعات المسددة للموردين مع زر التعديل في البداية */}
                 <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
                   <h4 class="font-bold text-slate-700 mb-2">سجل الدفعات المسددة للموردين:</h4>
                   <table class="w-full text-right border-collapse">
                     <thead>
                       <tr class="bg-slate-50 text-slate-600 border-b">
+                        <th class="p-2 bg-amber-500 text-white font-black text-center border-l border-amber-600">⚙ إجراءات</th>
                         <th class="p-2">التاريخ</th>
                         <th class="p-2">المورد</th>
                         <th class="p-2">المبلغ المسدد</th>
                         <th class="p-2">رقم الإيصال / البيان</th>
                         <th class="p-2">بواسطة</th>
-                        <th class="p-2 text-center">إجراءات</th>
                       </tr>
                     </thead>
                     <tbody>
                       {projSuppPayments.map(p => (
                         <tr key={p.id} class="border-b hover:bg-slate-50">
+                          <td class="p-2 text-center bg-amber-50 border-l border-amber-100">
+                            <div class="flex items-center justify-center gap-1.5">
+                              <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg font-black shadow-sm flex items-center gap-1"><span>✏️</span> تعديل</button>
+                              {isAdmin && <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-600 hover:bg-rose-200 px-2 py-1.5 rounded-lg font-bold">🗑️</button>}
+                            </div>
+                          </td>
                           <td class="p-2">{p.date}</td>
                           <td class="p-2 font-bold text-indigo-950">{p.supplier}</td>
                           <td class="p-2 text-emerald-600 font-bold font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
                           <td class="p-2">{p.notes || '-'}</td>
                           <td class="p-2 text-slate-500">{p.createdBy || '-'}</td>
-                          <td class="p-2 text-center flex items-center justify-center gap-1.5">
-                            <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
-                            <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="text-rose-500 hover:text-rose-700 font-bold px-1.5 py-0.5">🗑️</button>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1102,45 +1071,53 @@
               </div>
             )}
 
-            {/* 6. دليل المشاريع مع زر التعديل */}
+            {/* 6. دليل المشاريع مع زر التعديل في البداية */}
             {activeTab === "projects" && (
               <div class="space-y-3.5">
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
-                  <h3 class="font-bold mb-2.5 border-b pb-1.5 text-xs sm:text-sm">📁 إضافة مشروع إنشائي جديد</h3>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!newProj.id || !newProj.name) return;
-                    const clean = cleanId(newProj.id);
-                    const projectToAdd = { ...newProj, id: clean, budget: parseNum(newProj.budget), createdBy: user.name };
-                    const updatedProjects = [...projects, projectToAdd];
-                    setProjects(updatedProjects);
-                    if (db) db.ref('projects').set(updatedProjects);
-                    setSelectedProjId(clean);
-                    setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
-                    showToast(`تمت إضافة المشروع بنجاح!`);
-                  }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
-                    <div><label class="block font-bold mb-1">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded-xl p-2 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required /></div>
-                    <div><label class="block font-bold mb-1">العميل / المالك</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded-xl p-2" required /></div>
-                    <div><label class="block font-bold mb-1">المكتب الاستشاري</label><input type="text" value={newProj.consultant} onChange={e=>setNewProj({...newProj, consultant: e.target.value})} placeholder="الاستشاري المشرف" class="w-full border rounded-xl p-2" /></div>
-                    <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded-xl p-2" /></div>
-                    <div><label class="block font-bold mb-1">الميزانية التقديرية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded-xl p-2 text-blue-700 font-bold" /></div>
-                    <div><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl transition">حفظ المشروع</button></div>
-                  </form>
-                </div>
-
+                {isAdmin && (
+                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
+                    <h3 class="font-bold mb-2.5 border-b pb-1.5 text-xs sm:text-sm">📁 إضافة مشروع إنشائي جديد</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newProj.id || !newProj.name) return;
+                      const clean = cleanId(newProj.id);
+                      const projectToAdd = { ...newProj, id: clean, budget: parseNum(newProj.budget), createdBy: user.name };
+                      const updatedProjects = [...projects, projectToAdd];
+                      setProjects(updatedProjects);
+                      if (db) db.ref('projects').set(updatedProjects);
+                      setSelectedProjId(clean);
+                      setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
+                      showToast(`تمت إضافة المشروع بنجاح!`);
+                    }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
+                      <div><label class="block font-bold mb-1">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded-xl p-2 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required /></div>
+                      <div><label class="block font-bold mb-1">العميل / المالك</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded-xl p-2" required /></div>
+                      <div><label class="block font-bold mb-1">المكتب الاستشاري</label><input type="text" value={newProj.consultant} onChange={e=>setNewProj({...newProj, consultant: e.target.value})} placeholder="الاستشاري المشرف" class="w-full border rounded-xl p-2" /></div>
+                      <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded-xl p-2" /></div>
+                      <div><label class="block font-bold mb-1">الميزانية التقديرية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded-xl p-2 text-blue-700 font-bold" /></div>
+                      <div><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl transition">حفظ المشروع</button></div>
+                    </form>
+                  </div>
+                )}
                 <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
                   <table class="w-full text-right">
-                    <thead><tr class="bg-slate-100 text-slate-700"><th class="p-2.5">الكود</th><th class="p-2.5">المالك</th><th class="p-2.5">الاستشاري</th><th class="p-2.5">الموقع</th><th class="p-2.5">الميزانية</th><th class="p-2.5">الحالة</th><th class="p-2.5 text-center">إجراءات</th></tr></thead>
+                    <thead>
+                      <tr class="bg-slate-100 text-slate-700">
+                        <th class="p-2.5 bg-amber-500 text-white font-black text-center border-l border-amber-600">⚙ إجراءات</th>
+                        <th class="p-2.5">الكود</th><th class="p-2.5">المالك</th><th class="p-2.5">الاستشاري</th><th class="p-2.5">الموقع</th><th class="p-2.5">الميزانية</th><th class="p-2.5">الحالة</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {projects.map(p => (
                         <tr key={p.id} class="border-b hover:bg-slate-50">
+                          <td class="p-2.5 text-center bg-amber-50 border-l border-amber-100">
+                            <div class="flex items-center justify-center gap-1.5">
+                              <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg font-black shadow-sm flex items-center gap-1"><span>✏️</span> تعديل</button>
+                              {isAdmin && <button onClick={()=>deleteItem('projects', p.id, projects)} class="bg-rose-100 text-rose-600 hover:bg-rose-200 px-2 py-1.5 rounded-lg font-bold">🗑️</button>}
+                            </div>
+                          </td>
                           <td class="p-2.5 font-bold text-blue-700 font-mono">{p.id}</td><td class="p-2.5 font-semibold">{p.name}</td><td class="p-2.5 text-slate-600">{p.consultant || '-'}</td><td class="p-2.5">{p.location || '-'}</td>
                           <td class="p-2.5 font-bold text-slate-700">{parseNum(p.budget).toLocaleString()} ج.م</td>
                           <td class="p-2.5"><span class="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-lg text-[10px]">{p.status || 'جاري'}</span></td>
-                          <td class="p-2.5 text-center flex items-center justify-center gap-1.5">
-                            <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
-                            <button onClick={()=>deleteItem('projects', p.id, projects)} class="text-rose-500 font-bold px-1.5 py-0.5">🗑️</button>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1149,42 +1126,50 @@
               </div>
             )}
 
-            {/* 7. جدول الدفعات مع زر التعديل */}
+            {/* 7. جدول الدفعات مع زر التعديل في البداية */}
             {activeTab === "payments" && (
               <div class="space-y-3.5">
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
-                  <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💰 تسجيل دفعة مستلمة من العميل</h3>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    const targetProj = cleanId(selectedProjId);
-                    const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user.name};
-                    const updated = [newItem, ...payments];
-                    setPayments(updated);
-                    if (db) db.ref('payments').set(updated);
-                    setNewPay({date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: ""});
-                    showToast("تم تسجيل الدفعة بنجاح! 💵");
-                  }} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                    <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
-                    <div><label class="block font-bold mb-1">المبلغ (ج.م)</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-emerald-600 bg-emerald-50" required/></div>
-                    <div class="sm:col-span-3"><label class="block font-bold mb-1">البيان / تفاصيل التحويل</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded-xl p-2" placeholder="دفعة تحت الحساب المستخلص 1..."/></div>
-                    <div class="sm:col-span-3"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ التحصيل</button></div>
-                  </form>
-                </div>
-
+                {isAdmin && (
+                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
+                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💰 تسجيل دفعة مستلمة من العميل</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const targetProj = cleanId(selectedProjId);
+                      const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user.name};
+                      const updated = [newItem, ...payments];
+                      setPayments(updated);
+                      if (db) db.ref('payments').set(updated);
+                      setNewPay({date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: ""});
+                      showToast("تم تسجيل الدفعة بنجاح! 💵");
+                    }} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                      <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
+                      <div><label class="block font-bold mb-1">المبلغ (ج.م)</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-emerald-600 bg-emerald-50" required/></div>
+                      <div class="sm:col-span-3"><label class="block font-bold mb-1">البيان / تفاصيل التحويل</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded-xl p-2" placeholder="دفعة تحت الحساب المستخلص 1..."/></div>
+                      <div class="sm:col-span-3"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ التحصيل</button></div>
+                    </form>
+                  </div>
+                )}
                 <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
                   <table class="w-full text-right">
-                    <thead><tr class="bg-slate-100 text-slate-600"><th class="p-2.5">التاريخ</th><th class="p-2.5">المشروع</th><th class="p-2.5">المبلغ</th><th class="p-2.5">البيان</th><th class="p-2.5">بواسطة</th><th class="p-2.5 text-center">إجراءات</th></tr></thead>
+                    <thead>
+                      <tr class="bg-slate-100 text-slate-600">
+                        <th class="p-2.5 bg-amber-500 text-white font-black text-center border-l border-amber-600">⚙ إجراءات</th>
+                        <th class="p-2.5">التاريخ</th><th class="p-2.5">المشروع</th><th class="p-2.5">المبلغ</th><th class="p-2.5">البيان</th><th class="p-2.5">بواسطة</th>
+                      </tr>
+                    </thead>
                     <tbody>{projPayments.map((p) => (
                       <tr key={p.id} class="border-b hover:bg-slate-50">
+                        <td class="p-2.5 text-center bg-amber-50 border-l border-amber-100">
+                          <div class="flex items-center justify-center gap-1.5">
+                            <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg font-black shadow-sm flex items-center gap-1"><span>✏️</span> تعديل</button>
+                            {isAdmin && <button onClick={()=>deleteItem('payments', p.id, payments)} class="bg-rose-100 text-rose-600 hover:bg-rose-200 px-2 py-1.5 rounded-lg font-bold">🗑️️</button>}
+                          </div>
+                        </td>
                         <td class="p-2.5 text-slate-600">{p.date}</td>
                         <td class="p-2.5 font-bold text-blue-700">{p.projectId}</td>
                         <td class="p-2.5 text-emerald-600 font-bold">{parseNum(p.amount).toLocaleString()}</td>
                         <td class="p-2.5">{p.notes}</td>
                         <td class="p-2.5 text-slate-500">{p.createdBy || '-'}</td>
-                        <td class="p-2.5 text-center flex items-center justify-center gap-1.5">
-                          <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
-                          <button onClick={()=>deleteItem('payments', p.id, payments)} class="text-rose-500 font-bold px-1.5 py-0.5">🗑️</button>
-                        </td>
                       </tr>
                     ))}</tbody>
                   </table>
@@ -1192,7 +1177,7 @@
               </div>
             )}
 
-            {/* 8. المستخلصات الهندسية الرسمية والطباعة */}
+            {/* 8. المستخلصات الهندسية الرسمية والطباعة مع زر التعديل أولاً */}
             {activeTab === "extracts" && (
               <div class="space-y-4">
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs print-hidden">
@@ -1256,6 +1241,7 @@
                   <table class="w-full text-right border-collapse border border-slate-300">
                     <thead>
                       <tr class="bg-slate-200 text-slate-900 font-black">
+                        <th class="p-2 border border-slate-300 bg-amber-500 text-white text-center print-hidden">⚙ إجراءات</th>
                         <th class="p-2 border border-slate-300">التاريخ</th>
                         <th class="p-2 border border-slate-300">رقم المستخلص</th>
                         <th class="p-2 border border-slate-300">بيان الأعمال</th>
@@ -1264,13 +1250,18 @@
                         <th class="p-2 border border-slate-300 text-center">إجمالي القيمة</th>
                         <th class="p-2 border border-slate-300 text-center">الاستقطاعات</th>
                         <th class="p-2 border border-slate-300 text-center">الصافي المستحق</th>
-                        <th class="p-2 print-hidden border text-center">إجراءات</th>
                       </tr>
                     </thead>
                     <tbody>
                       {projExtracts.length === 0 ? <tr><td colSpan={9} class="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
                       projExtracts.map((ex) => (
                         <tr key={ex.id} class="hover:bg-slate-50">
+                          <td class="p-2 border border-slate-300 text-center bg-amber-50 print-hidden">
+                            <div class="flex items-center justify-center gap-1">
+                              <button onClick={() => setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg font-black shadow-sm flex items-center gap-1"><span>✏️</span> تعديل</button>
+                              {isAdmin && <button onClick={() => deleteItem('extracts', ex.id, extracts)} class="bg-rose-100 text-rose-600 hover:bg-rose-200 px-2 py-1.5 rounded-lg font-bold">🗑️</button>}
+                            </div>
+                          </td>
                           <td class="p-2 border border-slate-300">{ex.date}</td>
                           <td class="p-2 border border-slate-300 font-bold">{ex.extractNo}</td>
                           <td class="p-2 border border-slate-300">{ex.workDescription}</td>
@@ -1279,16 +1270,13 @@
                           <td class="p-2 border border-slate-300 text-center font-bold">{parseNum(ex.totalWork).toLocaleString()}</td>
                           <td class="p-2 border border-slate-300 text-center text-rose-600">{parseNum(ex.deductions).toLocaleString()}</td>
                           <td class="p-2 border border-slate-300 text-center font-black text-indigo-700 bg-indigo-50/50">{parseNum(ex.net).toLocaleString()}</td>
-                          <td class="p-2 print-hidden border text-center flex items-center justify-center gap-1">
-                            <button onClick={() => setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
-                            <button onClick={() => deleteItem('extracts', ex.id, extracts)} class="text-rose-500 font-bold px-1.5 py-0.5">🗑️</button>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr class="bg-slate-800 text-white font-bold">
-                        <td class="p-2.5 text-left" colSpan="7">إجمالي الصافي المعتمد لكافة المستخلصات:</td>
+                        <td class="p-2.5 text-left border print-hidden"></td>
+                        <td class="p-2.5 text-left" colSpan="6">إجمالي الصافي المعتمد لكافة المستخلصات:</td>
                         <td class="p-2.5 text-center text-sm" colSpan={2}>{totalWorkNet.toLocaleString()} ج.م</td>
                       </tr>
                     </tfoot>
@@ -1463,7 +1451,7 @@
                       'دفعة مورد'
                     }
                   </h3>
-                  <button onClick={() => setEditItemData(null)} class="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
+                  <button onClick={() => setEditItemData(null)} class="bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 rounded-full w-8 h-8 flex items-center justify-center font-bold transition">✕</button>
                 </div>
 
                 <form onSubmit={handleSaveEditedItem} class="space-y-3">
@@ -1555,9 +1543,8 @@
                     </>
                   )}
 
-                  <div class="flex gap-2 pt-2 border-t">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow">تأكيد وحفظ التعديلات</button>
-                    <button type="button" onClick={() => setEditItemData(null)} class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl">إلغاء</button>
+                  <div class="flex gap-2 pt-2 border-t mt-4">
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow transition">تأكيد وحفظ التعديلات</button>
                   </div>
                 </form>
               </div>
