@@ -20,17 +20,43 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   
   <style>
-    body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
-    .scrollbar-hide::-webkit-scrollbar { display: none; }
-    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    @media print {
-      body { background-color: white !important; font-size: 11px; }
-      .print-hidden { display: none !important; }
-      .print-area { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
-      .print-break-inside { page-break-inside: avoid; }
+    body { 
+      font-family: 'Cairo', sans-serif; 
+      background-color: #f8fafc; 
     }
-    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .scrollbar-hide::-webkit-scrollbar { 
+      display: none; 
+    }
+    .scrollbar-hide { 
+      -ms-overflow-style: none; 
+      scrollbar-width: none; 
+    }
+    @media print {
+      body { 
+        background-color: white !important; 
+        font-size: 11px; 
+      }
+      .print-hidden { 
+        display: none !important; 
+      }
+      .print-area { 
+        box-shadow: none !important; 
+        border: none !important; 
+        margin: 0 !important; 
+        padding: 0 !important; 
+        width: 100% !important; 
+      }
+      .print-break-inside { 
+        page-break-inside: avoid; 
+      }
+    }
+    @keyframes slideUp { 
+      from { transform: translateY(100%); opacity: 0; } 
+      to { transform: translateY(0); opacity: 1; } 
+    }
+    .toast-anim { 
+      animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+    }
   </style>
 </head>
 <body class="text-slate-800 antialiased select-none sm:select-auto">
@@ -56,14 +82,28 @@
     let db = null;
     let auth = null;
     try {
-      if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+      if (!firebase.apps.length) { 
+        firebase.initializeApp(firebaseConfig); 
+      }
       db = firebase.database();
       auth = firebase.auth();
       auth.languageCode = 'ar';
-    } catch (e) { console.error("Firebase init error:", e); }
+    } catch (e) { 
+      console.error("Firebase init error:", e); 
+    }
 
     const initialProjects = [
-      {"id": "cons-01", "name": "مشروع رئيسي 01", "location": "الموقع العام", "budget": 500000, "consultant": "مكتب الاستشارات الهندسية", "startDate": "2026-01-01", "deliveryDate": "2026-12-31", "status": "جاري العمل", "createdBy": "النظام"}
+      {
+        "id": "cons-01", 
+        "name": "مشروع رئيسي 01", 
+        "location": "الموقع العام", 
+        "budget": 500000, 
+        "consultant": "مكتب الاستشارات الهندسية", 
+        "startDate": "2026-01-01", 
+        "deliveryDate": "2026-12-31", 
+        "status": "جاري العمل", 
+        "createdBy": "النظام"
+      }
     ];
 
     const initialSettings = {
@@ -99,21 +139,44 @@
             type: 'bar',
             data: {
               labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'],
-              datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#4f46e5', '#e11d48', '#10b981'], borderRadius: 6 }]
+              datasets: [{ 
+                label: 'الموقف المالي العام', 
+                data: [allWork, allExp, allPay], 
+                backgroundColor: ['#4f46e5', '#e11d48', '#10b981'], 
+                borderRadius: 6 
+              }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            options: { 
+              responsive: true, 
+              maintainAspectRatio: false, 
+              plugins: { legend: { display: false } } 
+            }
           });
         }
+        
         if (chart2Ref.current) {
           chart2Instance.current = new Chart(chart2Ref.current, {
             type: 'doughnut',
             data: {
               labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'],
-              datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }]
+              datasets: [{ 
+                data: projExpData.length ? projExpData : [1], 
+                backgroundColor: projExpData.length ? ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] 
+              }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, padding: 6, font: { size: 9, family: 'Cairo' } } } } }
+            options: { 
+              responsive: true, 
+              maintainAspectRatio: false, 
+              plugins: { 
+                legend: { 
+                  position: 'bottom', 
+                  labels: { boxWidth: 8, padding: 6, font: { size: 9, family: 'Cairo' } } 
+                } 
+              } 
+            }
           });
         }
+        
         return () => {
           if (chart1Instance.current) chart1Instance.current.destroy();
           if (chart2Instance.current) chart2Instance.current.destroy();
@@ -160,7 +223,7 @@
       const [settings, setSettings] = useState(initialSettings);
       
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
-      const [activeTab, setActiveTab] = useState("dashboard"); // التبويب الافتراضي الأول
+      const [activeTab, setActiveTab] = useState("dashboard");
       const [myEmpName, setMyEmpName] = useState(localStorage.getItem('myEmpName') || "");
       const [suppScope, setSuppScope] = useState("project");
       
@@ -223,7 +286,11 @@
       };
 
       useEffect(() => {
-        if (!auth) { setAuthLoading(false); return; }
+        if (!auth) { 
+          setAuthLoading(false); 
+          return; 
+        }
+        
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           if (currentUser) {
             const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase();
@@ -232,10 +299,18 @@
             const authorized = isManager || isEng;
             
             let detectedRole = "موظف (Staff)";
-            if (isManager) { detectedRole = "مدير النظام (Admin)"; } 
-            else if (isEng) { detectedRole = "مهندس المشاريع"; }
+            if (isManager) { 
+              detectedRole = "مدير النظام (Admin)"; 
+            } else if (isEng) { 
+              detectedRole = "مهندس المشاريع"; 
+            }
 
-            setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", identifier });
+            setUser({ 
+              uid: currentUser.uid, 
+              name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", 
+              identifier 
+            });
+            
             setIsAdmin(authorized); 
             setIsDirector(isManager); 
             setIsProjectEng(isEng); 
@@ -256,6 +331,7 @@
           }
           setAuthLoading(false);
         });
+        
         return () => unsubscribe();
       }, []);
 
@@ -313,7 +389,10 @@
         const newVal = window.prompt(`أدخل [${title}] جديد لإضافته فوراً للقائمة:`, "");
         if (newVal && newVal.trim() !== "") {
           const cleanVal = newVal.trim();
-          if (currentArray.includes(cleanVal)) { showToast(`هذا البند موجود مسبقاً!`, "error"); return; }
+          if (currentArray.includes(cleanVal)) { 
+            showToast(`هذا البند موجود مسبقاً!`, "error"); 
+            return; 
+          }
           const updatedArray = [...currentArray, cleanVal];
           setSettings(prev => ({ ...prev, [settingKey]: updatedArray }));
           if (db) db.ref(`settings/${settingKey}`).set(updatedArray);
@@ -445,7 +524,7 @@
 
         if (db && path) db.ref(path).set(list);
         setEditItemData(null);
-        showToast("تم حفظ التعديلات بنجاح! ✏️");
+        showToast("تم حفظ التعديلات بنجاح! ✏️️");
       };
 
       const exportToExcel = () => {
@@ -635,10 +714,11 @@
 
       const activeEmployeesCustody = settings.employees.map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
-      // ترتيب التبويبات بالترتيب الدقيق المطلوب
+      // ترتيب التبويبات بالترتيب الدقيق مع إبراز "العهدة" كشاشة مستقلة
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "لوحة التحكم", icon: "📊" }] : [{ id: "my_custody", label: "لوحة عهدتي", icon: "💼" }]),
         { id: "projects", label: "المشاريع", icon: "📁" },
+        { id: "advances", label: "العهدة", icon: "💵" },
         { id: "add_data", label: "إدخال", icon: "➕" },
         { id: "payments", label: "الدفعات", icon: "💰" },
         { id: "expenses", label: "المصاريف", icon: "💸" },
@@ -717,7 +797,7 @@
             </div>
           )}
 
-          {["dashboard", "projects", "add_data", "payments", "expenses", "suppliers", "statement", "extracts", "my_custody"].includes(activeTab) && (
+          {["dashboard", "projects", "advances", "add_data", "payments", "expenses", "suppliers", "statement", "extracts", "my_custody"].includes(activeTab) && (
             <div class="print-hidden max-w-7xl mx-auto px-4 mt-3.5">
               <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -925,11 +1005,10 @@
               </div>
             )}
 
-            {/* 3. إدخال (المصروفات + العهد المباشرة) */}
-            {activeTab === "add_data" && (
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-                {/* تسجيل وسجل العهد والسلف */}
-                <div class="bg-emerald-50 p-4 sm:p-5 rounded-2xl border border-emerald-300 shadow-sm lg:col-span-2 text-xs">
+            {/* 3. العهدة (شاشة مخصصة تماماً للعهد والسلف وإدارتها) */}
+            {activeTab === "advances" && (
+              <div class="space-y-4">
+                <div class="bg-emerald-50 p-4 sm:p-5 rounded-2xl border border-emerald-300 shadow-sm text-xs">
                   <h3 class="font-black text-emerald-900 text-sm mb-3 border-b border-emerald-200 pb-2 flex items-center gap-1.5">
                     <span>💵</span> تسجيل استلام / تسليم عهدة مالية أو سلفة جديدة
                   </h3>
@@ -980,7 +1059,7 @@
                   </form>
 
                   <div class="mt-4 pt-3 border-t border-emerald-300">
-                    <h4 class="font-black text-emerald-950 mb-2 text-xs">سجل العهد والسلف للمشروع النشط:</h4>
+                    <h4 class="font-black text-emerald-950 mb-2 text-xs">سجل العهد والسلف المسجلة لمشروع ({currentProj.name}):</h4>
                     <div class="overflow-x-auto bg-white rounded-xl border border-emerald-200 shadow-xs">
                       <table class="w-full text-right text-xs border-collapse">
                         <thead>
@@ -997,7 +1076,7 @@
                         </thead>
                         <tbody>
                           {projAdvances.length === 0 ? (
-                            <tr><td colSpan={canEditOrDelete ? 6 : 5} class="p-4 text-center text-slate-400 font-bold">لا توجد عهد مسجلة بعد</td></tr>
+                            <tr><td colSpan={canEditOrDelete ? 6 : 5} class="p-4 text-center text-slate-400 font-bold">لا توجد عهد أو سلف مسجلة لهذا المشروع بعد</td></tr>
                           ) : (
                             projAdvances.map(a => (
                               <tr key={a.id} class="border-b hover:bg-emerald-50/50">
@@ -1022,133 +1101,135 @@
                     </div>
                   </div>
                 </div>
-
-                {/* تسجيل المصروفات */}
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm lg:col-span-2 text-xs">
-                  <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة توريد</h3>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if(parseNum(newExp.unitPrice) <= 0 || parseNum(newExp.quantity) <= 0) return;
-                    if(newExp.paymentMethod === 'خصم من العهدة' && !newExp.custodyEmployee) { 
-                      showToast("يجب اختيار اسم صاحب العهدة!", "error"); 
-                      return; 
-                    }
-                    const totalAmt = parseNum(newExp.quantity) * parseNum(newExp.unitPrice);
-                    const targetProj = cleanId(selectedProjId);
-                    const newItem = { 
-                      id: Date.now(), 
-                      projectId: targetProj, 
-                      ...newExp, 
-                      quantity: parseNum(newExp.quantity),
-                      unitPrice: parseNum(newExp.unitPrice),
-                      amount: totalAmt, 
-                      createdBy: user.name 
-                    };
-                    const updated = [newItem, ...expenses];
-                    setExpenses(updated);
-                    if (db) db.ref('expenses').set(updated);
-                    setNewExp({...newExp, quantity: 1, unitPrice: "", description: "", date: todayDate, receiptImg: ""});
-                    showToast(`تم حفظ المصروف بنجاح!`);
-                  }} class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
-                    <div>
-                      <label class="block font-bold mb-1 text-blue-700">التاريخ</label>
-                      <input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/>
-                    </div>
-                    <div>
-                      <label class="block font-bold mb-1">البند الرئيسي</label>
-                      <div class="flex gap-1">
-                        <select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border rounded-xl p-2" required>
-                          <option value="">اختر...</option>
-                          {settings.mainCategories.map(c => <option key={c}>{c}</option>)}
-                        </select>
-                        {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
-                      </div>
-                    </div>
-                    <div>
-                      <label class="block font-bold mb-1">البند الفرعي</label>
-                      <div class="flex gap-1">
-                        <select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border rounded-xl p-2" required>
-                          <option value="">اختر...</option>
-                          {settings.subCategories.map(c => <option key={c}>{c}</option>)}
-                        </select>
-                        {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
-                      </div>
-                    </div>
-                    <div>
-                      <label class="block font-bold mb-1">نوع التكلفة</label>
-                      <div class="flex gap-1">
-                        <select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border rounded-xl p-2">
-                          <option value="">اختر...</option>
-                          {settings.costTypes.map(c => <option key={c}>{c}</option>)}
-                        </select>
-                        {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
-                      </div>
-                    </div>
-                    <div>
-                      <label class="block font-bold mb-1">المورد / الجهة</label>
-                      <div class="flex gap-1">
-                        <select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border rounded-xl p-2">
-                          <option value="">اختر...</option>
-                          {settings.suppliers.map(c => <option key={c}>{c}</option>)}
-                        </select>
-                        {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
-                      </div>
-                    </div>
-                    <div>
-                      <label class="block font-bold mb-1">طريقة السداد</label>
-                      <select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-slate-700">
-                        <option value="خصم من العهدة">خصم من العهدة (موقع)</option>
-                        <option value="كاش">كاش من الخزينة</option>
-                        <option value="تحويل بنكي">تحويل بنكي مركزي</option>
-                        <option value="شيك">شيك</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label class="block font-bold mb-1 text-indigo-700">حالة الفاتورة (مشتريات)</label>
-                      <select value={newExp.billStatus} onChange={e=>setNewExp({...newExp, billStatus: e.target.value})} class="w-full border-2 border-indigo-200 p-2 rounded-xl font-bold bg-indigo-50/40">
-                        <option value="مدفوعة">✅ مسددة فوراً (لا دين على الشركة)</option>
-                        <option value="آجلة">⏳ آجلة (تسجل كمديونية للمورد)</option>
-                      </select>
-                    </div>
-                    {newExp.paymentMethod === 'خصم من العهدة' && (
-                      <div>
-                        <label class="block font-bold mb-1 text-rose-600">خصم من عهدة الموظف:</label>
-                        <select value={newExp.custodyEmployee || ""} onChange={e=>setNewExp({...newExp, custodyEmployee: e.target.value})} class="w-full border border-rose-300 bg-rose-50 rounded-xl p-2 font-bold" required>
-                          <option value="">اختر اسم الموظف...</option>
-                          {settings.employees.map(c => <option key={c}>{c}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    <div>
-                      <label class="block font-bold mb-1">الكمية</label>
-                      <input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/>
-                    </div>
-                    <div>
-                      <label class="block font-bold mb-1">سعر الوحدة</label>
-                      <input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/>
-                    </div>
-                    <div class="sm:col-span-2">
-                      <label class="block font-bold mb-1 text-slate-700">الوصف / ملاحظات التوريد</label>
-                      <input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="بيانات إذن الاستلام، رقم الفاتورة..." class="w-full border rounded-xl p-2 bg-slate-50 focus:bg-white outline-none"/>
-                    </div>
-                    <div class="sm:col-span-2">
-                      <label class="block font-bold mb-1 text-slate-700">📸 إرفاق صورة الفاتورة</label>
-                      <input type="file" accept="image/*" capture="environment" onChange={handleReceiptUpload} class="w-full text-xs border border-dashed border-slate-300 p-2 rounded-xl bg-slate-50"/>
-                      {newExp.receiptImg && <span class="text-[11px] text-emerald-600 font-bold mt-1 inline-block">✅ تم إرفاق الفاتورة</span>}
-                    </div>
-                    <div class="sm:col-span-4 bg-rose-50 border border-rose-200 p-2.5 rounded-xl flex justify-between items-center">
-                      <span class="font-bold text-rose-900">إجمالي قيمة الفاتورة:</span>
-                      <span class="text-sm font-black text-rose-600">{(parseNum(newExp.quantity) * parseNum(newExp.unitPrice)).toLocaleString()} ج.م</span>
-                    </div>
-                    <div class="sm:col-span-4">
-                      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المصروف والفاتورة ({selectedProjId})</button>
-                    </div>
-                  </form>
-                </div>
               </div>
             )}
 
-            {/* 4. الدفعات (تحصيلات العملاء) */}
+            {/* 4. إدخال المصروفات فقط */}
+            {activeTab === "add_data" && (
+              <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
+                <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة توريد</h3>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if(parseNum(newExp.unitPrice) <= 0 || parseNum(newExp.quantity) <= 0) return;
+                  if(newExp.paymentMethod === 'خصم من العهدة' && !newExp.custodyEmployee) { 
+                    showToast("يجب اختيار اسم صاحب العهدة!", "error"); 
+                    return; 
+                  }
+                  const totalAmt = parseNum(newExp.quantity) * parseNum(newExp.unitPrice);
+                  const targetProj = cleanId(selectedProjId);
+                  const newItem = { 
+                    id: Date.now(), 
+                    projectId: targetProj, 
+                    ...newExp, 
+                    quantity: parseNum(newExp.quantity),
+                    unitPrice: parseNum(newExp.unitPrice),
+                    amount: totalAmt, 
+                    createdBy: user.name 
+                  };
+                  const updated = [newItem, ...expenses];
+                  setExpenses(updated);
+                  if (db) db.ref('expenses').set(updated);
+                  setNewExp({...newExp, quantity: 1, unitPrice: "", description: "", date: todayDate, receiptImg: ""});
+                  showToast(`تم حفظ المصروف بنجاح!`);
+                }} class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                  <div>
+                    <label class="block font-bold mb-1 text-blue-700">التاريخ</label>
+                    <input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/>
+                  </div>
+                  <div>
+                    <label class="block font-bold mb-1">البند الرئيسي</label>
+                    <div class="flex gap-1">
+                      <select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border rounded-xl p-2" required>
+                        <option value="">اختر...</option>
+                        {settings.mainCategories.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block font-bold mb-1">البند الفرعي</label>
+                    <div class="flex gap-1">
+                      <select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border rounded-xl p-2" required>
+                        <option value="">اختر...</option>
+                        {settings.subCategories.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block font-bold mb-1">نوع التكلفة</label>
+                    <div class="flex gap-1">
+                      <select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border rounded-xl p-2">
+                        <option value="">اختر...</option>
+                        {settings.costTypes.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block font-bold mb-1">المورد / الجهة</label>
+                    <div class="flex gap-1">
+                      <select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border rounded-xl p-2">
+                        <option value="">اختر...</option>
+                        {settings.suppliers.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block font-bold mb-1">طريقة السداد</label>
+                    <select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-slate-700">
+                      <option value="خصم من العهدة">خصم من العهدة (موقع)</option>
+                      <option value="كاش">كاش من الخزينة</option>
+                      <option value="تحويل بنكي">تحويل بنكي مركزي</option>
+                      <option value="شيك">شيك</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block font-bold mb-1 text-indigo-700">حالة الفاتورة (مشتريات)</label>
+                    <select value={newExp.billStatus} onChange={e=>setNewExp({...newExp, billStatus: e.target.value})} class="w-full border-2 border-indigo-200 p-2 rounded-xl font-bold bg-indigo-50/40">
+                      <option value="مدفوعة">✅ مسددة فوراً (لا دين على الشركة)</option>
+                      <option value="آجلة">⏳ آجلة (تسجل كمديونية للمورد)</option>
+                    </select>
+                  </div>
+                  {newExp.paymentMethod === 'خصم من العهدة' && (
+                    <div>
+                      <label class="block font-bold mb-1 text-rose-600">خصم من عهدة الموظف:</label>
+                      <select value={newExp.custodyEmployee || ""} onChange={e=>setNewExp({...newExp, custodyEmployee: e.target.value})} class="w-full border border-rose-300 bg-rose-50 rounded-xl p-2 font-bold" required>
+                        <option value="">اختر اسم الموظف...</option>
+                        {settings.employees.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label class="block font-bold mb-1">الكمية</label>
+                    <input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/>
+                  </div>
+                  <div>
+                    <label class="block font-bold mb-1">سعر الوحدة</label>
+                    <input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block font-bold mb-1 text-slate-700">الوصف / ملاحظات التوريد</label>
+                    <input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="بيانات إذن الاستلام، رقم الفاتورة..." class="w-full border rounded-xl p-2 bg-slate-50 focus:bg-white outline-none"/>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block font-bold mb-1 text-slate-700">📸 إرفاق صورة الفاتورة</label>
+                    <input type="file" accept="image/*" capture="environment" onChange={handleReceiptUpload} class="w-full text-xs border border-dashed border-slate-300 p-2 rounded-xl bg-slate-50"/>
+                    {newExp.receiptImg && <span class="text-[11px] text-emerald-600 font-bold mt-1 inline-block">✅ تم إرفاق الفاتورة</span>}
+                  </div>
+                  <div class="sm:col-span-4 bg-rose-50 border border-rose-200 p-2.5 rounded-xl flex justify-between items-center">
+                    <span class="font-bold text-rose-900">إجمالي قيمة الفاتورة:</span>
+                    <span class="text-sm font-black text-rose-600">{(parseNum(newExp.quantity) * parseNum(newExp.unitPrice)).toLocaleString()} ج.م</span>
+                  </div>
+                  <div class="sm:col-span-4">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المصروف والفاتورة ({selectedProjId})</button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* 5. الدفعات (تحصيلات العملاء) */}
             {activeTab === "payments" && (
               <div class="space-y-3.5">
                 {isAdmin && (
@@ -1207,7 +1288,7 @@
               </div>
             )}
 
-            {/* 5. المصاريف */}
+            {/* 6. المصاريف */}
             {activeTab === "expenses" && (
               <div class="space-y-4">
                 <div class="bg-slate-50 p-4 rounded-2xl border border-slate-300 text-xs shadow-sm">
@@ -1215,15 +1296,15 @@
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                     <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="border rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
                       <option value="">كل البنود الرئيسية</option>
-                      {settings.mainCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                      {settings.mainCategories.map(c => <option key={c}>{c}</option>)}
                     </select>
                     <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="border rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
                       <option value="">كل البنود الفرعية</option>
-                      {settings.subCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                      {settings.subCategories.map(c => <option key={c}>{c}</option>)}
                     </select>
                     <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="border rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
                       <option value="">كل أنواع التكلفة</option>
-                      {settings.costTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                      {settings.costTypes.map(c => <option key={c}>{c}</option>)}
                     </select>
                   </div>
                   <div class="bg-indigo-100/70 border border-indigo-200 text-indigo-900 px-4 py-2.5 rounded-xl flex justify-between items-center font-bold">
@@ -1296,7 +1377,7 @@
               </div>
             )}
 
-            {/* 6. حساب الموردين */}
+            {/* 7. حساب الموردين */}
             {activeTab === "suppliers" && isAdmin && (
               <div class="space-y-4">
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
@@ -1411,7 +1492,7 @@
               </div>
             )}
 
-            {/* 7. كشف الحساب */}
+            {/* 8. كشف الحساب */}
             {activeTab === "statement" && isAdmin && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm print-area text-xs">
                 <div class="flex justify-between items-center mb-4 border-b pb-3 print-hidden">
@@ -1505,7 +1586,7 @@
               </div>
             )}
 
-            {/* 8. المستخلصات */}
+            {/* 9. المستخلصات */}
             {activeTab === "extracts" && (
               <div class="space-y-4">
                 {canEditOrDelete && (
@@ -1635,7 +1716,7 @@
               </div>
             )}
 
-            {/* 9. الدخول (سجل الدخول - خاص بالمدير العام) */}
+            {/* 10. الدخول (سجل الدخول - خاص بالمدير العام) */}
             {activeTab === "audit_log" && isDirector && (
               <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
                 <h3 class="font-bold text-slate-800 mb-2.5 border-b pb-2">🛡️ سجل دخول المستخدمين</h3>
@@ -1656,7 +1737,7 @@
               </div>
             )}
 
-            {/* 10. الإعدادات */}
+            {/* 11. الإعدادات */}
             {activeTab === "settings" && (
               <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs max-w-xl">
                 <h3 class="font-bold mb-3 text-sm">🖼️ شعار الشركة المعتمد للترويسة الهندسية والطباعة</h3>
@@ -1687,7 +1768,7 @@
               <div class="bg-white rounded-3xl p-5 w-full max-w-lg shadow-2xl border text-xs max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center border-b pb-3 mb-3">
                   <h3 class="font-bold text-sm text-slate-800">
-                    ✏️️ تعديل {
+                    ✏️ تعديل {
                       editItemData.type === 'expense' ? 'فاتورة مصروف' : 
                       editItemData.type === 'advance' ? 'سلفة / عهدة' : 
                       editItemData.type === 'extract' ? 'مستخلص أعمال' : 
