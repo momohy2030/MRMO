@@ -229,6 +229,7 @@
       
       const [toast, setToast] = useState({ show: false, message: "", type: "success" });
       const [activeInvoiceModal, setActiveInvoiceModal] = useState(null);
+      const [selectedSupplierDetail, setSelectedSupplierDetail] = useState(null); // نافذة كشف حساب المورد التفاعلية
       const [drawerOpen, setDrawerOpen] = useState(false);
 
       const [editItemData, setEditItemData] = useState(null);
@@ -524,7 +525,7 @@
 
         if (db && path) db.ref(path).set(list);
         setEditItemData(null);
-        showToast("تم حفظ التعديلات بنجاح! ✏️️");
+        showToast("تم حفظ التعديلات بنجاح! ✏️");
       };
 
       const exportToExcel = () => {
@@ -714,7 +715,7 @@
 
       const activeEmployeesCustody = settings.employees.map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
-      // ترتيب التبويبات بالترتيب الدقيق مع إبراز "العهدة" كشاشة مستقلة
+      // ترتيب التبويبات بالترتيب الدقيق المطلوب
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "لوحة التحكم", icon: "📊" }] : [{ id: "my_custody", label: "لوحة عهدتي", icon: "💼" }]),
         { id: "projects", label: "المشاريع", icon: "📁" },
@@ -992,7 +993,7 @@
                           {canEditOrDelete && (
                             <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 sticky left-0 z-10 shadow-xs">
                               <div class="flex items-center justify-center gap-1.5">
-                                <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
+                                <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏️️ تعديل</button>
                                 <button onClick={()=>deleteItem('projects', p.id, projects)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
                               </div>
                             </td>
@@ -1005,7 +1006,7 @@
               </div>
             )}
 
-            {/* 3. العهدة (شاشة مخصصة تماماً للعهد والسلف وإدارتها) */}
+            {/* 3. العهدة */}
             {activeTab === "advances" && (
               <div class="space-y-4">
                 <div class="bg-emerald-50 p-4 sm:p-5 rounded-2xl border border-emerald-300 shadow-sm text-xs">
@@ -1229,7 +1230,7 @@
               </div>
             )}
 
-            {/* 5. الدفعات (تحصيلات العملاء) */}
+            {/* 5. الدفعات */}
             {activeTab === "payments" && (
               <div class="space-y-3.5">
                 {isAdmin && (
@@ -1377,7 +1378,7 @@
               </div>
             )}
 
-            {/* 7. حساب الموردين */}
+            {/* 7. حساب الموردين (مع زر كشف حساب تفصيلي تفاعلي) */}
             {activeTab === "suppliers" && isAdmin && (
               <div class="space-y-4">
                 <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
@@ -1423,16 +1424,17 @@
                     <thead>
                       <tr class="bg-slate-100 text-slate-700 border-b">
                         <th class="p-2.5">اسم المورد</th>
-                        <th class="p-2.5 text-center">إجمالي المسحوبات (فواتير)</th>
-                        <th class="p-2.5 text-center">مسدد فوراً (لا دين)</th>
+                        <th class="p-2.5 text-center">إجمالي المسحوبات</th>
+                        <th class="p-2.5 text-center">مسدد فوراً</th>
                         <th class="p-2.5 text-center text-amber-700">فواتير آجلة (مديونية)</th>
                         <th class="p-2.5 text-center text-emerald-700">دفعات سداد للمورد</th>
                         <th class="p-2.5 text-center">الرصيد الصافي</th>
                         <th class="p-2.5 text-center">الموقف المحاسبي</th>
+                        <th class="p-2.5 text-center bg-slate-200 font-bold sticky left-0 z-10 shadow-xs">كشف الحساب</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {suppliersLedger.length === 0 ? <tr><td colSpan="7" class="text-center p-4 text-slate-500">لا توجد حركات مسجلة لهذا النطاق</td></tr> :
+                      {suppliersLedger.length === 0 ? <tr><td colSpan="8" class="text-center p-4 text-slate-500">لا توجد حركات مسجلة لهذا النطاق</td></tr> :
                       suppliersLedger.map((s, i) => (
                         <tr key={i} class="border-b hover:bg-slate-50">
                           <td class="p-2.5 font-bold text-indigo-900">{s.name}</td>
@@ -1444,7 +1446,12 @@
                           <td class="p-2.5 text-center">
                             {s.balance === 0 ? <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-bold text-[10px]">خالص الحساب</span> :
                              s.balance > 0 ? <span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg font-bold text-[10px]">دفعة مقدمة للمورد</span> :
-                             <span class="bg-rose-100 text-rose-800 px-2 py-1 rounded-lg font-bold text-[10px]">مستحق للمورد (مديونية)</span>}
+                             <span class="bg-rose-100 text-rose-800 px-2 py-1 rounded-lg font-bold text-[10px]">مستحق للمورد</span>}
+                          </td>
+                          <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 sticky left-0 z-10 shadow-xs">
+                            <button onClick={()=>setSelectedSupplierDetail(s.name)} class="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-lg font-bold text-[10px] shadow-xs">
+                              📑 كشف حساب
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1638,7 +1645,7 @@
                         <h2 class="text-lg font-black text-slate-950">شركة مساحة للاستشارات والمقاولات العمومية</h2>
                         <p class="text-[11px] text-slate-600 font-bold mt-0.5">قسم الإشراف والتنفيذ الهندسي وإدارة المشروعات</p>
                       </div>
-                      {settings.logo ? <img src={settings.logo} class="h-16 object-contain" /> : <div class="text-2xl">🏗️</div>}
+                      {settings.logo ? <img src={settings.logo} class="h-16 object-contain" /> : <div class="text-2xl">🏗️️</div>}
                     </div>
 
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-2.5 rounded-xl mt-3 text-[11px]">
@@ -1716,7 +1723,7 @@
               </div>
             )}
 
-            {/* 10. الدخول (سجل الدخول - خاص بالمدير العام) */}
+            {/* 10. الدخول */}
             {activeTab === "audit_log" && isDirector && (
               <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
                 <h3 class="font-bold text-slate-800 mb-2.5 border-b pb-2">🛡️ سجل دخول المستخدمين</h3>
@@ -1761,6 +1768,108 @@
               </div>
             )}
           </main>
+
+          {/* نافذة كشف حساب المورد التفاعلية مع إمكانية تعديل وحذف الحركات */}
+          {selectedSupplierDetail && (
+            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-5">
+              <div class="bg-white rounded-3xl p-5 w-full max-w-4xl shadow-2xl border text-xs max-h-[90vh] flex flex-col justify-between">
+                <div>
+                  <div class="flex justify-between items-center border-b pb-3 mb-3">
+                    <h3 class="font-black text-sm text-slate-900 flex items-center gap-2">
+                      <span>📑</span> كشف حساب تفصيلي للمورد: <span class="text-indigo-700 font-bold">{selectedSupplierDetail}</span>
+                    </h3>
+                    <button onClick={()=>setSelectedSupplierDetail(null)} class="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full w-8 h-8 flex items-center justify-center font-bold">✕</button>
+                  </div>
+
+                  <div class="overflow-y-auto max-h-[60vh]">
+                    <h4 class="font-bold text-slate-700 mb-2">1. الفواتير والمسحوبات:</h4>
+                    <table class="w-full text-right border-collapse mb-4 border">
+                      <thead>
+                        <tr class="bg-slate-100 text-slate-700 border-b">
+                          <th class="p-2 border">التاريخ</th>
+                          <th class="p-2 border">المشروع</th>
+                          <th class="p-2 border">البند</th>
+                          <th class="p-2 border text-center">الكمية</th>
+                          <th class="p-2 border text-center">السعر</th>
+                          <th class="p-2 border text-center">الإجمالي</th>
+                          <th class="p-2 border">حالة الفاتورة</th>
+                          {canEditOrDelete && <th class="p-2 border text-center bg-slate-200 font-bold">إجراءات</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {expenses.filter(e => (e.supplier || '').trim() === selectedSupplierDetail).length === 0 ? (
+                          <tr><td colSpan={canEditOrDelete ? 8 : 7} class="p-2 text-center text-slate-400">لا توجد فواتير مسجلة</td></tr>
+                        ) : (
+                          expenses.filter(e => (e.supplier || '').trim() === selectedSupplierDetail).map(e => (
+                            <tr key={e.id} class="border-b hover:bg-slate-50">
+                              <td class="p-2 border">{e.date}</td>
+                              <td class="p-2 border font-bold text-blue-700">{e.projectId}</td>
+                              <td class="p-2 border">{e.mainCategory} - {e.subCategory}</td>
+                              <td class="p-2 border text-center font-bold">{parseNum(e.quantity)}</td>
+                              <td class="p-2 border text-center">{parseNum(e.unitPrice).toLocaleString()}</td>
+                              <td class="p-2 border text-center font-black text-rose-600">{parseNum(e.amount).toLocaleString()}</td>
+                              <td class="p-2 border">
+                                <span class={`px-1.5 py-0.5 rounded text-[10px] font-bold ${e.billStatus === 'آجلة' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                  {e.billStatus || 'مدفوعة'}
+                                </span>
+                              </td>
+                              {canEditOrDelete && (
+                                <td class="p-2 border text-center whitespace-nowrap bg-slate-50">
+                                  <div class="flex items-center justify-center gap-1.5">
+                                    <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
+                                    <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-0.5 rounded font-bold text-[10px]">🗑️ حذف</button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+
+                    <h4 class="font-bold text-slate-700 mb-2">2. دفعات السداد المسددة للمورد:</h4>
+                    <table class="w-full text-right border-collapse border">
+                      <thead>
+                        <tr class="bg-slate-100 text-slate-700 border-b">
+                          <th class="p-2 border">التاريخ</th>
+                          <th class="p-2 border">المشروع</th>
+                          <th class="p-2 border text-center">المبلغ المسدد</th>
+                          <th class="p-2 border">البيان</th>
+                          {canEditOrDelete && <th class="p-2 border text-center bg-slate-200 font-bold">إجراءات</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {supplierPayments.filter(p => (p.supplier || '').trim() === selectedSupplierDetail).length === 0 ? (
+                          <tr><td colSpan={canEditOrDelete ? 5 : 4} class="p-2 text-center text-slate-400">لا توجد دفعات مسددة مسجلة</td></tr>
+                        ) : (
+                          supplierPayments.filter(p => (p.supplier || '').trim() === selectedSupplierDetail).map(p => (
+                            <tr key={p.id} class="border-b hover:bg-slate-50">
+                              <td class="p-2 border">{p.date}</td>
+                              <td class="p-2 border font-bold text-blue-700">{p.projectId}</td>
+                              <td class="p-2 border text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
+                              <td class="p-2 border">{p.notes || '-'}</td>
+                              {canEditOrDelete && (
+                                <td class="p-2 border text-center whitespace-nowrap bg-slate-50">
+                                  <div class="flex items-center justify-center gap-1.5">
+                                    <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
+                                    <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-0.5 rounded font-bold text-[10px]">🗑️ حذف</button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="pt-3 border-t flex justify-end mt-3">
+                  <button onClick={()=>setSelectedSupplierDetail(null)} class="bg-slate-800 text-white px-5 py-2 rounded-xl font-bold">إغلاق كشف الحساب</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* نافذة التعديل المنبثقة الموحدة */}
           {editItemData && canEditOrDelete && (
