@@ -57,7 +57,6 @@
 
     const SUPER_ADMIN_EMAIL = "mohamedmo686686@gmail.com";
     const ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, "mohamedmohy676676@gmail.com", "+201095545982"];
-    const DEFAULT_ADMIN_WHATSAPP = "201095545982";
 
     let db = null;
     let auth = null;
@@ -76,19 +75,30 @@
       return isNaN(n) ? 0 : n;
     };
 
-    const generatePdfAndOpenWhatsApp = (elementId, filename, textMessage, targetPhone) => {
+    // دالة إرسال واتساب عامة وسهلة
+    const openGeneralWhatsApp = (elementId, filename, textMessage) => {
+      let targetPhone = window.prompt("أدخل رقم هاتف المستلم (أو اتركه فارغاً لاختيار المحادثة من واتساب مباشرة):", "");
+      if (targetPhone === null) return;
+      targetPhone = targetPhone.replace(/[^0-9]/g, '');
+      if (targetPhone.startsWith('01')) targetPhone = '20' + targetPhone.substring(1);
+
       const element = document.getElementById(elementId);
-      if (!element) return;
-      const opt = {
-        margin: [4, 4, 4, 4], filename: filename, image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-      };
-      html2pdf().set(opt).from(element).save().then(() => {
-        let cleanPhone = (targetPhone || "").replace(/[^0-9]/g, '');
-        if (cleanPhone.startsWith('01')) cleanPhone = '20' + cleanPhone.substring(1);
-        const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+      if (element && typeof html2pdf !== 'undefined') {
+        const opt = {
+          margin: [8, 8, 8, 8], filename: filename || 'مستخلص.pdf', image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save().then(() => {
+          const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+          window.open(url, '_blank');
+        }).catch(() => {
+          const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+          window.open(url, '_blank');
+        });
+      } else {
+        const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
         window.open(url, '_blank');
-      });
+      }
     };
 
     function App() {
@@ -107,7 +117,7 @@
       
       const [settings, setSettings] = useState({
         engineers: ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"],
-        opTypes: ["رفع شبكي", "تخطيط أفدنة", "توقيع مساحي", "كروكي تقنين"],
+        opTypes: ["رفع شبكي", "تخطيط مساحي", "توقيع مساحي", "كروكي تقنين"],
         logo: "",
         theme: localStorage.getItem('theme') || 'light'
       });
@@ -121,33 +131,22 @@
 
       // نماذج الحسابات
       const [newOp, setNewOp] = useState({
-        date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "تخطيط أفدنة", workDescription: "", engineer: "م أحمد نبيل",
-        isFaddan: true, faddanQty: 80, faddanPrice: 250,
+        date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "تخطيط مساحي", workDescription: "", engineer: "م أحمد نبيل",
+        isFaddan: false, faddanQty: 1, faddanPrice: 250,
         isSketch: false, sketchesCount: 1,
-        agreedAmount: 20000, paidNow: 0, laborCost: 0, carCost: 0,
+        agreedAmount: 5000, paidNow: 0, laborCost: 0, carCost: 0,
         engDayType: "full", deviceDayType: "full"
       });
 
       const [newPayment, setNewPayment] = useState({ date: todayDate, clientName: "", siteLocation: "", amount: "", notes: "" });
       const [newTx, setNewTx] = useState({ date: todayDate, type: "income", category: "إيراد عام", amount: "", notes: "" });
 
-      // نموذج المستخلص
-      const [extractMeta, setExtractMeta] = useState({
-        clientName: "",
-        siteLocation: "",
-        processName: "عملية رفع وتخطيط مساحي",
-        extractNo: "1",
-        sheetNo: "1",
-        fromDate: todayDate,
-        toDate: todayDate,
-        previousBalance: 0,
-        engineerName: "م أحمد نبيل",
-        projectManagerPhone: ""
-      });
-
-      const [extractItems, setExtractItems] = useState([
-        { id: 1, desc: "تخطيط 80 فدان (موقع المحمية)", unitPrice: 250, rate: 90, prevQty: 0, currentQty: 80 }
-      ]);
+      // حالة المستخلص الجديد والمطور
+      const [extractClient, setExtractClient] = useState("");
+      const [extractSite, setExtractSite] = useState("");
+      const [extractNumber, setExtractNumber] = useState("1");
+      const [extractEngineer, setExtractEngineer] = useState("م أحمد نبيل");
+      const [extractItems, setExtractItems] = useState([]);
 
       useEffect(() => {
         if (settings.theme === 'dark') document.documentElement.classList.add('dark');
@@ -292,47 +291,57 @@
         }
       };
 
-      const handleImportOpsToExtract = () => {
-        if (!extractMeta.clientName) {
-          alert("يرجى اختيار العميل أولاً لاستيراد عملياته!");
+      // وظائف المستخلص الجديد (دمج السحب التلقائي مع التعديل اليدوي)
+      const handleImportClientOps = () => {
+        if (!extractClient) {
+          alert("يرجى اختيار العميل أولاً!");
           return;
         }
-        const matched = operations.filter(o => 
-          o.clientName === extractMeta.clientName && 
-          (!extractMeta.siteLocation || o.siteLocation === extractMeta.siteLocation)
+        const filtered = operations.filter(o => 
+          o.clientName === extractClient && 
+          (!extractSite || o.siteLocation === extractSite)
         );
 
-        if (matched.length === 0) {
-          alert("لا توجد عمليات مسجلة مطابقة لهذا العميل والموقع!");
+        if (filtered.length === 0) {
+          alert("لا توجد أعمال مسجلة مطابقة لهذا العميل أو الموقع!");
           return;
         }
 
-        const newItems = matched.map((o, idx) => ({
+        const imported = filtered.map((o, idx) => ({
           id: Date.now() + idx,
-          desc: `${o.workDescription || o.opType} (${o.siteLocation || 'الموقع'})`,
+          desc: o.workDescription || o.opType,
+          qty: o.isFaddan ? parseNum(o.faddanQty) : 1,
           unitPrice: o.isFaddan ? parseNum(o.faddanPrice) : parseNum(o.agreedAmount),
-          rate: 100,
-          prevQty: 0,
-          currentQty: o.isFaddan ? parseNum(o.faddanQty) : 1
+          rate: 100
         }));
 
-        setExtractItems(newItems);
-        showToast("تم استيراد بنود العمليات بنجاح! 📥");
+        setExtractItems(imported);
+        showToast("تم سحب الأعمال في الجدول! يمكنك تعديلها بحرية الآن 📥");
       };
 
-      const handleAddExtractRow = () => {
-        setExtractItems([...extractItems, { id: Date.now(), desc: "بند أعمال جديد", unitPrice: 250, rate: 100, prevQty: 0, currentQty: 1 }]);
+      const handleAddEmptyExtractRow = () => {
+        setExtractItems([
+          ...extractItems,
+          { id: Date.now(), desc: "بند أعمال مساحية", qty: 1, unitPrice: 1000, rate: 100 }
+        ]);
       };
 
       const handleRemoveExtractRow = (id) => {
         setExtractItems(extractItems.filter(item => item.id !== id));
       };
 
-      const currentExtractTotal = extractItems.reduce((sum, item) => {
-        return sum + (parseNum(item.currentQty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100));
+      // حسابات المستخلص الحالية
+      const extractTotalWork = extractItems.reduce((sum, item) => {
+        const itemVal = parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100);
+        return sum + itemVal;
       }, 0);
 
-      const finalRemainingDue = currentExtractTotal + parseNum(extractMeta.previousBalance);
+      // حساب إجمالي مدفوعات هذا العميل (المقدمات من العمليات + الدفعات المستلمة)
+      const clientOpsForPayment = operations.filter(o => o.clientName === extractClient && (!extractSite || o.siteLocation === extractSite));
+      const clientPaysForPayment = payments.filter(p => p.clientName === extractClient && (!extractSite || p.siteLocation === extractSite));
+      const clientTotalPaid = clientOpsForPayment.reduce((s,o)=>s+parseNum(o.paidNow),0) + clientPaysForPayment.reduce((s,p)=>s+parseNum(p.amount),0);
+
+      const extractRemainingBalance = extractTotalWork - clientTotalPaid;
 
       const clientNames = Array.from(new Set([...operations.map(o=>o.clientName), ...payments.map(p=>p.clientName)])).filter(Boolean);
       const siteLocationsList = Array.from(new Set(operations.map(o=>o.siteLocation).filter(Boolean)));
@@ -356,8 +365,8 @@
 
       const navTabs = [
         { id: "dashboard", label: "لوحة التحكم", icon: "📊" },
+        { id: "extracts", label: "المستخلصات", icon: "📄" },
         { id: "clients", label: "الأعمال والعملاء", icon: "👥" },
-        { id: "extracts", label: "المستخلصات والمواقع", icon: "📄" },
         { id: "vault", label: "الخزينة بالشهر", icon: "💵" },
         { id: "expenses", label: "مصاريف التشغيل", icon: "🚗" },
         { id: "engineers", label: "حساب المهندسين", icon: "👷" },
@@ -385,7 +394,7 @@
       return (
         <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
           
-          {/* شريط علوي للهاتف والكمبيوتر */}
+          {/* Header */}
           <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs">
             <div class="flex items-center gap-2">
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
@@ -395,8 +404,8 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-1.5 sm:gap-2">
-              <button onClick={() => setSettings(p=>({...p, theme: p.theme==='dark'?'light':'dark'}))} class="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base" title="تبديل الوضع">
+            <div class="flex items-center gap-2">
+              <button onClick={() => setSettings(p=>({...p, theme: p.theme==='dark'?'light':'dark'}))} class="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">
                 {settings.theme === 'dark' ? '☀️' : '🌙'}
               </button>
               <a href="index.html" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition">
@@ -409,7 +418,7 @@
           </header>
 
           <div class="flex-1 flex overflow-hidden">
-            {/* القائمة الجانبية للشاشات الكبيرة */}
+            {/* Desktop Sidebar */}
             <aside class="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col justify-between shrink-0 border-l border-slate-800">
               <div class="p-3 overflow-y-auto space-y-1 text-xs font-bold">
                 {navTabs.map(t => (
@@ -424,7 +433,7 @@
               </div>
             </aside>
 
-            {/* درج جانبي للهاتف (Mobile Drawer) */}
+            {/* Mobile Drawer */}
             {drawerOpen && (
               <div class="fixed inset-0 z-50 flex md:hidden">
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setDrawerOpen(false)}></div>
@@ -449,7 +458,7 @@
               </div>
             )}
 
-            {/* محتوى الصفحة الرئيسي */}
+            {/* Main Workspace */}
             <main class="flex-1 overflow-y-auto p-3.5 sm:p-5 text-xs max-w-7xl mx-auto w-full">
               
               {/* 1. لوحة التحكم */}
@@ -464,10 +473,184 @@
                 </div>
               )}
 
-              {/* 2. الأعمال والعملاء */}
+              {/* 2. المستخلصات الهندسية العصرية الجديدة (Modern Clean Invoice) */}
+              {activeTab === 'extracts' && (
+                <div class="space-y-4 font-bold">
+                  
+                  {/* شريط الإعداد والتحكم البسيط */}
+                  <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs print-hidden space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                      <div>
+                        <label>اختر العميل:</label>
+                        <select value={extractClient} onChange={e=>setExtractClient(e.target.value)} class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700">
+                          <option value="">-- اختر العميل --</option>{clientNames.map(c=><option key={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label>الموقع بالمزرعة (اختياري):</label>
+                        <input list="sites-list" value={extractSite} onChange={e=>setExtractSite(e.target.value)} placeholder="المحمية، خط 2400..." class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700"/>
+                        <datalist id="sites-list">{siteLocationsList.map(s=><option key={s} value={s}/>)}</datalist>
+                      </div>
+                      <div>
+                        <label>رقم المستخلص:</label>
+                        <input type="text" value={extractNumber} onChange={e=>setExtractNumber(e.target.value)} placeholder="1" class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700"/>
+                      </div>
+                      <div>
+                        <label>المهندس المشرف:</label>
+                        <select value={extractEngineer} onChange={e=>setExtractEngineer(e.target.value)} class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700">
+                          {settings.engineers.map(e=><option key={e}>{e}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t dark:border-slate-700">
+                      <button onClick={handleImportClientOps} class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
+                        📥 سحب أعمال العميل تلقائياً
+                      </button>
+                      <button onClick={handleAddEmptyExtractRow} class="w-full sm:w-auto bg-slate-800 hover:bg-black text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
+                        ➕ إضافة بند يدوي
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* الورقة الهندسية العصرية الجديدة (Clean Invoice Card) */}
+                  <div id="clean-extract-target" class="bg-white p-5 sm:p-7 rounded-3xl border border-slate-200 shadow-sm print-area text-slate-800 space-y-5">
+                    
+                    {/* ترويسة المستخلص العصرية النظيفة */}
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 pb-4 gap-3">
+                      <div>
+                        <h2 class="text-xl font-black text-slate-900 tracking-tight">مستخلص أعمال مساحية</h2>
+                        <div class="flex items-center gap-2 text-xs text-slate-500 font-bold mt-1">
+                          <span>رقم المستخلص: <strong class="text-indigo-600">#{extractNumber}</strong></span>
+                          <span>•</span>
+                          <span>التاريخ: {todayDate}</span>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <div class="text-left sm:text-right">
+                          <span class="block text-xs text-slate-400">العميل / المالك:</span>
+                          <strong class="text-sm font-black text-slate-900">{extractClient || 'عميل عام'}</strong>
+                          {extractSite && <span class="block text-[11px] text-amber-700 font-bold">الموقع: {extractSite}</span>}
+                        </div>
+                        {settings.logo && <img src={settings.logo} class="h-12 object-contain rounded-lg border p-1" />}
+                      </div>
+                    </div>
+
+                    {/* جدول البنود العصري النظيف */}
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-right border-collapse text-xs">
+                        <thead>
+                          <tr class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                            <th class="p-2.5 text-center w-8">م</th>
+                            <th class="p-2.5">بيان العمل</th>
+                            <th class="p-2.5 text-center w-24">الكمية / الفدان</th>
+                            <th class="p-2.5 text-center w-28">الفئة (السعر)</th>
+                            <th class="p-2.5 text-center w-24">نسبة الإنجاز</th>
+                            <th class="p-2.5 text-center w-32">الصافي</th>
+                            <th class="p-2.5 text-center w-8 print-hidden"></th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                          {extractItems.length === 0 ? (
+                            <tr><td colSpan={7} class="text-center p-6 text-slate-400 font-bold">لا توجد بنود في المستخلص حالياً. اضغط "سحب أعمال العميل" أو "إضافة بند يدوي".</td></tr>
+                          ) : (
+                            extractItems.map((item, idx) => {
+                              const net = parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100);
+                              return (
+                                <tr key={item.id} class="hover:bg-slate-50/60">
+                                  <td class="p-2.5 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                  <td class="p-2.5">
+                                    <input type="text" value={item.desc} onChange={e=>{
+                                      const up = extractItems.map(it=>it.id===item.id?{...it, desc: e.target.value}:it);
+                                      setExtractItems(up);
+                                    }} class="w-full bg-transparent font-bold outline-none text-slate-900"/>
+                                  </td>
+                                  <td class="p-2 text-center">
+                                    <input type="number" step="any" value={item.qty} onChange={e=>{
+                                      const up = extractItems.map(it=>it.id===item.id?{...it, qty: e.target.value}:it);
+                                      setExtractItems(up);
+                                    }} class="w-full text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/>
+                                  </td>
+                                  <td class="p-2 text-center">
+                                    <input type="number" step="any" value={item.unitPrice} onChange={e=>{
+                                      const up = extractItems.map(it=>it.id===item.id?{...it, unitPrice: e.target.value}:it);
+                                      setExtractItems(up);
+                                    }} class="w-full text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/>
+                                  </td>
+                                  <td class="p-2 text-center">
+                                    <select value={item.rate} onChange={e=>{
+                                      const up = extractItems.map(it=>it.id===item.id?{...it, rate: e.target.value}:it);
+                                      setExtractItems(up);
+                                    }} class="border border-slate-200 rounded-lg p-1 font-bold bg-white text-center outline-none">
+                                      <option value="100">%100</option>
+                                      <option value="90">%90</option>
+                                      <option value="50">%50</option>
+                                    </select>
+                                  </td>
+                                  <td class="p-2.5 text-center font-black text-indigo-700 text-sm">
+                                    {net.toLocaleString()} ج.م
+                                  </td>
+                                  <td class="p-2.5 text-center print-hidden">
+                                    <button onClick={()=>handleRemoveExtractRow(item.id)} class="text-rose-500 hover:text-rose-700 font-bold p-1">✕</button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* كروت الملخص المالي النظيفة */}
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200">
+                      <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+                        <span class="text-[11px] text-slate-500 font-bold block mb-0.5">إجمالي الأعمال المنجزة</span>
+                        <strong class="text-lg font-black text-slate-900">{extractTotalWork.toLocaleString()} ج.م</strong>
+                      </div>
+                      <div class="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-center">
+                        <span class="text-[11px] text-emerald-800 font-bold block mb-0.5">المسدد من العميل (المقدمات والدفعات)</span>
+                        <strong class="text-lg font-black text-emerald-700">{clientTotalPaid.toLocaleString()} ج.م</strong>
+                      </div>
+                      <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-center">
+                        <span class="text-[11px] text-rose-800 font-bold block mb-0.5">المتبقي المستحق المطلوب سداده</span>
+                        <strong class="text-xl font-black text-rose-600">{extractRemainingBalance.toLocaleString()} ج.م</strong>
+                      </div>
+                    </div>
+
+                    {/* التوقيع الرسمي في نهاية المستخلص */}
+                    <div class="pt-6 flex justify-between items-end border-t border-slate-200 text-xs font-bold text-slate-600">
+                      <div>
+                        <span>المهندس المسؤول عن الأعمال:</span>
+                        <strong class="block text-sm text-slate-900 mt-1">{extractEngineer}</strong>
+                      </div>
+                      <div class="text-center">
+                        <span>الاعتماد والختم:</span>
+                        <span class="block mt-4 text-slate-300">............................................</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* شريط الإجراءات والواتساب العام والمبسط */}
+                  <div class="flex flex-col sm:flex-row justify-end gap-2.5 pt-2 border-t dark:border-slate-700">
+                    <button onClick={()=>window.print()} class="bg-slate-800 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-1.5 transition">
+                      🖨️ طباعة المستخلص
+                    </button>
+                    
+                    {/* زر الواتساب العام والمبسط بالكامل */}
+                    <button onClick={()=>{
+                      const summaryMessage = `🏢 *مكتب الاستشارات والأعمال المساحية*\n📄 *مستخلص أعمال رقم:* #${extractNumber}\n👤 *العميل:* ${extractClient || 'عام'}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠️ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️ *التاريخ:* ${todayDate}`;
+                      openGeneralWhatsApp('clean-extract-target', `مستخلص_${extractClient || 'أعمال'}.pdf`, summaryMessage);
+                    }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-sm transition">
+                      <span>📲</span> إرسال المستخلص عبر واتساب (PDF)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. الأعمال والعملاء */}
               {activeTab === 'clients' && (
-                <div class="space-y-4">
-                  <form onSubmit={handleAddOperation} class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border dark:border-slate-700 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-bold">
+                <div class="space-y-4 font-bold">
+                  <form onSubmit={handleAddOperation} class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border dark:border-slate-700 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>التاريخ <input type="date" value={newOp.date} onChange={e=>setNewOp({...newOp, date: e.target.value})} class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700 dark:border-slate-600" required/></div>
                     <div>اسم العميل / المالك <input type="text" value={newOp.clientName} onChange={e=>setNewOp({...newOp, clientName: e.target.value})} placeholder="الواحة البحرية..." class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700 dark:border-slate-600" required/></div>
                     <div>الموقع بالمزرعة <input type="text" value={newOp.siteLocation} onChange={e=>setNewOp({...newOp, siteLocation: e.target.value})} placeholder="موقع المحمية، خط 2400..." class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700 dark:border-slate-600 bg-amber-50 dark:bg-amber-950/40" required/></div>
@@ -553,209 +736,6 @@
                 </div>
               )}
 
-              {/* 3. المستخلصات والمواقع */}
-              {activeTab === 'extracts' && (
-                <div class="space-y-4 font-bold">
-                  <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs print-hidden space-y-3">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                      <div>
-                        <label>المالك:</label>
-                        <select value={extractMeta.clientName} onChange={e=>setExtractMeta({...extractMeta, clientName: e.target.value})} class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700">
-                          <option value="">-- اختر المالك --</option>{clientNames.map(c=><option key={c}>{c}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label>الموقع بالمزرعة:</label>
-                        <input list="sites-list" value={extractMeta.siteLocation} onChange={e=>setExtractMeta({...extractMeta, siteLocation: e.target.value})} placeholder="المحمية، خط 2400..." class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700"/>
-                        <datalist id="sites-list">{siteLocationsList.map(s=><option key={s} value={s}/>)}</datalist>
-                      </div>
-                      <div>
-                        <label>المستخلص / الكشف:</label>
-                        <div class="flex gap-1 mt-1">
-                          <input type="text" placeholder="رقم" value={extractMeta.extractNo} onChange={e=>setExtractMeta({...extractMeta, extractNo: e.target.value})} class="w-1/2 border p-2.5 rounded-xl dark:bg-slate-700"/>
-                          <input type="text" placeholder="كشف" value={extractMeta.sheetNo} onChange={e=>setExtractMeta({...extractMeta, sheetNo: e.target.value})} class="w-1/2 border p-2.5 rounded-xl dark:bg-slate-700"/>
-                        </div>
-                      </div>
-                      <div>
-                        <label>المدة (من / إلى):</label>
-                        <div class="flex gap-1 mt-1">
-                          <input type="date" value={extractMeta.fromDate} onChange={e=>setExtractMeta({...extractMeta, fromDate: e.target.value})} class="w-1/2 border p-2 rounded-xl dark:bg-slate-700 text-[10px]"/>
-                          <input type="date" value={extractMeta.toDate} onChange={e=>setExtractMeta({...extractMeta, toDate: e.target.value})} class="w-1/2 border p-2 rounded-xl dark:bg-slate-700 text-[10px]"/>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 border-t pt-2.5 dark:border-slate-700">
-                      <div>
-                        <label>الباقي من السابق (ج.م):</label>
-                        <input type="number" value={extractMeta.previousBalance} onChange={e=>setExtractMeta({...extractMeta, previousBalance: e.target.value})} class="w-full border p-2.5 rounded-xl mt-1 text-rose-600 dark:bg-slate-700 font-black"/>
-                      </div>
-                      <div>
-                        <label>المهندس المسؤول:</label>
-                        <select value={extractMeta.engineerName} onChange={e=>setExtractMeta({...extractMeta, engineerName: e.target.value})} class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700">
-                          {settings.engineers.map(e=><option key={e}>{e}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label>هاتف مدير المشروع:</label>
-                        <input type="tel" placeholder="01xxxxxxxxx" value={extractMeta.projectManagerPhone} onChange={e=>setExtractMeta({...extractMeta, projectManagerPhone: e.target.value})} class="w-full border p-2.5 rounded-xl mt-1 dark:bg-slate-700 text-left font-mono" dir="ltr"/>
-                      </div>
-                    </div>
-
-                    <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t dark:border-slate-700">
-                      <button onClick={handleImportOpsToExtract} class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">📥 استيراد العمليات المسجلة</button>
-                      <button onClick={handleAddExtractRow} class="w-full sm:w-auto bg-slate-800 hover:bg-black text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">+ إضافة بند يدوي</button>
-                    </div>
-                  </div>
-
-                  {/* ورقة المستخلص المطابقة للأصل */}
-                  <div id="extract-sheet-target" class="bg-white p-3 sm:p-5 rounded-2xl border border-slate-400 shadow-md print-area text-slate-900 overflow-x-auto">
-                    <div class="min-w-[700px]">
-                      <div class="bg-[#FDEBD0] border-2 border-slate-900 p-2.5 rounded-t-xl">
-                        <div class="grid grid-cols-3 items-center border-b border-slate-900 pb-2 mb-2 text-center">
-                          <div class="text-right">
-                            <span class="block text-[11px] font-bold">المالك /</span>
-                            <strong class="text-sm text-black font-black">{extractMeta.clientName || 'الواحة البحرية الخضراء للإستثمار الزراعي'}</strong>
-                          </div>
-                          <div>
-                            <span class="block text-[11px] font-bold">عملية /</span>
-                            <strong class="text-xs text-black font-black">{extractMeta.processName}</strong>
-                            {extractMeta.siteLocation && <span class="block text-[11px] text-amber-900 font-bold">({extractMeta.siteLocation})</span>}
-                          </div>
-                          <div class="text-left flex justify-end items-center">
-                            {settings.logo ? <img src={settings.logo} class="h-12 object-contain"/> : <div class="text-xl font-black">🏗️ مساحة</div>}
-                          </div>
-                        </div>
-
-                        <div class="grid grid-cols-4 gap-1.5 text-center text-[10px] font-bold bg-white/70 p-1.5 rounded-lg border border-slate-800">
-                          <div>المدة: <u>{extractMeta.fromDate}</u> إلى <u>{extractMeta.toDate}</u></div>
-                          <div>مستخلص: <u class="text-indigo-900 font-black">{extractMeta.extractNo}</u></div>
-                          <div>كشف: <u>{extractMeta.sheetNo}</u></div>
-                          <div>الموقع: <u>{extractMeta.siteLocation || 'العام'}</u></div>
-                        </div>
-                      </div>
-
-                      <table class="w-full border-collapse border-2 border-slate-900 text-right text-[11px]">
-                        <thead>
-                          <tr class="bg-slate-200 text-black font-black text-center border-b-2 border-slate-900">
-                            <th class="p-1 border border-slate-800 w-8">م</th>
-                            <th class="p-1.5 border border-slate-800">بيان الأعمال</th>
-                            <th class="p-1 border border-slate-800 w-20">الفئة</th>
-                            <th class="p-1 border border-slate-800 w-16">الإنجاز</th>
-                            <th class="p-1 border border-slate-800 text-center" colSpan="3">
-                              <div>كمية الأعمال</div>
-                              <div class="grid grid-cols-3 border-t border-slate-800 text-[9px] mt-0.5">
-                                <span>سابق</span><span>منفذ</span><span>إجمالي</span>
-                              </div>
-                            </th>
-                            <th class="p-1.5 border border-slate-800 w-28 text-center">القيمة بالجملة</th>
-                            <th class="p-1 border border-slate-800 w-7 print-hidden">حذف</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {extractItems.map((item, idx) => {
-                            const itemTotal = parseNum(item.currentQty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100);
-                            const totalQuantity = parseNum(item.prevQty) + parseNum(item.currentQty);
-
-                            return (
-                              <tr key={item.id} class="border-b border-slate-800 hover:bg-slate-50">
-                                <td class="p-1.5 border border-slate-800 text-center font-bold">{idx + 1}</td>
-                                <td class="p-1 border border-slate-800">
-                                  <input type="text" value={item.desc} onChange={e=>{
-                                    const updated = extractItems.map(it=>it.id===item.id?{...it, desc: e.target.value}:it);
-                                    setExtractItems(updated);
-                                  }} class="w-full bg-transparent font-bold outline-none"/>
-                                </td>
-                                <td class="p-1 border border-slate-800 text-center">
-                                  <input type="number" step="any" value={item.unitPrice} onChange={e=>{
-                                    const updated = extractItems.map(it=>it.id===item.id?{...it, unitPrice: e.target.value}:it);
-                                    setExtractItems(updated);
-                                  }} class="w-full text-center bg-transparent font-bold outline-none"/>
-                                </td>
-                                <td class="p-1 border border-slate-800 text-center font-bold">
-                                  <select value={item.rate} onChange={e=>{
-                                    const updated = extractItems.map(it=>it.id===item.id?{...it, rate: e.target.value}:it);
-                                    setExtractItems(updated);
-                                  }} class="bg-transparent font-bold text-center outline-none">
-                                    <option value="100">%100</option>
-                                    <option value="90">%90</option>
-                                    <option value="50">%50</option>
-                                  </select>
-                                </td>
-                                <td class="p-1 border border-slate-800 text-center w-14">
-                                  <input type="number" value={item.prevQty} onChange={e=>{
-                                    const updated = extractItems.map(it=>it.id===item.id?{...it, prevQty: e.target.value}:it);
-                                    setExtractItems(updated);
-                                  }} class="w-full text-center bg-transparent outline-none"/>
-                                </td>
-                                <td class="p-1 border border-slate-800 text-center w-14 font-black">
-                                  <input type="number" value={item.currentQty} onChange={e=>{
-                                    const updated = extractItems.map(it=>it.id===item.id?{...it, currentQty: e.target.value}:it);
-                                    setExtractItems(updated);
-                                  }} class="w-full text-center bg-transparent outline-none"/>
-                                </td>
-                                <td class="p-1 border border-slate-800 text-center w-14 font-bold bg-slate-100">{totalQuantity}</td>
-                                <td class="p-1.5 border border-slate-800 text-center font-black text-xs">{itemTotal.toLocaleString()}</td>
-                                <td class="p-1 border border-slate-800 text-center print-hidden">
-                                  <button onClick={()=>handleRemoveExtractRow(item.id)} class="text-rose-600 font-bold p-1">✕</button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-
-                          <tr class="font-black bg-slate-100 border-t-2 border-slate-900">
-                            <td colSpan="7" class="p-2 border border-slate-800 text-left">الإجمالي:</td>
-                            <td class="p-2 border border-slate-800 text-center text-xs">{currentExtractTotal.toLocaleString()}</td>
-                            <td class="print-hidden border border-slate-800"></td>
-                          </tr>
-                          <tr class="font-black bg-slate-100">
-                            <td colSpan="7" class="p-2 border border-slate-800 text-left">الباقي من المستخلص السابق:</td>
-                            <td class="p-2 border border-slate-800 text-center text-xs">{parseNum(extractMeta.previousBalance).toLocaleString()}</td>
-                            <td class="print-hidden border border-slate-800"></td>
-                          </tr>
-                          <tr class="font-black bg-[#E2E8F0] border-b-2 border-slate-900">
-                            <td colSpan="7" class="p-2 border border-slate-800 text-left text-sm">الباقي الإجمالي المستحق:</td>
-                            <td class="p-2 border border-slate-800 text-center text-sm text-rose-800 font-black">{finalRemainingDue.toLocaleString()} ج.م</td>
-                            <td class="print-hidden border border-slate-800"></td>
-                          </tr>
-                        </tbody>
-                      </table>
-
-                      <div class="grid grid-cols-2 text-center mt-5 pt-3 border-t-2 border-slate-900 font-black text-[11px]">
-                        <div>
-                          <span>المهندس المسؤول / {extractMeta.engineerName}</span>
-                          <div class="mt-6 border-t border-dotted border-slate-600 pt-1 w-2/3 mx-auto">التوقيع والاعتماد</div>
-                        </div>
-                        <div>
-                          <span>المالك / {extractMeta.clientName || 'الواحة البحرية'}</span>
-                          <div class="mt-6 border-t border-dotted border-slate-600 pt-1 w-2/3 mx-auto">توقيع الاستلام</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t dark:border-slate-700">
-                    <button onClick={()=>window.print()} class="bg-slate-800 text-white px-4 py-2.5 rounded-xl font-bold">🖨️ طباعة المستخلص</button>
-                    
-                    <button onClick={()=>{
-                      const msg = `🏢 *مكتب مساحة للاستشارات*\n📄 *مستخلص أعمال: ${extractMeta.processName}*\n📍 *الموقع:* ${extractMeta.siteLocation || 'العام'}\n👤 *المالك:* ${extractMeta.clientName}\n💰 *المستحق:* ${finalRemainingDue.toLocaleString()} ج.م`;
-                      generatePdfAndOpenWhatsApp('extract-sheet-target', `مستخلص_${extractMeta.clientName}.pdf`, msg, DEFAULT_ADMIN_WHATSAPP);
-                    }} class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold">📲 PDF + واتساب للأدمن</button>
-
-                    <button onClick={()=>{
-                      let phone = extractMeta.projectManagerPhone;
-                      if (!phone) {
-                        phone = prompt("أدخل رقم هاتف مدير المشروع / المالك (واتساب):", "01");
-                        if (!phone) return;
-                        setExtractMeta(m=>({...m, projectManagerPhone: phone}));
-                      }
-                      const msg = `🏢 *مكتب مساحة للاستشارات*\n📄 *مستخلص أعمال:* ${extractMeta.processName}\n📍 *الموقع:* ${extractMeta.siteLocation}\n💰 *المطلوب سداده:* ${finalRemainingDue.toLocaleString()} ج.م`;
-                      generatePdfAndOpenWhatsApp('extract-sheet-target', `مستخلص_${extractMeta.clientName}.pdf`, msg, phone);
-                    }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold">📲 إرسال لمدير المشروع</button>
-                  </div>
-                </div>
-              )}
-
               {/* 4. الخزينة */}
               {activeTab === 'vault' && (
                 <div class="space-y-4 font-bold">
@@ -826,16 +806,16 @@
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs">
                     <label class="mb-1 block">اختر المهندس:</label>
-                    <select value={extractMeta.engineerName} onChange={e=>setExtractMeta({...extractMeta, engineerName: e.target.value})} class="w-full sm:w-1/2 border p-2.5 rounded-xl dark:bg-slate-700">
+                    <select value={extractEngineer} onChange={e=>setExtractEngineer(e.target.value)} class="w-full sm:w-1/2 border p-2.5 rounded-xl dark:bg-slate-700">
                       {settings.engineers.map(e=><option key={e}>{e}</option>)}
                     </select>
                   </div>
-                  {extractMeta.engineerName && (() => {
-                    const engOps = operations.filter(o=>o.engineer === extractMeta.engineerName);
+                  {extractEngineer && (() => {
+                    const engOps = operations.filter(o=>o.engineer === extractEngineer);
                     const totalEngDues = engOps.reduce((s,o)=>s+parseNum(o.engFee),0);
                     return (
                       <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs">
-                        <div class="flex justify-between items-center mb-3"><h3>حساب: {extractMeta.engineerName}</h3><span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 px-3 py-1 rounded-xl">المستحق: {totalEngDues.toLocaleString()} ج.م</span></div>
+                        <div class="flex justify-between items-center mb-3"><h3>حساب: {extractEngineer}</h3><span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 px-3 py-1 rounded-xl">المستحق: {totalEngDues.toLocaleString()} ج.م</span></div>
                         <div class="overflow-x-auto">
                           <table class="w-full text-right border"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border">التاريخ</th><th class="p-2 border">العمل والموقع</th><th class="p-2 border text-center text-emerald-600">الأتعاب</th></tr></thead>
                           <tbody>{engOps.map(o=><tr key={o.id}><td class="p-2 border whitespace-nowrap">{o.date}</td><td class="p-2 border">{o.clientName} ({o.siteLocation})</td><td class="p-2 border text-center font-bold text-emerald-600">{parseNum(o.engFee).toLocaleString()}</td></tr>)}</tbody></table>
@@ -920,19 +900,19 @@
             </main>
           </div>
 
-          {/* شريط التنقل السفلي للهواتف الذكية (Bottom Navigation Bar) */}
+          {/* Bottom Bar للهاتف */}
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg">
             <button onClick={()=>setActiveTab('dashboard')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
               <span class="text-base">📊</span>
               <span class="text-[9px] mt-0.5">الرئيسية</span>
             </button>
-            <button onClick={()=>setActiveTab('clients')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='clients'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
-              <span class="text-base">👥</span>
-              <span class="text-[9px] mt-0.5">الأعمال</span>
-            </button>
             <button onClick={()=>setActiveTab('extracts')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='extracts'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
               <span class="text-base">📄</span>
               <span class="text-[9px] mt-0.5">المستخلص</span>
+            </button>
+            <button onClick={()=>setActiveTab('clients')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='clients'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
+              <span class="text-base">👥</span>
+              <span class="text-[9px] mt-0.5">الأعمال</span>
             </button>
             <button onClick={()=>setActiveTab('vault')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='vault'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
               <span class="text-base">💵</span>
@@ -944,7 +924,7 @@
             </button>
           </nav>
 
-          {/* التنبيهات */}
+          {/* Toast */}
           {toast.show && <div class="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs z-50 shadow-2xl font-bold">{toast.message}</div>}
         </div>
       );
