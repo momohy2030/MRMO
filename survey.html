@@ -44,7 +44,6 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    // --- إعدادات قاعدة البيانات الخاصة بك ---
     const firebaseConfig = {
       apiKey: "AIzaSyDHjQTNfAh3wQ8tSOXOIewJNXaDCHADrR8",
       authDomain: "mrmo-d8760.firebaseapp.com",
@@ -76,7 +75,6 @@
       return isNaN(n) ? 0 : n;
     };
 
-    // --- دالة PDF والواتساب ---
     const generatePdfAndOpenWhatsApp = (elementId, filename, textMessage, targetPhone = "201095545982") => {
       const element = document.getElementById(elementId);
       if (!element) return;
@@ -111,15 +109,13 @@
         theme: localStorage.getItem('theme') || 'light'
       });
 
-      const [vaultMonth, setVaultMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
+      const [vaultMonth, setVaultMonth] = useState(new Date().toISOString().substring(0, 7));
       const [toast, setToast] = useState({ show: false, message: "" });
-      const [editItemData, setEditItemData] = useState(null);
       const [selectedClientForStatement, setSelectedClientForStatement] = useState("");
       const [selectedEngineerForStatement, setSelectedEngineerForStatement] = useState("");
 
       const todayDate = new Date().toISOString().split('T')[0];
 
-      // تطبيق الـ Theme
       useEffect(() => {
         if (settings.theme === 'dark') document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
@@ -131,14 +127,13 @@
         setTimeout(() => setToast({ show: false, message: "" }), 3000);
       };
 
-      // النماذج
       const [newOp, setNewOp] = useState({
         date: todayDate, clientName: "", opType: "", workDescription: "", engineer: "م أحمد نبيل",
         isFaddan: false, faddanQty: 1, faddanPrice: 0,
         isSketch: false, sketchesCount: 1,
         agreedAmount: 0, paidNow: 0, laborCost: 0, carCost: 0,
-        engDayType: "full", // full=2000, half=1500, percent=80%
-        deviceDayType: "full" // full=3500, half=1750, none=0
+        engDayType: "full",
+        deviceDayType: "full"
       });
 
       const [newPayment, setNewPayment] = useState({ date: todayDate, clientName: "", amount: "", notes: "" });
@@ -199,17 +194,14 @@
         const total = parseNum(op.agreedAmount);
         let engFee = 0, deviceFee = 0, officeFee = 0;
 
-        // حساب المهندس
         if (op.engDayType === 'full') engFee = 2000;
         else if (op.engDayType === 'half') engFee = 1500;
         else if (op.engDayType === 'percent') engFee = total * 0.80;
 
-        // حساب الجهاز
         if (op.deviceDayType === 'full') deviceFee = 3500;
         else if (op.deviceDayType === 'half') deviceFee = 1750;
         else deviceFee = 0;
 
-        // حساب المكتب
         if (op.engDayType === 'percent') {
           officeFee = total * 0.20; 
         } else {
@@ -278,16 +270,13 @@
         }
       };
 
-      // --- حسابات عامة ---
       const clientNames = Array.from(new Set([...operations.map(o=>o.clientName), ...payments.map(p=>p.clientName)])).filter(Boolean);
       
-      // خزينة الشهر
       const monthlyTx = transactions.filter(t => t.date.startsWith(vaultMonth));
       const mIn = monthlyTx.filter(t=>t.type==='income').reduce((s,t)=>s+parseNum(t.amount),0);
       const mOut = monthlyTx.filter(t=>t.type==='expense').reduce((s,t)=>s+parseNum(t.amount),0);
       const mNet = mIn - mOut;
 
-      // أرباح الجهاز والمكتب الشاملة
       const totalRtk = operations.reduce((s,o)=>s+(o.deviceFee||0),0);
       const totalOffice = operations.reduce((s,o)=>s+(o.officeFee||0),0);
 
@@ -328,6 +317,14 @@
               <h1 class="font-black text-white text-lg flex items-center gap-2"><span>📐</span> مساحة ERP</h1>
               <button onClick={()=>setSidebarOpen(false)} class="md:hidden text-white text-xl">✕</button>
             </div>
+            
+            {/* زر مباشر بالسايدبار للعودة للإنشاءات */}
+            <div class="p-3 pb-0">
+              <a href="index.html" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-xl font-bold flex items-center justify-center gap-2 text-xs shadow-md transition">
+                <span>🏗️</span> العودة لبوابة الإنشاءات
+              </a>
+            </div>
+
             <nav class="flex-1 overflow-y-auto p-3 space-y-1 text-sm font-bold">
               {navTabs.map(t => (
                 <button key={t.id} onClick={() => { setActiveTab(t.id); setSidebarOpen(false); }} class={`w-full text-right flex items-center gap-3 p-3 rounded-xl transition ${activeTab===t.id ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}>
@@ -348,11 +345,14 @@
                 <button onClick={()=>setSidebarOpen(true)} class="md:hidden text-2xl dark:text-white">☰</button>
                 <h2 class="font-black text-lg text-indigo-700 dark:text-indigo-400">{navTabs.find(t=>t.id===activeTab)?.label}</h2>
               </div>
-              <div class="flex gap-2">
+              <div class="flex items-center gap-2">
                 <button onClick={() => setSettings(p=>({...p, theme: p.theme==='dark'?'light':'dark'}))} class="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-lg">
                   {settings.theme === 'dark' ? '☀️' : '🌙'}
                 </button>
-                <a href="/" class="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-1">🏗️ الإنشاءات</a>
+                {/* زر التنقل الأساسي المؤكد للإنشاءات */}
+                <a href="index.html" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition">
+                  <span>🏗️</span> <span class="hidden sm:inline">قطاع الإنشاءات</span>
+                </a>
               </div>
             </header>
 
@@ -361,17 +361,12 @@
               {/* 1. لوحة التحكم */}
               {activeTab === 'dashboard' && (
                 <div class="space-y-6">
-                  <DashboardCharts 
-                    totalWork={operations.reduce((s,o)=>s+parseNum(o.agreedAmount),0)}
-                    totalReceived={payments.reduce((s,p)=>s+parseNum(p.amount),0)}
-                    totalExpenses={operations.reduce((s,o)=>s+parseNum(o.laborCost)+parseNum(o.carCost),0)}
-                    opCounts={{
-                      rtkFull: operations.filter(o=>o.engDayType==='full').length,
-                      rtkHalf: operations.filter(o=>o.engDayType==='half').length,
-                      sketch: operations.filter(o=>o.isSketch).length,
-                      faddan: operations.filter(o=>o.isFaddan).length
-                    }}
-                  />
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div class="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border dark:border-slate-700 shadow-sm"><span class="text-slate-400 font-bold block text-[10px]">إجمالي الأعمال</span><strong class="text-indigo-600 text-base font-black">{operations.reduce((s,o)=>s+parseNum(o.agreedAmount),0).toLocaleString()} ج.م</strong></div>
+                    <div class="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border dark:border-slate-700 shadow-sm"><span class="text-slate-400 font-bold block text-[10px]">إجمالي التحصيلات</span><strong class="text-emerald-600 text-base font-black">{payments.reduce((s,p)=>s+parseNum(p.amount),0).toLocaleString()} ج.م</strong></div>
+                    <div class="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border dark:border-slate-700 shadow-sm"><span class="text-slate-400 font-bold block text-[10px]">مصاريف التشغيل</span><strong class="text-rose-600 text-base font-black">{operations.reduce((s,o)=>s+parseNum(o.laborCost)+parseNum(o.carCost),0).toLocaleString()} ج.م</strong></div>
+                    <div class="bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 p-3.5 rounded-2xl shadow-sm"><span class="text-indigo-800 dark:text-indigo-300 font-bold block text-[10px]">سيولة الشهر</span><strong class="text-indigo-900 dark:text-indigo-200 text-lg font-black">{mNet.toLocaleString()} ج.م</strong></div>
+                  </div>
                 </div>
               )}
 
@@ -380,8 +375,8 @@
                 <div class="space-y-4">
                   <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border dark:border-slate-700 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
                     <div class="flex items-center gap-2">
-                      <label class="font-bold">تصفية شهر:</label>
-                      <input type="month" value={vaultMonth} onChange={e=>setVaultMonth(e.target.value)} class="border p-2 rounded-xl dark:bg-slate-700 dark:border-slate-600"/>
+                      <label class="font-bold text-xs">تصفية شهر:</label>
+                      <input type="month" value={vaultMonth} onChange={e=>setVaultMonth(e.target.value)} class="border p-2 rounded-xl dark:bg-slate-700 dark:border-slate-600 text-xs font-bold"/>
                     </div>
                     <div class="flex gap-4 text-center text-sm">
                       <div><span class="block text-slate-500 text-[10px]">وارد الشهر</span><strong class="text-emerald-600 text-lg">{mIn.toLocaleString()}</strong></div>
@@ -398,14 +393,14 @@
                   </form>
 
                   <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto text-xs">
-                    <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">التاريخ</th><th class="p-2">البند</th><th class="p-2">المبلغ</th>{isAdmin && <th class="p-2">إجراء</th>}</tr></thead>
+                    <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">التاريخ</th><th class="p-2">البند</th><th class="p-2">المبلغ</th>{isAdmin && <th class="p-2 text-center">إجراء</th>}</tr></thead>
                     <tbody>
                       {monthlyTx.map(t=>(
                         <tr key={t.id} class="border-b dark:border-slate-700">
                           <td class="p-2">{t.date}</td>
                           <td class="p-2"><span class={t.type==='income'?'text-emerald-600':'text-rose-600'}>{t.type==='income'?'📥':'📤'} {t.category}</span></td>
                           <td class="p-2 font-black">{parseNum(t.amount).toLocaleString()}</td>
-                          {isAdmin && <td class="p-2"><button onClick={()=>deleteItem('transactions',t.id,transactions,setTransactions)} class="text-rose-600">🗑️</button></td>}
+                          {isAdmin && <td class="p-2 text-center"><button onClick={()=>deleteItem('transactions',t.id,transactions,setTransactions)} class="text-rose-600 font-bold">🗑️ حذف</button></td>}
                         </tr>
                       ))}
                     </tbody></table>
@@ -426,7 +421,7 @@
                           <option value="">اختر...</option>
                           {settings.opTypes.map(o=><option key={o}>{o}</option>)}
                         </select>
-                        <button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} class="bg-slate-200 dark:bg-slate-600 px-2 rounded-xl">+</button>
+                        <button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} class="bg-slate-200 dark:bg-slate-600 px-2 rounded-xl font-black">+</button>
                       </div>
                     </div>
                     
@@ -435,7 +430,7 @@
                         <select value={newOp.engineer} onChange={e=>setNewOp({...newOp, engineer: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700">
                           {settings.engineers.map(e=><option key={e}>{e}</option>)}
                         </select>
-                        <button type="button" onClick={()=>updateSettingArray('engineers','مهندس')} class="bg-slate-200 dark:bg-slate-600 px-2 rounded-xl">+</button>
+                        <button type="button" onClick={()=>updateSettingArray('engineers','مهندس')} class="bg-slate-200 dark:bg-slate-600 px-2 rounded-xl font-black">+</button>
                       </div>
                     </div>
 
@@ -447,20 +442,20 @@
                     </div>
 
                     {newOp.isFaddan && <>
-                      <div>عدد الأفدنة <input type="number" step="any" value={newOp.faddanQty} onChange={e=>setNewOp({...newOp, faddanQty: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700 bg-amber-50"/></div>
-                      <div>سعر الفدان <input type="number" step="any" value={newOp.faddanPrice} onChange={e=>setNewOp({...newOp, faddanPrice: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700 bg-amber-50"/></div>
+                      <div>عدد الأفدنة <input type="number" step="any" value={newOp.faddanQty} onChange={e=>setNewOp({...newOp, faddanQty: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700 bg-amber-50 dark:bg-amber-950"/></div>
+                      <div>سعر الفدان <input type="number" step="any" value={newOp.faddanPrice} onChange={e=>setNewOp({...newOp, faddanPrice: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700 bg-amber-50 dark:bg-amber-950"/></div>
                     </>}
                     
                     {newOp.isSketch && <div>عدد الكروكيات <input type="number" value={newOp.sketchesCount} onChange={e=>setNewOp({...newOp, sketchesCount: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700"/></div>}
 
-                    {!newOp.isFaddan && <div>المبلغ المتفق عليه <input type="number" value={newOp.agreedAmount} onChange={e=>setNewOp({...newOp, agreedAmount: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700 bg-indigo-50 text-indigo-700" required/></div>}
+                    {!newOp.isFaddan && <div>المبلغ المتفق عليه <input type="number" value={newOp.agreedAmount} onChange={e=>setNewOp({...newOp, agreedAmount: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300" required/></div>}
 
                     <div>مقدم مدفوع <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700"/></div>
                     <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700"/></div>
                     <div>مصاريف سيارة <input type="number" value={newOp.carCost} onChange={e=>setNewOp({...newOp, carCost: e.target.value})} class="w-full border p-2 rounded-xl mt-1 dark:bg-slate-700"/></div>
 
                     <div class="md:col-span-2 bg-slate-100 dark:bg-slate-700 p-3 rounded-xl border border-slate-300 dark:border-slate-600">
-                      <label class="block mb-2 text-indigo-700 dark:text-indigo-300">⚙️ ضبط حسابات التوزيع:</label>
+                      <label class="block mb-2 text-indigo-700 dark:text-indigo-300 font-bold">⚙️ ضبط حسابات التوزيع:</label>
                       <div class="grid grid-cols-2 gap-2">
                         <div>جهد المهندس: 
                           <select value={newOp.engDayType} onChange={e=>setNewOp({...newOp, engDayType: e.target.value})} class="w-full p-2 rounded mt-1 bg-white dark:bg-slate-800">
@@ -475,7 +470,7 @@
                       </div>
                     </div>
 
-                    <div class="md:col-span-4 mt-2"><button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm shadow">حفظ العملية</button></div>
+                    <div class="md:col-span-4 mt-2"><button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-sm font-black shadow transition">حفظ العملية</button></div>
                   </form>
 
                   <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto text-xs">
@@ -486,7 +481,7 @@
                           <td class="p-2">{o.date}</td><td class="p-2 font-bold">{o.clientName}</td><td class="p-2 truncate max-w-[150px]">{o.workDescription}</td>
                           <td class="p-2 font-black text-indigo-600 dark:text-indigo-400">{parseNum(o.agreedAmount).toLocaleString()}</td>
                           <td class="p-2">{o.engineer}</td>
-                          {isAdmin && <td class="p-2 text-center"><button onClick={()=>deleteItem('operations',o.id,operations,setOperations)} class="text-rose-600">🗑️</button></td>}
+                          {isAdmin && <td class="p-2 text-center"><button onClick={()=>deleteItem('operations',o.id,operations,setOperations)} class="text-rose-600 font-bold">🗑️ حذف</button></td>}
                         </tr>
                       ))}
                     </tbody></table>
@@ -522,7 +517,7 @@
                     const totalEngDues = engOps.reduce((s,o)=>s+parseNum(o.engFee),0);
                     return (
                       <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-sm text-xs">
-                        <div class="flex justify-between items-center mb-4"><h3 class="font-black text-sm">حساب: {selectedEngineerForStatement}</h3><span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-xl font-bold">إجمالي المستحق: {totalEngDues.toLocaleString()} ج.م</span></div>
+                        <div class="flex justify-between items-center mb-4"><h3 class="font-black text-sm">حساب: {selectedEngineerForStatement}</h3><span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 px-3 py-1 rounded-xl font-bold">إجمالي المستحق: {totalEngDues.toLocaleString()} ج.م</span></div>
                         <table class="w-full text-right border"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border">التاريخ</th><th class="p-2 border">العميل والبيان</th><th class="p-2 border text-center">نوع الجهد</th><th class="p-2 border text-center text-emerald-600">الأتعاب المستحقة</th></tr></thead>
                         <tbody>{engOps.map(o=><tr key={o.id}><td class="p-2 border">{o.date}</td><td class="p-2 border">{o.clientName} - {o.workDescription}</td><td class="p-2 border text-center">{o.engDayType}</td><td class="p-2 border text-center font-bold text-emerald-600">{parseNum(o.engFee).toLocaleString()}</td></tr>)}</tbody></table>
                       </div>
@@ -536,7 +531,7 @@
                 <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border shadow-sm text-center">
                   <h3 class="font-black text-lg text-indigo-700 dark:text-indigo-400 mb-2">إيرادات جهاز RTK المجمعة</h3>
                   <div class="text-4xl font-black mb-8">{totalRtk.toLocaleString()} ج.م</div>
-                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-bold">
                     <div class="p-4 border rounded-2xl bg-indigo-50 dark:bg-slate-700">م. مندور (50%)<br/><strong class="text-lg text-indigo-900 dark:text-indigo-300 mt-2 block">{(totalRtk*0.5).toLocaleString()}</strong></div>
                     <div class="p-4 border rounded-2xl">م. أسامة<br/><strong class="text-lg mt-2 block">{((totalRtk*0.5)/3).toLocaleString()}</strong></div>
                     <div class="p-4 border rounded-2xl">م. أيمن<br/><strong class="text-lg mt-2 block">{((totalRtk*0.5)/3).toLocaleString()}</strong></div>
@@ -554,8 +549,8 @@
                     <div>الملاحظات <input type="text" value={newPayment.notes} onChange={e=>setNewPayment({...newPayment, notes:e.target.value})} class="w-full border p-2 rounded mt-1 dark:bg-slate-700"/></div>
                     <div class="flex items-end"><button class="w-full bg-emerald-600 text-white py-2 rounded">تسجيل دفعة واردة</button></div>
                   </form>
-                  <table class="w-full text-right bg-white dark:bg-slate-800 rounded-2xl border"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">التاريخ</th><th class="p-2">العميل</th><th class="p-2 text-center">المبلغ</th>{isAdmin&&<th class="p-2"></th>}</tr></thead>
-                  <tbody>{payments.map(p=><tr key={p.id} class="border-b dark:border-slate-700"><td class="p-2">{p.date}</td><td class="p-2">{p.clientName}</td><td class="p-2 text-center text-emerald-600">{parseNum(p.amount).toLocaleString()}</td>{isAdmin&&<td class="p-2"><button onClick={()=>deleteItem('payments',p.id,payments,setPayments)}>🗑️</button></td>}</tr>)}</tbody></table>
+                  <table class="w-full text-right bg-white dark:bg-slate-800 rounded-2xl border"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">التاريخ</th><th class="p-2">العميل</th><th class="p-2 text-center">المبلغ</th>{isAdmin&&<th class="p-2 text-center">إجراء</th>}</tr></thead>
+                  <tbody>{payments.map(p=><tr key={p.id} class="border-b dark:border-slate-700"><td class="p-2">{p.date}</td><td class="p-2">{p.clientName}</td><td class="p-2 text-center text-emerald-600">{parseNum(p.amount).toLocaleString()}</td>{isAdmin&&<td class="p-2 text-center"><button onClick={()=>deleteItem('payments',p.id,payments,setPayments)} class="text-rose-600">🗑️ حذف</button></td>}</tr>)}</tbody></table>
                 </div>
               )}
 
@@ -585,7 +580,7 @@
                         
                         <table class="w-full border text-right mb-4">
                           <thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border">البيان</th><th class="p-2 border text-center">المبلغ</th></tr></thead>
-                          <tbody>{cOps.map(o=><tr key={o.id}><td class="p-2 border">{o.workDescription} {o.isFaddan?`(${o.faddanQty} فدان)`:''}</td><td class="p-2 border text-center">{parseNum(o.agreedAmount).toLocaleString()}</td></tr>)}</tbody>
+                          <tbody>{cOps.map(o=><tr key={o.id}><td class="p-2 border">{o.workDescription} {o.isFaddan?`(${o.faddanQty} فدان)`:''}</td><td class="p-2 border text-center font-bold">{parseNum(o.agreedAmount).toLocaleString()}</td></tr>)}</tbody>
                         </table>
                         
                         <div class="grid grid-cols-3 gap-2 text-center font-bold">
@@ -616,7 +611,7 @@
                 <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border shadow-sm text-center">
                   <h3 class="font-black text-lg mb-2">أرباح المكتب المجمعة (20% من الأعمال)</h3>
                   <div class="text-4xl font-black mb-8 text-emerald-600">{Math.round(totalOffice).toLocaleString()} ج.م</div>
-                  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+                  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-bold">
                     <div class="p-4 border rounded-2xl bg-amber-50 dark:bg-slate-700">في سبيل الله (10%)<br/><strong class="text-lg mt-2 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
                     <div class="p-4 border rounded-2xl bg-blue-50 dark:bg-slate-700">م. أحمد نبيل (10%)<br/><strong class="text-lg mt-2 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
                     <div class="p-4 border rounded-2xl">م. أسامة<br/><strong class="text-lg mt-2 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
@@ -651,7 +646,6 @@
             </div>
           </main>
 
-          {/* Toast */}
           {toast.show && <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs z-50 shadow-xl">{toast.message}</div>}
         </div>
       );
