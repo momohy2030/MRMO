@@ -525,7 +525,7 @@
         }
       };
 
- const updateSettingArray = (key, title) => {
+      const updateSettingArray = (key, title) => {
         const val = prompt(`إضافة ${title} جديد:`);
         if (val && val.trim()) {
           const cleanVal = val.trim();
@@ -540,10 +540,8 @@
           const newSettings = { ...settings, [key]: updatedList };
 
           setSettings(newSettings);
-          // حفظ كامل إعدادات settings في المسار الصحيح
           saveListSafely('settings', 'settings', newSettings);
 
-          // تحديد العنصر المضاف فوراً داخل حقل الإدخال
           if (key === 'opTypes') {
             handleOpTypeChange(cleanVal);
           } else if (key === 'engineers') {
