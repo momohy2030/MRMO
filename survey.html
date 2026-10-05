@@ -32,12 +32,8 @@
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     
     @media print {
-      body * {
-        visibility: hidden !important;
-      }
-      #printable-area, #printable-area * {
-        visibility: visible !important;
-      }
+      body * { visibility: hidden !important; }
+      #printable-area, #printable-area * { visibility: visible !important; }
       #printable-area {
         position: absolute !important;
         left: 0 !important;
@@ -50,9 +46,7 @@
         background: white !important;
         color: black !important;
       }
-      .print-hidden {
-        display: none !important;
-      }
+      .print-hidden { display: none !important; }
     }
   </style>
 </head>
@@ -244,7 +238,6 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
-      // نماذج الإدخال
       const [newOp, setNewOp] = useState({
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
         isFaddan: false, faddanQty: 1, faddanPrice: 250,
@@ -258,14 +251,12 @@
 
       const [newPayment, setNewPayment] = useState({ date: todayDate, clientName: "", siteLocation: "", amount: "", notes: "سداد دفعة من المستخلص" });
 
-      // المستخلص
       const [extractClient, setExtractClient] = useState("");
       const [extractSite, setExtractSite] = useState("");
       const [extractNumber, setExtractNumber] = useState("1");
       const [extractEngineer, setExtractEngineer] = useState("م أحمد نبيل");
       const [extractItems, setExtractItems] = useState([]);
 
-      // كشف الحساب التفصيلي للشركاء
       const [statementClient, setStatementClient] = useState("");
 
       useEffect(() => {
@@ -291,14 +282,17 @@
         db.ref('survey_data/login_logs').push(entry);
       };
 
+      // التحقق الصارم والمرن من الحساب وتفعيل مدير النظام
       useEffect(() => {
         if (!auth) { setAuthLoading(false); return; }
         return auth.onAuthStateChanged((curr) => {
           if (curr) {
-            const email = (curr.email || "").toLowerCase();
+            const cleanEmail = (curr.email || "").trim().toLowerCase();
             setUser(curr);
-            setIsSuperAdmin(email === SUPER_ADMIN_EMAIL.toLowerCase());
-            setIsAdmin(ADMIN_EMAILS.some(e => email.includes(e.toLowerCase())));
+
+            const isSuper = cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase() || cleanEmail.includes("mohamedmo686686");
+            setIsSuperAdmin(isSuper);
+            setIsAdmin(isSuper || ADMIN_EMAILS.some(e => cleanEmail.includes(e.toLowerCase())));
 
             if (db && !sessionStorage.getItem('survey_log_done')) {
               db.ref('survey_data/login_logs').push({
@@ -349,7 +343,6 @@
         }
       };
 
-      // حساب التوزيع المالي الدقيق المطلوب
       const calculateOperationShares = (op) => {
         const total = parseNum(op.agreedAmount);
         const labor = parseNum(op.laborCost);
@@ -365,11 +358,10 @@
           deviceFee = 1750;
           officeFee = Math.max(0, total - engFee - deviceFee - labor - car);
         } else if (op.opType === 'قياس وكروكي') {
-          engFee = total * 0.80; // 80% للمهندس
-          officeFee = total * 0.20; // 20% للمكتب
+          engFee = total * 0.80;
+          officeFee = total * 0.20;
           deviceFee = 0;
         } else {
-          // لأي نوع آخر: يوم كامل افتراضي أو حسب الإدخال
           engFee = 2000;
           deviceFee = 0;
           officeFee = Math.max(0, total - engFee - deviceFee - labor - car);
@@ -415,7 +407,6 @@
         setOpModalOpen(false);
       };
 
-      // تسجيل حركة الخزينة (وارد / صادر)
       const handleAddTransaction = (e) => {
         e.preventDefault();
         const amt = parseNum(newTx.amount);
@@ -458,7 +449,6 @@
         }
       };
 
-      // دالة موثوقة لسحب أعمال العميل
       const loadClientOpsIntoExtract = (targetClient, targetSite) => {
         const cName = (targetClient || '').trim();
         const sName = (targetSite || '').trim();
@@ -550,7 +540,7 @@
         { id: "extracts", label: "المستخلصات", icon: "📄" },
         { id: "statement", label: "كشف الحساب", icon: "📑" },
         { id: "office", label: "أرباح المكتب", icon: "🏢" },
-        ...(isSuperAdmin ? [{ id: "logs", label: "سجل الدخول", icon: "🛡️" }] : []),
+        ...(isSuperAdmin ? [{ id: "logs", label: "سجل الدخول والمراقبة", icon: "🛡️" }] : []),
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ];
 
@@ -576,7 +566,14 @@
             <div class="flex items-center gap-2">
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
               <div>
-                <h1 class="text-sm font-black leading-tight text-indigo-700 dark:text-indigo-400">مساحة ERP</h1>
+                <div class="flex items-center gap-1.5">
+                  <h1 class="text-sm font-black leading-tight text-indigo-700 dark:text-indigo-400">مساحة ERP</h1>
+                  {isSuperAdmin && (
+                    <span class="bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300">
+                      👑 مدير النظام
+                    </span>
+                  )}
+                </div>
                 <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[130px] sm:max-w-none">{navTabs.find(t=>t.id===activeTab)?.label}</p>
               </div>
             </div>
@@ -617,7 +614,10 @@
                 <div class="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-4 flex flex-col justify-between">
                   <div>
                     <div class="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-                      <span class="font-black text-sm">أقسام نظام المساحة</span>
+                      <div>
+                        <span class="font-black text-sm">أقسام نظام المساحة</span>
+                        {isSuperAdmin && <span class="block text-[10px] text-amber-400 font-bold">👑 صلاحية مدير النظام كاملة</span>}
+                      </div>
                       <button onClick={()=>setDrawerOpen(false)} class="text-slate-400 hover:text-white text-lg">✕</button>
                     </div>
                     <nav class="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">
@@ -686,7 +686,7 @@
                 </div>
               )}
 
-              {/* 3. تبويب الأعمال والطلعات (مع تسجيل حصص المهندس والجهاز تفصيلاً) */}
+              {/* 3. تبويب الأعمال والطلعات */}
               {activeTab === 'operations' && (
                 <div class="space-y-4">
                   <div class="flex flex-col sm:flex-row gap-2 justify-between items-stretch sm:items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border dark:border-slate-700 shadow-xs">
@@ -730,7 +730,7 @@
                               <span>🚗 سيارة: <strong>{parseNum(o.carCost)}</strong></span>
                               <span>👷 عمالة: <strong>{parseNum(o.laborCost)}</strong></span>
                               <span>👷 أتعاب المهندس: <strong class="text-emerald-600">{parseNum(o.engFee)}</strong></span>
-                              <span>🛰️️ حصة الجهاز: <strong class="text-purple-600">{parseNum(o.deviceFee)}</strong></span>
+                              <span>🛰 حصة الجهاز: <strong class="text-purple-600">{parseNum(o.deviceFee)}</strong></span>
                             </div>
                           </div>
 
@@ -745,7 +745,7 @@
                               </button>
                               {isAdmin && (
                                 <button onClick={()=>deleteItem('operations', o.id, operations, setOperations, 'طلعة')} class="bg-rose-50 dark:bg-slate-700 text-rose-600 p-2 rounded-xl hover:bg-rose-100" title="حذف">
-                                  🗑️
+                                  🗑️️
                                 </button>
                               )}
                             </div>
@@ -756,11 +756,9 @@
                 </div>
               )}
 
-              {/* 4. تبويب الخزينة (مع إضافة نموذج تسجيل الوارد والصادر) */}
+              {/* 4. تبويب الخزينة */}
               {activeTab === 'vault' && (
                 <div class="space-y-4 font-bold">
-                  
-                  {/* كروت الملخص المالي للخزينة */}
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-3">
                     <div class="flex items-center gap-2">
                       <label>تصفية شهر:</label>
@@ -786,7 +784,6 @@
                     </div>
                   </div>
 
-                  {/* نموذج تسجيل حركة وارد وصادر مباشرة بالخزينة */}
                   <form onSubmit={handleAddTransaction} class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-3">
                     <h3 class="text-xs font-black text-indigo-700 dark:text-indigo-400">💵 تسجيل حركة بالخزينة (وارد / صادر):</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
@@ -819,7 +816,6 @@
                     </button>
                   </form>
 
-                  {/* جدول حركات الخزينة */}
                   <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto">
                     <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">التاريخ</th><th class="p-2">النوع والبند</th><th class="p-2">الملاحظات</th><th class="p-2 text-center">المبلغ</th>{isAdmin && <th class="p-2 text-center">إجراء</th>}</tr></thead>
                     <tbody>
@@ -927,7 +923,7 @@
                 </div>
               )}
 
-              {/* 9. المستخلصات (مع لوجو الشركة وعزل الطباعة) */}
+              {/* 9. المستخلصات */}
               {activeTab === 'extracts' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs print-hidden flex flex-col sm:flex-row gap-3 items-center">
@@ -955,7 +951,6 @@
 
                   {extractClient ? (
                     <div>
-                      {/* ورقة المستخلص الحصرية مع اللوجو */}
                       <div id="printable-area" class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm print-area text-slate-800 space-y-5">
                         <div class="flex justify-between items-start border-b border-slate-200 pb-4">
                           <div>
@@ -1094,7 +1089,7 @@
                 </div>
               )}
 
-              {/* 10. كشف الحساب التفصيلي المخصص للشركاء (مع اللوجو وتفصيل كل مليم) */}
+              {/* 10. كشف الحساب التفصيلي المخصص للشركاء */}
               {activeTab === 'statement' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-3 items-center print-hidden">
@@ -1229,6 +1224,15 @@
                     }; r.readAsDataURL(f);
                   }} class="w-full p-2 border rounded-xl dark:bg-slate-700"/>
                   {settings.logo && <img src={settings.logo} class="h-16 object-contain mt-2 border p-2 rounded-xl" />}
+
+                  {/* اختصار خاص بمدير النظام لفتح سجل الدخول فوراً */}
+                  {isSuperAdmin && (
+                    <div class="pt-3 border-t dark:border-slate-700">
+                      <button onClick={()=>setActiveTab('logs')} class="w-full bg-amber-600 hover:bg-amber-700 text-white p-2.5 rounded-xl text-xs font-black shadow-xs">
+                        🛡️ فتح سجل النشاطات والمراقبة
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
