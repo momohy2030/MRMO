@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة المعاملات الإنشائية - MOMOHY ERP</title>
   
-  <!-- وسوم التثبيت الرسمية -->
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#0f172a">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -70,7 +69,6 @@
       .print-break-inside { page-break-inside: avoid; }
     }
 
-    /* قواعد عزل التنسيق وضمان سلامة النصوص والأرقام عند تصدير الـ PDF */
     .pdf-render-mode {
       background: #ffffff !important;
       color: #0f172a !important;
@@ -109,6 +107,14 @@
     }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   </style>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
 </head>
 <body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200">
   <div id="root"></div>
@@ -132,8 +138,6 @@
     const PROJECT_MANAGER_EMAIL = "alaayousef1698@gmail.com";
     const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL, PROJECT_MANAGER_EMAIL, "+201000000000", "+201095545982"];
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
-    
-    // الحساب المحظور صراحة من قطاع الإنشاءات
     const BLOCKED_CONSTRUCTION_EMAILS = ["ahmnab23@gmail.com"];
 
     let db = null;
@@ -176,6 +180,8 @@
       const n = parseFloat(clean);
       return isNaN(n) ? 0 : n;
     };
+
+    const ensureArr = (data) => Array.isArray(data) ? data : (data ? Object.values(data) : []);
 
     const constructionStorage = {
       get(key, fallback = []) {
@@ -286,7 +292,7 @@
           if (chart1Instance.current) chart1Instance.current.destroy();
           if (chart2Instance.current) chart2Instance.current.destroy();
         };
-      }, [allWork, allExp, allPay, projExpLabels.join(','), projExpData.join(',')]);
+      }, [allWork, allExp, allPay, projExpLabels.length, projExpData.length]);
 
       return (
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
@@ -305,20 +311,9 @@
     function App() {
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
-      const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+      const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
       const [isOnline, setIsOnline] = useState(navigator.onLine);
       const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
-
-      const [loginMethod, setLoginMethod] = useState("choose");
-      const [phoneNumber, setPhoneNumber] = useState("");
-      const [otpCode, setOtpCode] = useState("");
-      const [verificationId, setVerificationId] = useState(null);
-      const [loginError, setLoginError] = useState("");
-
-      const [loading, setLoading] = useState(false);
-
-      // حارس الأمان لمنع الشاشة البيضاء (يُجبر البيانات أن تكون مصفوفة)
-      const ensureArr = (data) => Array.isArray(data) ? data : (data ? Object.values(data) : []);
 
       const [projects, setProjects] = useState(() => ensureArr(constructionStorage.get('projects', initialProjects)));
       const [expenses, setExpenses] = useState(() => ensureArr(constructionStorage.get('expenses', [])));
@@ -339,9 +334,11 @@
           logo: saved.logo || ""
         };
       });
+
+      const [userRolesMap, setUserRolesMap] = useState(() => constructionStorage.get('roles', {}));
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
       const [activeTab, setActiveTab] = useState("dashboard");
-      const [myEmpName, setMyEmpName] = useState(localStorage.getItem('myEmpName') || "");
+      const [myEmpName, setMyEmpName] = useState(() => localStorage.getItem('myEmpName') || "");
       const [suppScope, setSuppScope] = useState("project");
       
       const [toast, setToast] = useState({ show: false, message: "", type: "success" });
@@ -441,28 +438,27 @@
         const handleValue = (snapshot) => {
           try {
             const data = snapshot.val() || {};
-            const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
             
-            const loadedProjects = toArr(data.projects);
+            const loadedProjects = ensureArr(data.projects);
             const finalProjects = loadedProjects.length > 0 ? loadedProjects : initialProjects;
             setProjects(finalProjects);
             constructionStorage.set('projects', finalProjects);
 
-            if (data.expenses) { const l = toArr(data.expenses).reverse(); setExpenses(l); constructionStorage.set('expenses', l); }
-            if (data.extracts) { const l = toArr(data.extracts).reverse(); setExtracts(l); constructionStorage.set('extracts', l); }
-            if (data.payments) { const l = toArr(data.payments).reverse(); setPayments(l); constructionStorage.set('payments', l); }
-            if (data.advances) { const l = toArr(data.advances).reverse(); setAdvances(l); constructionStorage.set('advances', l); }
-            if (data.supplier_payments) { const l = toArr(data.supplier_payments).reverse(); setSupplierPayments(l); constructionStorage.set('supplier_payments', l); }
-            if (data.login_logs) { const l = toArr(data.login_logs).reverse(); setLoginLogs(l); constructionStorage.set('login_logs', l); }
+            if (data.expenses) { const l = ensureArr(data.expenses).reverse(); setExpenses(l); constructionStorage.set('expenses', l); }
+            if (data.extracts) { const l = ensureArr(data.extracts).reverse(); setExtracts(l); constructionStorage.set('extracts', l); }
+            if (data.payments) { const l = ensureArr(data.payments).reverse(); setPayments(l); constructionStorage.set('payments', l); }
+            if (data.advances) { const l = ensureArr(data.advances).reverse(); setAdvances(l); constructionStorage.set('advances', l); }
+            if (data.supplier_payments) { const l = ensureArr(data.supplier_payments).reverse(); setSupplierPayments(l); constructionStorage.set('supplier_payments', l); }
+            if (data.login_logs) { const l = ensureArr(data.login_logs).reverse(); setLoginLogs(l); constructionStorage.set('login_logs', l); }
             if (data.roles) { setUserRolesMap(data.roles); constructionStorage.set('roles', data.roles); }
 
             const savedSettings = data.settings || {};
             const finalSettings = {
-              mainCategories: toArr(savedSettings.mainCategories).length ? toArr(savedSettings.mainCategories) : initialSettings.mainCategories,
-              subCategories: toArr(savedSettings.subCategories).length ? toArr(savedSettings.subCategories) : initialSettings.subCategories,
-              costTypes: toArr(savedSettings.costTypes).length ? toArr(savedSettings.costTypes) : initialSettings.costTypes,
-              suppliers: toArr(savedSettings.suppliers).length ? toArr(savedSettings.suppliers) : initialSettings.suppliers,
-              employees: toArr(savedSettings.employees).length ? toArr(savedSettings.employees) : initialSettings.employees,
+              mainCategories: ensureArr(savedSettings.mainCategories).length ? ensureArr(savedSettings.mainCategories) : initialSettings.mainCategories,
+              subCategories: ensureArr(savedSettings.subCategories).length ? ensureArr(savedSettings.subCategories) : initialSettings.subCategories,
+              costTypes: ensureArr(savedSettings.costTypes).length ? ensureArr(savedSettings.costTypes) : initialSettings.costTypes,
+              suppliers: ensureArr(savedSettings.suppliers).length ? ensureArr(savedSettings.suppliers) : initialSettings.suppliers,
+              employees: ensureArr(savedSettings.employees).length ? ensureArr(savedSettings.employees) : initialSettings.employees,
               logo: savedSettings.logo || ""
             };
             setSettings(finalSettings);
@@ -472,7 +468,7 @@
               if (prev && finalProjects.some(p => cleanId(p.id) === cleanId(prev))) return prev;
               return finalProjects[0]?.id || "cons-01";
             });
-          } catch (err) { console.error(err); } finally { setLoading(false); }
+          } catch (err) { console.error(err); }
         };
         rootRef.on('value', handleValue);
         return () => { rootRef.off('value', handleValue); };
@@ -487,7 +483,6 @@
       const currentUserEmail = (user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
-      // تعريف الصلاحيات المحدثة
       const isSuperAdmin = currentUserEmail === SUPER_ADMIN_EMAIL.toLowerCase() || currentUserEmail.includes("mohamedmohy676676");
       const isProjectManager = currentUserEmail === PROJECT_MANAGER_EMAIL.toLowerCase() || currentUserEmail.includes("alaayousef1698");
 
@@ -507,7 +502,7 @@
       const userRoleTitle = useMemo(() => {
         if (isSuperAdmin) return "مدير النظام (Admin)";
         if (isProjectManager) return "مدير مشاريع (PM)";
-        if (isAdmin) return "مدير (Admin)";
+        if (isAdmin) return "إدارة (Admin)";
         if (isAccountant) return "المحاسب (Accountant)";
         return "مهندس الموقع (Site Engineer)";
       }, [isSuperAdmin, isProjectManager, isAdmin, isAccountant]);
@@ -563,15 +558,11 @@
       };
 
       const handleGoogleLogin = () => { 
-        setLoginError(""); 
-        const provider = new firebase.auth.GoogleAuthProvider(); 
-        auth.signInWithPopup(provider).catch((error) => { setLoginError("تعذر الدخول: " + error.message); }); 
+        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch((error) => { showToast("تعذر الدخول: " + error.message, "error"); }); 
       };
 
       const handleLogout = () => { 
         auth.signOut(); 
-        setLoginMethod("choose"); 
-        setVerificationId(null); 
         setDrawerOpen(false); 
       };
 
@@ -699,10 +690,38 @@
         showToast(`تم تعيين صلاحية (${newRoleInput.role}) بنجاح! 🛡️`);
       };
 
-      if (loading) {
+      if (authLoading) {
         return (
           <div class="min-h-screen flex items-center justify-center bg-slate-950 text-white font-bold text-sm">
-            جاري مزامنة النظام... ⏳
+            جاري تأمين الاتصال... 🔒
+          </div>
+        );
+      }
+
+      if (!user) {
+        return (
+          <div class="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+            <div class="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center border border-slate-200 dark:border-slate-800">
+              <div class="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🏗️</div>
+              <h2 class="text-xl font-black text-slate-900 dark:text-white">MOMOHY ERP</h2>
+              <p class="text-slate-500 dark:text-slate-400 text-xs mt-1 mb-6 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
+              
+              {accessDeniedMessage ? (
+                <div class="space-y-3">
+                  <div class="bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 p-3 rounded-2xl text-xs font-bold leading-relaxed">
+                    ⚠️ {accessDeniedMessage}
+                  </div>
+                  <a href="/survey.html" class="w-full inline-block bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl text-xs shadow-md transition">
+                    📐 الانتقال إلى قطاع المساحة
+                  </a>
+                </div>
+              ) : (
+                <button onClick={handleGoogleLogin} class="w-full flex items-center justify-center gap-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 font-bold py-3.5 rounded-2xl shadow-sm text-xs transition">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                  تسجيل الدخول عبر Google
+                </button>
+              )}
+            </div>
           </div>
         );
       }
@@ -780,7 +799,8 @@
         return { received: empAdv, spent: empExp, balance: empAdv - empExp };
       };
 
-      // التبويبات المتاحة (سجل الدخول محجوب عن مدير المشاريع، ومتاح فقط للمدير العام)
+      const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
+
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "الرئيسية", icon: "📊" }] : [{ id: "my_custody", label: "عهدتي", icon: "💼" }]),
         { id: "projects", label: "المشاريع", icon: "📁" },
@@ -794,42 +814,6 @@
         ...(isAdmin && isSuperAdmin ? [{ id: "audit_log", label: "الدخول", icon: "🛡️" }] : []),
         ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
       ];
-
-      if (authLoading) {
-        return (
-          <div class="min-h-screen flex items-center justify-center bg-slate-950 text-white font-bold text-sm">
-            جاري تأمين الاتصال... 🔒
-          </div>
-        );
-      }
-
-      if (!user) {
-        return (
-          <div class="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-            <div class="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center border border-slate-200 dark:border-slate-800">
-              <div class="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🏗️</div>
-              <h2 class="text-xl font-black text-slate-900 dark:text-white">MOMOHY ERP</h2>
-              <p class="text-slate-500 dark:text-slate-400 text-xs mt-1 mb-6 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
-              
-              {accessDeniedMessage ? (
-                <div class="space-y-3">
-                  <div class="bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 p-3 rounded-2xl text-xs font-bold leading-relaxed">
-                    ⚠️ {accessDeniedMessage}
-                  </div>
-                  <a href="/survey.html" class="w-full inline-block bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl text-xs shadow-md transition">
-                    📐 الانتقال إلى قطاع المساحة
-                  </a>
-                </div>
-              ) : (
-                <button onClick={handleGoogleLogin} class="w-full flex items-center justify-center gap-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 font-bold py-3.5 rounded-2xl shadow-sm text-xs transition">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                  تسجيل الدخول عبر Google
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      }
 
       return (
         <div class="min-h-screen pb-20 md:pb-10">
@@ -948,7 +932,6 @@
           </div>
 
           <main class="max-w-7xl mx-auto px-4 mt-3.5">
-            {/* 1. الرئيسية / لوحة التحكم */}
             {activeTab === "dashboard" && isAdmin && (
               <div class="space-y-4">
                 {projBudget > 0 && (
@@ -1014,7 +997,6 @@
               </div>
             )}
 
-            {/* 2. لوحة عهدتي (للمهندسين والموظفين) */}
             {activeTab === "my_custody" && !isAdmin && (
               <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 text-xs">
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -1058,7 +1040,6 @@
               </div>
             )}
 
-            {/* 3. المشاريع */}
             {activeTab === "projects" && (
               <div class="space-y-3.5">
                 {(isAdmin || isAccountant) && (
@@ -1123,7 +1104,6 @@
               </div>
             )}
 
-            {/* 4. إدخال فاتورة ومصروف جديد */}
             {activeTab === "add_data" && (
               <div class="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
                 <h3 class="font-black text-sm text-slate-900 dark:text-white mb-4 pb-2 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-2">
@@ -1250,7 +1230,6 @@
               </div>
             )}
 
-            {/* 5. سجل المصاريف */}
             {activeTab === "expenses" && (
               <div class="space-y-3">
                 <div class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row gap-2.5 text-xs">
@@ -1333,7 +1312,6 @@
               </div>
             )}
 
-            {/* 6. سجل العهد */}
             {activeTab === "advances" && (
               <div class="space-y-4">
                 <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
@@ -1393,7 +1371,6 @@
               </div>
             )}
 
-            {/* 7. الدفعات والتحصيلات */}
             {activeTab === "payments" && (isAdmin || isAccountant) && (
               <div class="space-y-4">
                 <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
@@ -1449,7 +1426,6 @@
               </div>
             )}
 
-            {/* 8. حساب الموردين */}
             {activeTab === "suppliers" && (isAdmin || isAccountant) && (
               <div class="space-y-4">
                 <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
@@ -1516,7 +1492,6 @@
               </div>
             )}
 
-            {/* 9. كشف الحساب المتكامل */}
             {activeTab === "statement" && isAdmin && (
               <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs space-y-4">
                 <div class="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 print-hidden">
@@ -1581,7 +1556,6 @@
               </div>
             )}
 
-            {/* 10. المستخلصات المعتمدة */}
             {activeTab === "extracts" && (isAdmin || isAccountant) && (
               <div class="space-y-4">
                 <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs print-hidden">
@@ -1701,7 +1675,6 @@
               </div>
             )}
 
-            {/* 11. سجل الدخول للمراقبة */}
             {activeTab === "audit_log" && isAdmin && isSuperAdmin && (
               <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs space-y-3">
                 <h3 class="font-black text-sm text-slate-900 dark:text-white">🛡 سجل الدخول والنشاط</h3>
@@ -1721,7 +1694,6 @@
               </div>
             )}
 
-            {/* 12. الإعدادات والنسخ الاحتياطي */}
             {activeTab === "settings" && isAdmin && (
               <div class="space-y-4 text-xs font-bold">
                 <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
@@ -1752,7 +1724,6 @@
             )}
           </main>
 
-          {/* نافذة كشف حساب المورد */}
           {selectedSupplierDetail && (
             <div class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
               <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 w-full max-w-2xl shadow-2xl border dark:border-slate-800 text-xs max-h-[85vh] flex flex-col justify-between">
@@ -1777,7 +1748,6 @@
             </div>
           )}
 
-          {/* نافذة التعديل المنبثقة الموحدة */}
           {editItemData && canEditOrDelete && (
             <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
               <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 text-xs">
@@ -1812,7 +1782,6 @@
             </div>
           )}
 
-          {/* شريط التنقل السفلي للهواتف الذكية */}
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-lg z-40 px-2 py-1 flex justify-around items-center">
             {navTabs.slice(0, 4).map(tab => (
               <button 
@@ -1835,7 +1804,6 @@
             </button>
           </nav>
 
-          {/* التنبيهات المنبثقة */}
           {toast.show && (
             <div class="fixed bottom-16 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
               <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
@@ -1845,7 +1813,6 @@
             </div>
           )}
 
-          {/* معاينة صورة الفاتورة */}
           {activeInvoiceModal && (
             <div class="fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
               <div class="bg-white dark:bg-slate-900 p-4 rounded-3xl max-w-md w-full flex flex-col items-center shadow-2xl">
