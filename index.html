@@ -5,37 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة المعاملات الإنشائية - MOMOHY ERP</title>
 
-  <!-- Service Worker المدمج لتخزين كافة ملفات الـ CDN محلياً والفتح بدون إنترنت -->
+  <!-- تسجيل Service Worker عبر ملف sw.js الخارجي لضمان الفتح بدون إنترنت والتخلص من رسالة You're offline -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        const swCode = `
-          const CACHE_NAME = 'momohy-construction-v2';
-          self.addEventListener('install', (e) => {
-            self.skipWaiting();
-          });
-          self.addEventListener('activate', (e) => {
-            e.waitUntil(clients.claim());
-          });
-          self.addEventListener('fetch', (e) => {
-            if (e.request.method !== 'GET') return;
-            e.respondWith(
-              caches.match(e.request).then((cachedResponse) => {
-                if (cachedResponse) return cachedResponse;
-                return fetch(e.request).then((networkResponse) => {
-                  if (networkResponse && networkResponse.status === 200) {
-                    const responseClone = networkResponse.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
-                  }
-                  return networkResponse;
-                }).catch(() => caches.match(e.request));
-              })
-            );
-          });
-        `;
-        const blob = new Blob([swCode], { type: 'application/javascript' });
-        const swUrl = URL.createObjectURL(blob);
-        navigator.serviceWorker.register(swUrl).catch((err) => console.log('SW init:', err));
+        navigator.serviceWorker.register('./sw.js')
+          .then(() => console.log('تم تفعيل التخزين بدون إنترنت بنجاح (sw.js)'))
+          .catch((err) => console.log('خطأ في تسجيل sw.js:', err));
       });
     }
   </script>
@@ -105,7 +81,7 @@
     const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL, "+201000000000", "+201095545982"];
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
     
-    // الحساب المحظور صراحة من قطاع الإنشاءات
+    // حساب محظور صراحة من قطاع الإنشاءات
     const BLOCKED_CONSTRUCTION_EMAILS = ["ahmnab23@gmail.com"];
 
     let db = null;
@@ -280,7 +256,7 @@
 
       const [loading, setLoading] = useState(false);
 
-      // تحميل فوري من الذاكرة المحلية حتى يفتح بدون إنترنت
+      // استرجاع فوري من الذاكرة المحلية حتى يفتح بدون إنترنت
       const [projects, setProjects] = useState(() => constructionStorage.get('projects', initialProjects));
       const [expenses, setExpenses] = useState(() => constructionStorage.get('expenses', []));
       const [extracts, setExtracts] = useState(() => constructionStorage.get('extracts', []));
@@ -367,7 +343,7 @@
       useEffect(() => {
         const savedEmail = localStorage.getItem('last_const_user_email');
         
-        // إذا كان الجهاز بدون نت وتوجد جلسة سابقة مسجلة، ادخل فوراً وتخطّ الشاشة البيضاء
+        // إذا كان الجهاز بدون نت وتوجد جلسة سابقة مسجلة، ادخل فوراً
         if (!navigator.onLine && savedEmail) {
           if (BLOCKED_CONSTRUCTION_EMAILS.some(b => savedEmail.includes(b.toLowerCase()))) {
             setAccessDeniedMessage("عفواً، حسابك مصرح له بالدخول لقطاع المساحة فقط وغير مصرح له بدخول قطاع الإنشاءات.");
@@ -1067,7 +1043,7 @@
               </div>
               <div class="flex items-center gap-2">
                 <button onClick={toggleTheme} class="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs border border-slate-700 transition" title="تبديل الوضع الليلي">
-                  {theme === 'dark' ? '☀️️' : '🌙'}
+                  {theme === 'dark' ? '☀️' : '🌙'}
                 </button>
                 <a href="/survey.html" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 shadow-sm transition">
                   📐 <span class="hidden sm:inline">قطاع المساحة</span>
@@ -1321,7 +1297,7 @@
                             <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                               <div class="flex items-center justify-center gap-1.5">
                                 <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏ تعديل</button>
-                                <button onClick={()=>deleteItem('projects', p.id, projects)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️️ حذف</button>
+                                <button onClick={()=>deleteItem('projects', p.id, projects)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑 حذف</button>
                               </div>
                             </td>
                           )}
@@ -1417,7 +1393,7 @@
                                   <td class="p-2.5 text-center whitespace-nowrap bg-emerald-50/90 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                                     <div class="flex items-center justify-center gap-1.5">
                                       <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1 rounded-lg font-bold text-[10px] shadow-xs">✏ تعديل</button>
-                                      {isAdmin && <button onClick={() => deleteItem('advances', a.id, advances)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️️ حذف</button>}
+                                      {isAdmin && <button onClick={() => deleteItem('advances', a.id, advances)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑 حذف</button>}
                                     </div>
                                   </td>
                                 )}
@@ -1603,7 +1579,7 @@
                           <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                             <div class="flex items-center justify-center gap-1.5">
                               <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏ تعديل</button>
-                              <button onClick={()=>deleteItem('payments', p.id, payments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
+                              <button onClick={()=>deleteItem('payments', p.id, payments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑 حذف</button>
                             </div>
                           </td>
                         )}
@@ -1701,8 +1677,8 @@
                             {canEditOrDelete && (
                               <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                                 <div class="flex items-center justify-center gap-1.5">
-                                  <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold shadow-xs">✏️ تعديل</button>
-                                  {isAdmin && <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold">🗑️ حذف</button>}
+                                  <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold shadow-xs">✏ تعديل</button>
+                                  {isAdmin && <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold">🗑 حذف</button>}
                                 </div>
                               </td>
                             )}
@@ -1833,8 +1809,8 @@
                             {isAdmin && (
                               <td class="p-2 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                                 <div class="flex items-center justify-center gap-1.5">
-                                  <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
-                                  <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
+                                  <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏ تعديل</button>
+                                  <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑 حذف</button>
                                 </div>
                               </td>
                             )}
@@ -2002,7 +1978,7 @@
                       }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold shadow text-xs flex items-center gap-1.5 transition">
                         📲 إرسال المستخلص PDF + واتساب للأدمن
                       </button>
-                      <button onClick={() => window.print()} class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-bold shadow text-xs flex items-center gap-1.5 transition">
+                      <button onClick={() => window.print()} class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-bold shadow text-xs transition">
                         🖨️ طباعة
                       </button>
                     </div>
@@ -2065,8 +2041,8 @@
                               {isAdmin && (
                                 <td class="p-2 border border-slate-300 text-center whitespace-nowrap bg-slate-50 print-hidden sticky left-0 z-10 shadow-xs">
                                   <div class="flex items-center justify-center gap-1.5">
-                                    <button onClick={() => setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
-                                    <button onClick={() => deleteItem('extracts', ex.id, extracts)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
+                                    <button onClick={() => setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-1 rounded-lg font-bold text-[10px]">✏ تعديل</button>
+                                    <button onClick={() => deleteItem('extracts', ex.id, extracts)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑 حذف</button>
                                   </div>
                                 </td>
                               )}
@@ -2318,7 +2294,7 @@
                                 <td class="p-2 border text-center whitespace-nowrap bg-slate-50 print-hidden">
                                   <div class="flex items-center justify-center gap-1.5">
                                     <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏ تعديل</button>
-                                    <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-0.5 rounded font-bold text-[10px]">🗑️ حذف</button>
+                                    <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded font-bold text-[10px]">🗑 حذف</button>
                                   </div>
                                 </td>
                               )}
@@ -2347,13 +2323,13 @@
                             <tr key={p.id} class="border-b hover:bg-slate-50">
                               <td class="p-2 border">{p.date}</td>
                               <td class="p-2 border font-bold text-blue-700">{p.projectId}</td>
-                              <td class="p-2 border text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
+                              <td class="p-2 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
                               <td class="p-2 border">{p.notes || '-'}</td>
                               {canEditOrDelete && (
                                 <td class="p-2 border text-center whitespace-nowrap bg-slate-50 print-hidden">
                                   <div class="flex items-center justify-center gap-1.5">
-                                    <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
-                                    <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
+                                    <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏ تعديل</button>
+                                    <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑 حذف</button>
                                   </div>
                                 </td>
                               )}
@@ -2372,7 +2348,7 @@
                     const totalPurch = suppInvoices.reduce((s, e) => s + parseNum(e.amount), 0);
                     const totalPaid = suppPays.reduce((s, p) => s + parseNum(p.amount), 0);
                     const bal = totalPaid - totalPurch;
-                    const suppStatementMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📑 *كشف حساب مورد:* ${selectedSupplierDetail}\n----------------------------------\n📦 *إجمالي المسحوبات والفواتير:* ${totalPurch.toLocaleString()} ج.م\n💵 *إجمالي الدفعات المسددة:* ${totalPaid.toLocaleString()} ج.م\n⚖️ *الرصيد الصافي:* ${Math.abs(bal).toLocaleString()} ج.م (${bal >= 0 ? 'رصيد دائن للمورد' : 'مستحق للمورد'})\n----------------------------------\n🗓️ *تاريخ الإشعار:* ${todayDate}`;
+                    const suppStatementMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📑 *كشف حساب مورد:* ${selectedSupplierDetail}\n----------------------------------\n📦 *إجمالي المسحوبات والفواتير:* ${totalPurch.toLocaleString()} ج.م\n💵 *إجمالي الدفعات المسددة:* ${totalPaid.toLocaleString()} ج.م\n⚖️ *الرصيد الصافي:* ${Math.abs(bal).toLocaleString()} ج.م (${bal >= 0 ? 'رصيد دائن للمورد' : 'مستحق للمورد'})\n----------------------------------\n🗓 *تاريخ الإشعار:* ${todayDate}`;
                     generatePdfAndOpenWhatsApp('supplier-statement-pdf-target', `كشف_مورد_${selectedSupplierDetail}.pdf`, suppStatementMsg);
                   }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 transition">
                     📲 إرسال كشف الحساب PDF للأدمن
@@ -2389,7 +2365,7 @@
               <div class="bg-white dark:bg-slate-800 rounded-3xl p-5 w-full max-w-lg shadow-2xl border dark:border-slate-700 text-xs max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
                   <h3 class="font-bold text-sm text-slate-800 dark:text-white">
-                    ✏️ تعديل {
+                    ✏ تعديل {
                       editItemData.type === 'expense' ? 'فاتورة مصروف' : 
                       editItemData.type === 'advance' ? 'سلفة / عهدة' : 
                       editItemData.type === 'extract' ? 'مستخلص أعمال' : 
