@@ -226,7 +226,7 @@
       
       const [settings, setSettings] = useState({
         engineers: ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"],
-        opTypes: ["يوم RTK", "نصف يوم RTK", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"],
+        opTypes: ["يوم RTK", "1/2RTK (نصف يوم)", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"],
         logo: "",
         theme: localStorage.getItem('theme') || 'light'
       });
@@ -238,11 +238,12 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
+      // نماذج الإدخال
       const [newOp, setNewOp] = useState({
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
         isFaddan: false, faddanQty: 1, faddanPrice: 250,
         isSketch: false, sketchesCount: 1,
-        agreedAmount: 3500, paidNow: 0, laborCost: 0, carCost: 0
+        agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0
       });
 
       const [newTx, setNewTx] = useState({
@@ -251,12 +252,14 @@
 
       const [newPayment, setNewPayment] = useState({ date: todayDate, clientName: "", siteLocation: "", amount: "", notes: "سداد دفعة من المستخلص" });
 
+      // المستخلص
       const [extractClient, setExtractClient] = useState("");
       const [extractSite, setExtractSite] = useState("");
       const [extractNumber, setExtractNumber] = useState("1");
       const [extractEngineer, setExtractEngineer] = useState("م أحمد نبيل");
       const [extractItems, setExtractItems] = useState([]);
 
+      // كشف الحساب
       const [statementClient, setStatementClient] = useState("");
 
       useEffect(() => {
@@ -282,7 +285,7 @@
         db.ref('survey_data/login_logs').push(entry);
       };
 
-      // التحقق الصارم والمرن من الحساب وتفعيل مدير النظام
+      // التحقق الصارم والمرن من حساب مدير النظام
       useEffect(() => {
         if (!auth) { setAuthLoading(false); return; }
         return auth.onAuthStateChanged((curr) => {
@@ -290,7 +293,9 @@
             const cleanEmail = (curr.email || "").trim().toLowerCase();
             setUser(curr);
 
-            const isSuper = cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase() || cleanEmail.includes("mohamedmo686686");
+            const isSuper = cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase() || 
+                            cleanEmail.includes("mohamedmo686686") || 
+                            cleanEmail.includes("686686");
             setIsSuperAdmin(isSuper);
             setIsAdmin(isSuper || ADMIN_EMAILS.some(e => cleanEmail.includes(e.toLowerCase())));
 
@@ -343,25 +348,33 @@
         }
       };
 
+      // حساب التوزيع المالي الدقيق بنصف يوم RTK واليوم الكامل والكروكي
       const calculateOperationShares = (op) => {
         const total = parseNum(op.agreedAmount);
         const labor = parseNum(op.laborCost);
         const car = parseNum(op.carCost);
+        const type = String(op.opType || '');
         let engFee = 0, deviceFee = 0, officeFee = 0;
 
-        if (op.opType === 'يوم RTK') {
-          engFee = 2000;
-          deviceFee = 3500;
-          officeFee = Math.max(0, total - engFee - deviceFee - labor - car);
-        } else if (op.opType === 'نصف يوم RTK') {
+        // فحص نصف يوم RTK بدقة
+        if (type.includes('1/2') || type.includes('نص') || type.includes('نصف')) {
           engFee = 1500;
           deviceFee = 1750;
           officeFee = Math.max(0, total - engFee - deviceFee - labor - car);
-        } else if (op.opType === 'قياس وكروكي') {
-          engFee = total * 0.80;
-          officeFee = total * 0.20;
+        } 
+        // فحص يوم كامل RTK
+        else if (type.includes('RTK') || type.includes('يوم RTK')) {
+          engFee = 2000;
+          deviceFee = 3500;
+          officeFee = Math.max(0, total - engFee - deviceFee - labor - car);
+        } 
+        // فحص قياس وكروكي
+        else if (type.includes('كروكي') || type.includes('قياس')) {
+          engFee = total * 0.80; // 80% للمهندس
+          officeFee = total * 0.20; // 20% للمكتب
           deviceFee = 0;
-        } else {
+        } 
+        else {
           engFee = 2000;
           deviceFee = 0;
           officeFee = Math.max(0, total - engFee - deviceFee - labor - car);
@@ -544,6 +557,11 @@
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ];
 
+      // حساب تفصيلي استباقي لعرضه في شاشة إضافة طلعة
+      const livePreview = useMemo(() => {
+        return calculateOperationShares(newOp);
+      }, [newOp.opType, newOp.agreedAmount, newOp.laborCost, newOp.carCost]);
+
       if (authLoading) return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">جاري التهيئة...</div>;
 
       if (!user) {
@@ -561,20 +579,26 @@
       return (
         <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
           
-          {/* Header */}
+          {/* Header العلوي المحدث مع إظهار حساب مدير النظام بصورة واضحة */}
           <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div class="flex items-center gap-2">
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
               <div>
-                <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-2">
                   <h1 class="text-sm font-black leading-tight text-indigo-700 dark:text-indigo-400">مساحة ERP</h1>
-                  {isSuperAdmin && (
-                    <span class="bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300">
+                  {isSuperAdmin ? (
+                    <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
                       👑 مدير النظام
+                    </span>
+                  ) : (
+                    <span class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      مستخدم
                     </span>
                   )}
                 </div>
-                <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[130px] sm:max-w-none">{navTabs.find(t=>t.id===activeTab)?.label}</p>
+                <div class="text-[10px] text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none">
+                  {user.email}
+                </div>
               </div>
             </div>
 
@@ -700,7 +724,7 @@
                       />
                     </div>
                     <button 
-                      onClick={()=>{ setEditingOp(null); setNewOp({ date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل", isFaddan: false, faddanQty: 1, faddanPrice: 250, isSketch: false, sketchesCount: 1, agreedAmount: 3500, paidNow: 0, laborCost: 0, carCost: 0 }); setOpModalOpen(true); }}
+                      onClick={()=>{ setEditingOp(null); setNewOp({ date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل", isFaddan: false, faddanQty: 1, faddanPrice: 250, isSketch: false, sketchesCount: 1, agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0 }); setOpModalOpen(true); }}
                       class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 shadow-sm text-xs"
                     >
                       ➕ تسجيل طلعة جديدة
@@ -729,8 +753,8 @@
                             <div class="grid grid-cols-2 gap-1 text-[10px] pt-1 border-t dark:border-slate-600">
                               <span>🚗 سيارة: <strong>{parseNum(o.carCost)}</strong></span>
                               <span>👷 عمالة: <strong>{parseNum(o.laborCost)}</strong></span>
-                              <span>👷 أتعاب المهندس: <strong class="text-emerald-600">{parseNum(o.engFee)}</strong></span>
-                              <span>🛰 حصة الجهاز: <strong class="text-purple-600">{parseNum(o.deviceFee)}</strong></span>
+                              <span>👷 أتعاب المهندس: <strong class="text-emerald-600">{parseNum(o.engFee)} ج.م</strong></span>
+                              <span>🛰 حصة الجهاز: <strong class="text-purple-600">{parseNum(o.deviceFee)} ج.م</strong></span>
                             </div>
                           </div>
 
@@ -745,7 +769,7 @@
                               </button>
                               {isAdmin && (
                                 <button onClick={()=>deleteItem('operations', o.id, operations, setOperations, 'طلعة')} class="bg-rose-50 dark:bg-slate-700 text-rose-600 p-2 rounded-xl hover:bg-rose-100" title="حذف">
-                                  🗑️️
+                                  🗑
                                 </button>
                               )}
                             </div>
@@ -800,7 +824,7 @@
                       </div>
                       <div>
                         <label class="block text-[11px] mb-1">البند / التصنيف:</label>
-                        <input type="text" value={newTx.category} onChange={e=>setNewTx({...newTx, category: e.target.value})} placeholder="مثال: مصاريف بوفيه، إيراد عام..." class="w-full border p-2 rounded-xl dark:bg-slate-700" required/>
+                        <input type="text" value={newTx.category} onChange={e=>setNewTx({...newTx, category: e.target.value})} placeholder="مصاريف بوفيه، إيراد عام..." class="w-full border p-2 rounded-xl dark:bg-slate-700" required/>
                       </div>
                       <div>
                         <label class="block text-[11px] mb-1">المبلغ (ج.م):</label>
@@ -1195,7 +1219,7 @@
                 </div>
               )}
 
-              {/* 12. سجل الدخول والنشاطات (خاص بمدير النظام mohamedmo686686@gmail.com) */}
+              {/* 12. سجل الدخول والنشاطات المعتمد لمدير النظام */}
               {activeTab === 'logs' && isSuperAdmin && (
                 <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto p-4 space-y-3 font-bold">
                   <h3 class="text-sm font-black text-indigo-700 dark:text-indigo-400">🛡️ سجل نشاطات وحركات المستخدمين (خاص بمدير النظام):</h3>
@@ -1218,14 +1242,13 @@
                     const f = e.target.files[0]; if(!f) return;
                     const r = new FileReader(); r.onload = (evt) => {
                       setSettings(p=>({...p, logo: evt.target.result}));
-                      if(db) db.ref('survey_data/settings/logo').set(evt.target.result);
+                      if(db) db.ref(`survey_data/settings/logo`).set(evt.target.result);
                       logActivity('تحديث شعار المكتب');
                       showToast("تم تحديث الشعار!");
                     }; r.readAsDataURL(f);
                   }} class="w-full p-2 border rounded-xl dark:bg-slate-700"/>
                   {settings.logo && <img src={settings.logo} class="h-16 object-contain mt-2 border p-2 rounded-xl" />}
 
-                  {/* اختصار خاص بمدير النظام لفتح سجل الدخول فوراً */}
                   {isSuperAdmin && (
                     <div class="pt-3 border-t dark:border-slate-700">
                       <button onClick={()=>setActiveTab('logs')} class="w-full bg-amber-600 hover:bg-amber-700 text-white p-2.5 rounded-xl text-xs font-black shadow-xs">
@@ -1239,7 +1262,7 @@
             </main>
           </div>
 
-          {/* النافذة السريعة للطلعة مع التوزيع الآلي */}
+          {/* النافذة السريعة للطلعة مع التوزيع الآلي الصريح لنصف يوم RTK */}
           {opModalOpen && (
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
@@ -1289,16 +1312,20 @@
                   )}
 
                   <div class="grid grid-cols-3 gap-2">
-                    <div>المسدد فورا <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
-                    <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
-                    <div>مصاريف سيارة <input type="number" value={newOp.carCost} onChange={e=>setNewOp({...newOp, carCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
+                    <div>المسدد فورا <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700"/></div>
+                    <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700"/></div>
+                    <div>مصاريف سيارة <input type="number" value={newOp.carCost} onChange={e=>setNewOp({...newOp, carCost: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700"/></div>
                   </div>
 
-                  <div class="p-2 bg-indigo-50 dark:bg-slate-700 rounded-xl text-[11px] text-slate-600 dark:text-slate-300">
-                    💡 <strong>حساب آلي:</strong>
-                    {newOp.opType === 'يوم RTK' && ' المهندس: 2000 ج.م | الجهاز: 3500 ج.م'}
-                    {newOp.opType === 'نصف يوم RTK' && ' المهندس: 1500 ج.م | الجهاز: 1750 ج.م'}
-                    {newOp.opType === 'قياس وكروكي' && ' المهندس: 80% | المكتب: 20%'}
+                  {/* شريط المعاينة المباشر للحسابات للتأكد من الأرقام */}
+                  <div class="p-2.5 bg-emerald-50 dark:bg-slate-700 border border-emerald-200 dark:border-slate-600 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
+                    <div class="flex justify-between">
+                      <span>👷 أتعاب المهندس: <strong>{livePreview.engFee.toLocaleString()} ج.م</strong></span>
+                      <span>🛰 حصة الجهاز: <strong>{livePreview.deviceFee.toLocaleString()} ج.م</strong></span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 dark:text-slate-400">
+                      🏢 صافي أرباح المكتب المتوقعة: <strong>{livePreview.officeFee.toLocaleString()} ج.م</strong>
+                    </div>
                   </div>
 
                   <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">
