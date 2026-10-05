@@ -4,7 +4,42 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة المعاملات الإنشائية - MOMOHY ERP</title>
-  
+
+  <!-- Service Worker المدمج لتخزين كافة ملفات الـ CDN محلياً والفتح بدون إنترنت -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swCode = `
+          const CACHE_NAME = 'momohy-construction-v2';
+          self.addEventListener('install', (e) => {
+            self.skipWaiting();
+          });
+          self.addEventListener('activate', (e) => {
+            e.waitUntil(clients.claim());
+          });
+          self.addEventListener('fetch', (e) => {
+            if (e.request.method !== 'GET') return;
+            e.respondWith(
+              caches.match(e.request).then((cachedResponse) => {
+                if (cachedResponse) return cachedResponse;
+                return fetch(e.request).then((networkResponse) => {
+                  if (networkResponse && networkResponse.status === 200) {
+                    const responseClone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
+                  }
+                  return networkResponse;
+                }).catch(() => caches.match(e.request));
+              })
+            );
+          });
+        `;
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch((err) => console.log('SW init:', err));
+      });
+    }
+  </script>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -114,7 +149,7 @@
       return isNaN(n) ? 0 : n;
     };
 
-    // مدير التخزين المحلي والمزامنة بدون إنترنت لقطاع الإنشاءات
+    // مدير التخزين والمزامنة بدون إنترنت لقطاع الإنشاءات
     const constructionStorage = {
       get(key, fallback = []) {
         try {
@@ -245,7 +280,7 @@
 
       const [loading, setLoading] = useState(false);
 
-      // استرجاع البيانات من التخزين المحلي فوراً لتعمل بدون نت
+      // تحميل فوري من الذاكرة المحلية حتى يفتح بدون إنترنت
       const [projects, setProjects] = useState(() => constructionStorage.get('projects', initialProjects));
       const [expenses, setExpenses] = useState(() => constructionStorage.get('expenses', []));
       const [extracts, setExtracts] = useState(() => constructionStorage.get('extracts', []));
@@ -273,16 +308,16 @@
 
       const todayDate = new Date().toISOString().split('T')[0];
 
-      // مراقبة الاتصال التلقائي والمزامنة
+      // مراقبة حالة الاتصال والمزامنة التلقائية
       useEffect(() => {
         const handleOnline = () => {
           setIsOnline(true);
-          showToast("تم الاتصال بالإنترنت! جاري مزامنة السجلات 🟢");
+          showToast("تم الاتصال بالإنترنت! جاري المزامنة مع السيرفر 🟢");
           if (db) constructionStorage.syncQueue(db);
         };
         const handleOffline = () => {
           setIsOnline(false);
-          showToast("تم الانتقال للعمل بدون إنترنت (حفظ محلي) 📡");
+          showToast("تم الانتقال لوضع العمل بدون إنترنت (حفظ محلي) 📡");
         };
 
         window.addEventListener('online', handleOnline);
@@ -328,13 +363,32 @@
         }
       };
 
-      // التحقق من الحساب مع فحص الحظر الصريح لـ ahmnab23@gmail.com
+      // التحقق من الحساب مع حل مشكلة الفتح بدون إنترنت وفحص الحظر الصريح
       useEffect(() => {
+        const savedEmail = localStorage.getItem('last_const_user_email');
+        
+        // إذا كان الجهاز بدون نت وتوجد جلسة سابقة مسجلة، ادخل فوراً وتخطّ الشاشة البيضاء
+        if (!navigator.onLine && savedEmail) {
+          if (BLOCKED_CONSTRUCTION_EMAILS.some(b => savedEmail.includes(b.toLowerCase()))) {
+            setAccessDeniedMessage("عفواً، حسابك مصرح له بالدخول لقطاع المساحة فقط وغير مصرح له بدخول قطاع الإنشاءات.");
+            setUser(null);
+            setAuthLoading(false);
+            return;
+          }
+          setUser({
+            identifier: savedEmail,
+            name: localStorage.getItem('last_const_user_name') || savedEmail
+          });
+          setAuthLoading(false);
+          return;
+        }
+
         if (!auth) { 
           setAuthLoading(false); 
           return; 
         }
-        return auth.onAuthStateChanged((currentUser) => {
+
+        const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           if (currentUser) {
             const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase().trim();
             
@@ -356,7 +410,6 @@
             localStorage.setItem('last_const_user_email', identifier);
             localStorage.setItem('last_const_user_name', currentUser.displayName || identifier);
           } else {
-            const savedEmail = localStorage.getItem('last_const_user_email');
             if (savedEmail && !navigator.onLine) {
               setUser({ identifier: savedEmail, name: localStorage.getItem('last_const_user_name') || savedEmail });
             } else {
@@ -365,9 +418,11 @@
           }
           setAuthLoading(false);
         });
+
+        return () => unsubscribe();
       }, []);
 
-      // استقبال البيانات وحفظها محلياً
+      // استقبال البيانات وتخزينها محلياً فوراً
       useEffect(() => {
         if (!db) return;
         const rootRef = db.ref('/');
@@ -475,7 +530,7 @@
         return "مهندس الموقع (Site Engineer)";
       }, [isAdmin, isAccountant]);
 
-      // تحويل غير المديرين تلقائياً إذا حاولوا فتح تبويب لوحة التحكم المحجوب
+      // حماية الشاشة من الفراغ إذا كان الحساب ليس أدمناً
       useEffect(() => {
         if (!isAdmin && activeTab === 'dashboard') {
           setActiveTab('projects');
@@ -770,7 +825,7 @@
                   billStatus: r['حالة الفاتورة'] || 'مدفوعة',
                   paymentMethod: r['طريقة الدفع'] || 'كاش',
                   description: r['الوصف'] || r.description || 'مستورد من إكسيل',
-                  createdBy: user.name
+                  createdBy: user?.name || 'مستخدم'
                 }));
                 const updated = [...mapped, ...expenses];
                 setExpenses(updated);
@@ -853,6 +908,7 @@
       });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + parseNum(e?.amount), 0);
 
+      // حماية تحويل الموردين لمنع s.trim() crash
       const allSupplierNames = Array.from(new Set([
         ...(settings?.suppliers || []),
         ...expenses.map(e => e?.supplier).filter(Boolean),
@@ -897,7 +953,7 @@
 
       const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
-      // التبويبات المتاحة (تم حجب الإعدادات وسجل الدخول عن غير الأدمن)
+      // التبويبات المتاحة (محجوب منها الإعدادات وسجل الدخول عن غير الأدمن)
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "لوحة التحكم", icon: "📊" }] : [{ id: "my_custody", label: "لوحة عهدتي", icon: "💼" }]),
         { id: "projects", label: "المشاريع", icon: "📁" },
@@ -983,7 +1039,7 @@
       return (
         <div class="min-h-screen pb-24 md:pb-10">
           
-          {/* شريط حالة الاتصال بالإنترنت */}
+          {/* شريط حالة الاتصال بالإنترنت التفاعلي */}
           {!isOnline && (
             <div class="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
               <span>📡</span>
@@ -1011,7 +1067,7 @@
               </div>
               <div class="flex items-center gap-2">
                 <button onClick={toggleTheme} class="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs border border-slate-700 transition" title="تبديل الوضع الليلي">
-                  {theme === 'dark' ? '☀️' : '🌙'}
+                  {theme === 'dark' ? '☀️️' : '🌙'}
                 </button>
                 <a href="/survey.html" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 shadow-sm transition">
                   📐 <span class="hidden sm:inline">قطاع المساحة</span>
@@ -1265,7 +1321,7 @@
                             <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                               <div class="flex items-center justify-center gap-1.5">
                                 <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏ تعديل</button>
-                                <button onClick={()=>deleteItem('projects', p.id, projects)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
+                                <button onClick={()=>deleteItem('projects', p.id, projects)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️️ حذف</button>
                               </div>
                             </td>
                           )}
@@ -1361,7 +1417,7 @@
                                   <td class="p-2.5 text-center whitespace-nowrap bg-emerald-50/90 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                                     <div class="flex items-center justify-center gap-1.5">
                                       <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1 rounded-lg font-bold text-[10px] shadow-xs">✏ تعديل</button>
-                                      {isAdmin && <button onClick={() => deleteItem('advances', a.id, advances)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>}
+                                      {isAdmin && <button onClick={() => deleteItem('advances', a.id, advances)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️️ حذف</button>}
                                     </div>
                                   </td>
                                 )}
@@ -2069,7 +2125,7 @@
               </div>
             )}
 
-            {/* 11. الإعدادات (خاصة بمدير النظام فقط) */}
+            {/* 11. الإعدادات (مخصصة لمدير النظام فقط) */}
             {activeTab === "settings" && isAdmin && (
               <div class="space-y-4 text-xs font-bold">
                 
@@ -2558,7 +2614,7 @@
             </button>
           </nav>
 
-          {/* نافذة التنبيهات التفاعلية */}
+          {/* نافذة التنبيهات */}
           {toast.show && (
             <div class="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
               <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
