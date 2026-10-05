@@ -1508,7 +1508,7 @@
                     <div>نوع العمل 
                       <div class="flex gap-1 mt-1">
                         <select value={newOp.opType} onChange={e=>handleOpTypeChange(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
-                          {settings.opTypes.map(o=><option key={o}>{o}</option>)}
+                          {(Array.isArray(settings.opTypes) && settings.opTypes.length ? settings.opTypes : ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"]).map(o=><option key={o} value={o}>{o}</option>)}
                         </select>
                         <button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button>
                       </div>
