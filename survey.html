@@ -225,7 +225,14 @@
       
       const [settings, setSettings] = useState({
         engineers: ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"],
-        opTypes: ["يوم RTK", "1/2RTK (نصف يوم)", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"],
+        opTypes: [
+          "يوم RTK", 
+          "1/2RTK (نصف يوم)", 
+          "مهندس يوم + جهاز نصف يوم", 
+          "قياس وكروكي", 
+          "تخطيط شبكة", 
+          "تخطيط جور"
+        ],
         logo: "",
         theme: localStorage.getItem('theme') || 'light'
       });
@@ -243,14 +250,12 @@
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
       const isAdmin = isSuperAdmin || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
 
-      // نموذج الإدخال مع خيارات احتساب أتعاب المهندس المرنة
       const initialOpState = {
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
         isFaddan: false, faddanQty: 1, faddanPrice: 250,
         isSketch: false, sketchesCount: 1,
         agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0,
-        // خيارات احتساب المهندس المرنة:
-        engCalcMethod: "auto", // auto, percent80, percent70, customPercent, customFixed
+        engCalcMethod: "auto", // auto, engDay_devHalf, percent80, percent70, customPercent, customFixed
         engCustomPercent: 80,
         engCustomFixedAmount: 1500
       };
@@ -348,7 +353,7 @@
         }
       };
 
-      // الدالة الشاملة لحساب التوزيعات ونسب الشركاء والمهندس المرنة
+      // حساب التوزيعات مع دعم (مهندس يوم + جهاز نصف يوم)
       const calculateOperationShares = (op) => {
         const total = parseNum(op?.agreedAmount);
         const labor = parseNum(op?.laborCost);
@@ -359,17 +364,24 @@
 
         let engFee = 0, deviceFee = 0, officeFee = 0;
 
-        // 1. تحديد حصة الجهاز (RTK)
-        if (type.includes('1/2') || type.includes('نص') || type.includes('نصف')) {
-          deviceFee = 1750;
-        } else if (type.includes('RTK') || type.includes('يوم RTK')) {
-          deviceFee = 3500;
+        // حالة خاصة: مهندس يوم كامل + جهاز نصف يوم
+        const isEngDayDevHalf = method === 'engDay_devHalf' || type.includes('مهندس يوم + جهاز نصف يوم');
+        const isHalfRtk = !isEngDayDevHalf && (type.includes('1/2') || type.includes('نص') || type.includes('نصف'));
+        const isFullRtk = !isEngDayDevHalf && (type.includes('يوم RTK') || (type.includes('RTK') && !isHalfRtk));
+
+        // 1. تحديد حصة الجهاز
+        if (isEngDayDevHalf || isHalfRtk) {
+          deviceFee = 1750; // نصف يوم RTK
+        } else if (isFullRtk) {
+          deviceFee = 3500; // يوم كامل RTK
         } else {
-          deviceFee = 0;
+          deviceFee = 0;    // أي عمل بدون RTK لا يأخذ الجهاز شيئاً
         }
 
-        // 2. تحديد حصة وأتعاب المهندس حسب الطريقة المختارة
-        if (method === 'percent80') {
+        // 2. تحديد حصة المهندس
+        if (isEngDayDevHalf) {
+          engFee = 2000; // يوم كامل للمهندس
+        } else if (method === 'percent80') {
           engFee = total * 0.80;
         } else if (method === 'percent70') {
           engFee = total * 0.70;
@@ -379,18 +391,18 @@
         } else if (method === 'customFixed') {
           engFee = parseNum(op?.engCustomFixedAmount) || 0;
         } else {
-          // الطريقة التلقائية (Auto)
-          if (type.includes('1/2') || type.includes('نص') || type.includes('نصف')) {
+          // الحساب الآلي الافتراضي
+          if (isHalfRtk) {
             engFee = 1500;
-          } else if (type.includes('RTK') || type.includes('يوم RTK')) {
+          } else if (isFullRtk) {
             engFee = 2000;
           } else {
-            // أي عمل آخر (تخطيط، رفع، كروكي... إلخ) يطبق الافتراضي 80% للمهندس
+            // أي عمل بدون RTK يحسب 80% للمهندس تلقائياً
             engFee = total * 0.80;
           }
         }
 
-        // 3. احتساب صافي أرباح المكتب المتبقية
+        // 3. صافي أرباح المكتب
         officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
 
         return { 
@@ -405,14 +417,16 @@
         let defaultAmount = newOp.agreedAmount;
         let defaultMethod = "auto";
 
-        if (selectedType === 'يوم RTK') {
+        if (selectedType === 'مهندس يوم + جهاز نصف يوم') {
+          defaultAmount = 3750; // 2000 مهندس + 1750 جهاز
+          defaultMethod = "engDay_devHalf";
+        } else if (selectedType === 'يوم RTK') {
           defaultAmount = 5500;
           defaultMethod = "auto";
         } else if (selectedType.includes('1/2') || selectedType.includes('نص')) {
           defaultAmount = 3250;
           defaultMethod = "auto";
         } else {
-          // لأي عمل آخر: تفعيل نسبة 80% مهندس - 20% مكتب افتراضياً
           defaultMethod = "percent80";
         }
         
@@ -609,7 +623,7 @@
         { id: "operations", label: "الأعمال والطلعات", icon: "📐" },
         { id: "vault", label: "الخزينة", icon: "💵" },
         { id: "payments", label: "الدفعات", icon: "💰" },
-        { id: "rtk", label: "جهاز RTK", icon: "🛰️" },
+        { id: "rtk", label: "جهاز RTK", icon: "🛰️️" },
         { id: "expenses", label: "مصاريف التشغيل", icon: "🚗" },
         { id: "engineers", label: "حساب المهندسين", icon: "👷" },
         { id: "extracts", label: "المستخلصات", icon: "📄" },
@@ -834,7 +848,7 @@
                               <span>🚗 سيارة: <strong>{parseNum(o.carCost)}</strong></span>
                               <span>👷 عمالة: <strong>{parseNum(o.laborCost)}</strong></span>
                               <span>👷 أتعاب المهندس: <strong class="text-emerald-600">{parseNum(o.engFee)} ج.م</strong></span>
-                              <span>🛰 حصة الجهاز: <strong class="text-purple-600">{parseNum(o.deviceFee)} ج.م</strong></span>
+                              <span>🛰 حصة الجهاز: <strong class={parseNum(o.deviceFee)>0 ? "text-purple-600" : "text-slate-400"}>{parseNum(o.deviceFee)} ج.م</strong></span>
                             </div>
                           </div>
 
@@ -935,7 +949,7 @@
                   </form>
 
                   <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto">
-                    <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">التاريخ</th><th class="p-2">النوع والبند</th><th class="p-2">الملاحظات</th><th class="p-2 text-center">المبلغ</th>{isAdmin && <th class="p-2 text-center">إجراء</th>}</tr></thead>
+                    <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">التاريخ</th><th class="p-2">النوع والبند</th><th class="p-2.5">الملاحظات</th><th class="p-2 text-center">المبلغ</th>{isAdmin && <th class="p-2 text-center">إجراء</th>}</tr></thead>
                     <tbody>
                       {monthlyTx.map(t=>(
                         <tr key={t.id} class="border-b dark:border-slate-700">
@@ -1189,7 +1203,7 @@
                       {/* أزرار الإجراءات */}
                       <div class="flex flex-col sm:flex-row justify-end gap-2.5 pt-4 print-hidden">
                         <button onClick={()=>window.print()} class="bg-slate-800 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-1.5 transition">
-                          🖨️ طباعة المستخلص
+                          🖨️️ طباعة المستخلص
                         </button>
                         <button onClick={()=>{
                           const summaryMessage = `🏢 *مكتب الاستشارات والأعمال المساحية*\n📄 *مستخلص تصفية أعمال للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️ *التاريخ:* ${todayDate}`;
@@ -1356,7 +1370,7 @@
             </main>
           </div>
 
-          {/* نافذة تسجيل وتعديل الطلعة مع خيارات احتساب المهندس الذكية */}
+          {/* نافذة تسجيل وتعديل الطلعة */}
           {opModalOpen && (
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
@@ -1497,13 +1511,20 @@
                   {/* قسم تحديد طريقة احتساب أتعاب المهندس المرنة */}
                   <div class="p-3 bg-indigo-50 dark:bg-slate-700/60 rounded-2xl border border-indigo-200 dark:border-slate-600 space-y-2">
                     <label class="block text-indigo-900 dark:text-indigo-300 font-black text-[11px]">⚙️ طريقة احتساب أتعاب المهندس في هذه العملية:</label>
-                    <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
                       <button 
                         type="button" 
                         onClick={()=>setNewOp({...newOp, engCalcMethod: 'auto'})}
                         class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'auto' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
                       >
-                        ⚡ حسب نوع العمل
+                        ⚡ تلقائي
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'engDay_devHalf'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'engDay_devHalf' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        🛰️ مهندس يوم + جهاز 1/2
                       </button>
                       <button 
                         type="button" 
@@ -1533,7 +1554,7 @@
                         <label class="block text-[10px] text-slate-600 dark:text-slate-300 mb-1">أدخل مبلغ أتعاب المهندس المقطوع (ج.م):</label>
                         <input 
                           type="number" 
-                          step="any"
+                          step="any" 
                           value={newOp.engCustomFixedAmount} 
                           onChange={e=>setNewOp({...newOp, engCustomFixedAmount: e.target.value})} 
                           class="w-full border p-2 rounded-xl dark:bg-slate-800 bg-white font-bold text-emerald-600"
