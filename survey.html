@@ -30,11 +30,30 @@
     body { font-family: 'Cairo', sans-serif; -webkit-tap-highlight-color: transparent; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* عزل تام للمستخلص عند الطباعة */
     @media print {
-      body { background-color: white !important; font-size: 11px; }
-      .print-hidden { display: none !important; }
-      .print-area { box-shadow: none !important; border: none !important; width: 100% !important; margin: 0 !important; }
-      .dark .print-area { color: black !important; background: white !important; }
+      body * {
+        visibility: hidden !important;
+      }
+      #invoice-paper, #invoice-paper * {
+        visibility: visible !important;
+      }
+      #invoice-paper {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 10mm !important;
+        box-shadow: none !important;
+        border: none !important;
+        background: white !important;
+        color: black !important;
+      }
+      .print-hidden {
+        display: none !important;
+      }
     }
   </style>
 </head>
@@ -75,7 +94,6 @@
       return isNaN(n) ? 0 : n;
     };
 
-    // دالة تصدير ورقة المستخلص فقط وتوليد الـ PDF وفتح واتساب
     const exportCleanPdfAndWhatsApp = (elementId, filename, textMessage) => {
       let targetPhone = window.prompt("أدخل رقم هاتف المستلم (أو اتركه فارغاً لاختيار المحادثة مباشرة في واتساب):", "");
       if (targetPhone === null) return;
@@ -142,7 +160,7 @@
             data: {
               labels: stats.months.length ? stats.months : ['لا توجد بيانات'],
               datasets: [{
-                label: 'حجم وقيمة الأعمال الشهرية (ج.م)',
+                label: 'قيمة الأعمال الشهرية (ج.م)',
                 data: stats.revenues.length ? stats.revenues : [0],
                 backgroundColor: '#6366f1',
                 borderRadius: 8
@@ -227,7 +245,6 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
-      // نماذج الإدخال
       const [newOp, setNewOp] = useState({
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
         isFaddan: false, faddanQty: 1, faddanPrice: 250,
@@ -238,14 +255,12 @@
 
       const [newPayment, setNewPayment] = useState({ date: todayDate, clientName: "", siteLocation: "", amount: "", notes: "سداد دفعة من المستخلص" });
 
-      // المستخلص
       const [extractClient, setExtractClient] = useState("");
       const [extractSite, setExtractSite] = useState("");
       const [extractNumber, setExtractNumber] = useState("1");
       const [extractEngineer, setExtractEngineer] = useState("م أحمد نبيل");
       const [extractItems, setExtractItems] = useState([]);
 
-      // كشف الحساب التفصيلي للشركاء
       const [statementClient, setStatementClient] = useState("");
 
       useEffect(() => {
@@ -353,7 +368,7 @@
       const handleSaveOperation = (e) => {
         e.preventDefault();
         const total = newOp.isFaddan ? parseNum(newOp.faddanQty) * parseNum(newOp.faddanPrice) : parseNum(newOp.agreedAmount);
-        const finalOp = { ...newOp, agreedAmount: total };
+        const finalOp = { ...newOp, clientName: (newOp.clientName || '').trim(), siteLocation: (newOp.siteLocation || '').trim(), agreedAmount: total };
         const shares = calculateOperationShares(finalOp);
 
         if (editingOp) {
@@ -372,8 +387,8 @@
           if (db) db.ref('survey_data/operations').set(updatedOps);
 
           if (parseNum(newOp.paidNow) > 0) {
-            const autoPay = { id: Date.now() + 1, date: newOp.date, clientName: newOp.clientName, siteLocation: newOp.siteLocation, amount: parseNum(newOp.paidNow), notes: `دفعة مقدمة موقع` };
-            const autoTx = { id: Date.now() + 2, date: newOp.date, type: "income", category: "تحصيل مساحة مقدم", clientOrEntity: `${newOp.clientName}`, amount: parseNum(newOp.paidNow) };
+            const autoPay = { id: Date.now() + 1, date: newOp.date, clientName: finalOp.clientName, siteLocation: finalOp.siteLocation, amount: parseNum(newOp.paidNow), notes: `دفعة مقدمة موقع` };
+            const autoTx = { id: Date.now() + 2, date: newOp.date, type: "income", category: "تحصيل مساحة مقدم", clientOrEntity: `${finalOp.clientName}`, amount: parseNum(newOp.paidNow) };
             setPayments([autoPay, ...payments]);
             setTransactions([autoTx, ...transactions]);
             if(db){
@@ -389,7 +404,7 @@
 
       const handleAddPayment = (e) => {
         e.preventDefault();
-        const item = { id: Date.now(), ...newPayment, amount: parseNum(newPayment.amount) };
+        const item = { id: Date.now(), ...newPayment, clientName: (newPayment.clientName||'').trim(), amount: parseNum(newPayment.amount) };
         const tx = { id: Date.now()+1, date: item.date, type: 'income', category: 'سداد دفعة مستخلص', clientOrEntity: item.clientName, amount: item.amount };
         
         const upPay = [item, ...payments];
@@ -413,27 +428,44 @@
         }
       };
 
-      // سحب أعمال العميل للمستخلص (مع تحويل وصف العمل إلى بيان رسمي)
-      useEffect(() => {
-        if (!extractClient) {
+      // دالة موثوقة لسحب أعمال العميل
+      const loadClientOpsIntoExtract = (targetClient, targetSite) => {
+        const cName = (targetClient || '').trim();
+        const sName = (targetSite || '').trim();
+        if (!cName) {
           setExtractItems([]);
           return;
         }
-        const filtered = operations.filter(o => 
-          o.clientName === extractClient && 
-          (!extractSite || o.siteLocation === extractSite)
-        );
+
+        const filtered = operations.filter(o => {
+          const matchClient = (o.clientName || '').trim() === cName;
+          const matchSite = !sName || (o.siteLocation || '').trim() === sName;
+          return matchClient && matchSite;
+        });
 
         const loaded = filtered.map((o, idx) => ({
           id: o.id || (Date.now() + idx),
           date: o.date,
-          desc: o.workDescription || o.opType, // يظهر بيان ووصف العمل فقط
+          desc: o.workDescription ? o.workDescription : o.opType,
           qty: o.isFaddan ? parseNum(o.faddanQty) : 1,
           unitPrice: o.isFaddan ? parseNum(o.faddanPrice) : parseNum(o.agreedAmount),
           rate: 100
         }));
 
         setExtractItems(loaded);
+        if (loaded.length > 0) {
+          showToast(`تم تحميل ${loaded.length} أعمال بنجاح في المستخلص!`);
+        } else {
+          showToast(`لا توجد أعمال مسجلة مطابقة للعميل.`);
+        }
+      };
+
+      useEffect(() => {
+        if (extractClient) {
+          loadClientOpsIntoExtract(extractClient, extractSite);
+        } else {
+          setExtractItems([]);
+        }
       }, [extractClient, extractSite, operations]);
 
       const handleAddEmptyExtractRow = () => {
@@ -447,20 +479,22 @@
         setExtractItems(extractItems.filter(item => item.id !== id));
       };
 
-      // حسابات المستخلص
       const extractTotalWork = extractItems.reduce((sum, item) => {
         return sum + (parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100));
       }, 0);
 
-      const clientOpsForPayment = operations.filter(o => o.clientName === extractClient && (!extractSite || o.siteLocation === extractSite));
-      const clientPaysForPayment = payments.filter(p => p.clientName === extractClient && (!extractSite || p.siteLocation === extractSite));
+      const clientOpsForPayment = operations.filter(o => (o.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (o.siteLocation||'').trim() === extractSite.trim()));
+      const clientPaysForPayment = payments.filter(p => (p.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (p.siteLocation||'').trim() === extractSite.trim()));
       const clientTotalPaid = clientOpsForPayment.reduce((s,o)=>s+parseNum(o.paidNow),0) + clientPaysForPayment.reduce((s,p)=>s+parseNum(p.amount),0);
       const extractRemainingBalance = extractTotalWork - clientTotalPaid;
 
-      const clientNames = Array.from(new Set([...operations.map(o=>o.clientName), ...payments.map(p=>p.clientName)])).filter(Boolean);
-      const siteLocationsList = Array.from(new Set(operations.map(o=>o.siteLocation).filter(Boolean)));
+      const clientNames = Array.from(new Set([
+        ...operations.map(o => (o.clientName || '').trim()),
+        ...payments.map(p => (p.clientName || '').trim())
+      ])).filter(Boolean);
 
-      // حسابات الخزينة
+      const siteLocationsList = Array.from(new Set(operations.map(o => (o.siteLocation || '').trim()).filter(Boolean)));
+
       const monthlyTx = transactions.filter(t => t.date && t.date.startsWith(vaultMonth));
       const mIn = monthlyTx.filter(t=>t.type==='income').reduce((s,t)=>s+parseNum(t.amount),0);
       const mOut = monthlyTx.filter(t=>t.type==='expense').reduce((s,t)=>s+parseNum(t.amount),0);
@@ -474,7 +508,6 @@
       const totalRtk = operations.reduce((s,o)=>s+(o.deviceFee||0),0);
       const totalOffice = operations.reduce((s,o)=>s+(o.officeFee||0),0);
 
-      // ترتيب التبويبات بحسب طلبك الدقيق
       const navTabs = [
         { id: "dashboard", label: "لوحة التحكم", icon: "📊" },
         { id: "clients_list", label: "العملاء", icon: "👥" },
@@ -509,7 +542,7 @@
         <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
           
           {/* Header */}
-          <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs">
+          <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div class="flex items-center gap-2">
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
               <div>
@@ -533,7 +566,7 @@
 
           <div class="flex-1 flex overflow-hidden">
             {/* Desktop Sidebar */}
-            <aside class="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col justify-between shrink-0 border-l border-slate-800">
+            <aside class="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col justify-between shrink-0 border-l border-slate-800 print-hidden">
               <div class="p-3 overflow-y-auto space-y-1 text-xs font-bold">
                 {navTabs.map(t => (
                   <button key={t.id} onClick={() => setActiveTab(t.id)} class={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl transition ${activeTab===t.id ? 'bg-indigo-600 text-white shadow' : 'hover:bg-slate-800'}`}>
@@ -549,7 +582,7 @@
 
             {/* Mobile Drawer */}
             {drawerOpen && (
-              <div class="fixed inset-0 z-50 flex md:hidden">
+              <div class="fixed inset-0 z-50 flex md:hidden print-hidden">
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setDrawerOpen(false)}></div>
                 <div class="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-4 flex flex-col justify-between">
                   <div>
@@ -595,8 +628,8 @@
                     <h3 class="text-sm font-black mb-3">👥 دليل العملاء والمزارع المسجلة:</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {clientNames.map(c => {
-                        const ops = operations.filter(o => o.clientName === c);
-                        const pays = payments.filter(p => p.clientName === c);
+                        const ops = operations.filter(o => (o.clientName||'').trim() === c);
+                        const pays = payments.filter(p => (p.clientName||'').trim() === c);
                         const totalBilled = ops.reduce((s,o)=>s+parseNum(o.agreedAmount),0);
                         const totalPaid = pays.reduce((s,p)=>s+parseNum(p.amount),0) + ops.reduce((s,o)=>s+parseNum(o.paidNow),0);
                         const due = totalBilled - totalPaid;
@@ -623,7 +656,7 @@
                 </div>
               )}
 
-              {/* 3. تبويب الأعمال والطلعات (مع أزرار الحذف والتعديل وفصل المصاريف) */}
+              {/* 3. تبويب الأعمال والطلعات */}
               {activeTab === 'operations' && (
                 <div class="space-y-4">
                   <div class="flex flex-col sm:flex-row gap-2 justify-between items-stretch sm:items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border dark:border-slate-700 shadow-xs">
@@ -775,7 +808,7 @@
                 </div>
               )}
 
-              {/* 7. مصاريف التشغيل (مفصلة عمالة وسيارة لكل عملية) */}
+              {/* 7. مصاريف التشغيل */}
               {activeTab === 'expenses' && (
                 <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 overflow-x-auto font-bold space-y-3">
                   <h3 class="text-sm font-black">🚗 تفصيل مصاريف العمالة والسيارات لكل عملية:</h3>
@@ -825,27 +858,35 @@
                 </div>
               )}
 
-              {/* 9. المستخلصات (تصميم فاتورة أنيق - التقاط الورقة وحدها في الـ PDF دون واجهة البرنامج) */}
+              {/* 9. المستخلصات (مع زر السحب اليدوي الصريح وعزل الطباعة) */}
               {activeTab === 'extracts' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs print-hidden flex flex-col sm:flex-row gap-3 items-center">
-                    <div class="w-full sm:w-1/2">
-                      <label class="block mb-1">اختر العميل لتوليد المستخلص:</label>
+                    <div class="w-full sm:w-1/3">
+                      <label class="block mb-1">اختر العميل:</label>
                       <select value={extractClient} onChange={e=>setExtractClient(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-black text-xs">
                         <option value="">-- اضغط لاختيار العميل --</option>
                         {clientNames.map(c=><option key={c}>{c}</option>)}
                       </select>
                     </div>
-                    <div class="w-full sm:w-1/2">
+                    <div class="w-full sm:w-1/3">
                       <label class="block mb-1">الموقع بالمزرعة (اختياري):</label>
                       <input list="sites-list" value={extractSite} onChange={e=>setExtractSite(e.target.value)} placeholder="الموقع العام، المحمية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-xs"/>
                       <datalist id="sites-list">{siteLocationsList.map(s=><option key={s} value={s}/>)}</datalist>
+                    </div>
+                    <div class="w-full sm:w-1/3 flex items-end">
+                      <button 
+                        onClick={()=>loadClientOpsIntoExtract(extractClient, extractSite)} 
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1.5"
+                      >
+                        📥 سحب أعمال العميل
+                      </button>
                     </div>
                   </div>
 
                   {extractClient ? (
                     <div>
-                      {/* ورقة المستخلص المنعزلة وحدها */}
+                      {/* ورقة المستخلص التي سيتم طباعتها وتصديرها حصراً */}
                       <div id="invoice-paper" class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm print-area text-slate-800 space-y-5">
                         <div class="flex justify-between items-start border-b border-slate-200 pb-4">
                           <div>
@@ -870,7 +911,7 @@
                               <tr class="bg-slate-50 text-slate-600 border-b border-slate-200">
                                 <th class="p-2.5 text-center w-8">م</th>
                                 <th class="p-2.5 w-24">التاريخ</th>
-                                <th class="p-2.5">بيان الأعمال (وصف العمل)</th>
+                                <th class="p-2.5">بيان الأعمال</th>
                                 <th class="p-2.5 text-center w-20">الكمية</th>
                                 <th class="p-2.5 text-center w-24">الفئة</th>
                                 <th class="p-2.5 text-center w-24">نسبة الإنجاز</th>
@@ -879,49 +920,53 @@
                               </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                              {extractItems.map((item, idx) => {
-                                const net = parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100);
-                                return (
-                                  <tr key={item.id} class="hover:bg-slate-50/60">
-                                    <td class="p-2.5 text-center text-slate-400 font-bold">{idx + 1}</td>
-                                    <td class="p-2.5 text-slate-500 font-mono whitespace-nowrap">{item.date || '-'}</td>
-                                    <td class="p-2.5 font-bold text-slate-900">
-                                      <input type="text" value={item.desc} onChange={e=>{
-                                        const up = extractItems.map(it=>it.id===item.id?{...it, desc: e.target.value}:it);
-                                        setExtractItems(up);
-                                      }} class="w-full bg-transparent font-bold outline-none"/>
-                                    </td>
-                                    <td class="p-2 text-center">
-                                      <input type="number" step="any" value={item.qty} onChange={e=>{
-                                        const up = extractItems.map(it=>it.id===item.id?{...it, qty: e.target.value}:it);
-                                        setExtractItems(up);
-                                      }} class="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/>
-                                    </td>
-                                    <td class="p-2 text-center">
-                                      <input type="number" step="any" value={item.unitPrice} onChange={e=>{
-                                        const up = extractItems.map(it=>it.id===item.id?{...it, unitPrice: e.target.value}:it);
-                                        setExtractItems(up);
-                                      }} class="w-20 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/>
-                                    </td>
-                                    <td class="p-2 text-center">
-                                      <select value={item.rate} onChange={e=>{
-                                        const up = extractItems.map(it=>it.id===item.id?{...it, rate: e.target.value}:it);
-                                        setExtractItems(up);
-                                      }} class="border border-slate-200 rounded-lg p-1 font-bold bg-white text-center outline-none">
-                                        <option value="100">%100</option>
-                                        <option value="90">%90</option>
-                                        <option value="50">%50</option>
-                                      </select>
-                                    </td>
-                                    <td class="p-2.5 text-center font-black text-indigo-700 text-sm">
-                                      {net.toLocaleString()} ج.م
-                                    </td>
-                                    <td class="p-2.5 text-center print-hidden">
-                                      <button onClick={()=>handleRemoveExtractRow(item.id)} class="text-rose-500 hover:text-rose-700 font-bold p-1">✕</button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
+                              {extractItems.length === 0 ? (
+                                <tr><td colSpan={8} class="text-center p-6 text-slate-400 font-bold">لا توجد بنود حالياً. اضغط "سحب أعمال العميل" بالأعلى.</td></tr>
+                              ) : (
+                                extractItems.map((item, idx) => {
+                                  const net = parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100);
+                                  return (
+                                    <tr key={item.id} class="hover:bg-slate-50/60">
+                                      <td class="p-2.5 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                      <td class="p-2.5 text-slate-500 font-mono whitespace-nowrap">{item.date || '-'}</td>
+                                      <td class="p-2.5 font-bold text-slate-900">
+                                        <input type="text" value={item.desc} onChange={e=>{
+                                          const up = extractItems.map(it=>it.id===item.id?{...it, desc: e.target.value}:it);
+                                          setExtractItems(up);
+                                        }} class="w-full bg-transparent font-bold outline-none"/>
+                                      </td>
+                                      <td class="p-2 text-center">
+                                        <input type="number" step="any" value={item.qty} onChange={e=>{
+                                          const up = extractItems.map(it=>it.id===item.id?{...it, qty: e.target.value}:it);
+                                          setExtractItems(up);
+                                        }} class="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/>
+                                      </td>
+                                      <td class="p-2 text-center">
+                                        <input type="number" step="any" value={item.unitPrice} onChange={e=>{
+                                          const up = extractItems.map(it=>it.id===item.id?{...it, unitPrice: e.target.value}:it);
+                                          setExtractItems(up);
+                                        }} class="w-20 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/>
+                                      </td>
+                                      <td class="p-2 text-center">
+                                        <select value={item.rate} onChange={e=>{
+                                          const up = extractItems.map(it=>it.id===item.id?{...it, rate: e.target.value}:it);
+                                          setExtractItems(up);
+                                        }} class="border border-slate-200 rounded-lg p-1 font-bold bg-white text-center outline-none">
+                                          <option value="100">%100</option>
+                                          <option value="90">%90</option>
+                                          <option value="50">%50</option>
+                                        </select>
+                                      </td>
+                                      <td class="p-2.5 text-center font-black text-indigo-700 text-sm">
+                                        {net.toLocaleString()} ج.م
+                                      </td>
+                                      <td class="p-2.5 text-center print-hidden">
+                                        <button onClick={()=>handleRemoveExtractRow(item.id)} class="text-rose-500 hover:text-rose-700 font-bold p-1">✕</button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -966,7 +1011,7 @@
                           🖨️ طباعة المستخلص
                         </button>
                         <button onClick={()=>{
-                          const summaryMessage = `🏢 *مكتب الاستشارات والأعمال المساحية*\n📄 *مستخلص تصفية أعمال للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠️️ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️ *التاريخ:* ${todayDate}`;
+                          const summaryMessage = `🏢 *مكتب الاستشارات والأعمال المساحية*\n📄 *مستخلص تصفية أعمال للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️ *التاريخ:* ${todayDate}`;
                           exportCleanPdfAndWhatsApp('invoice-paper', `مستخلص_${extractClient}.pdf`, summaryMessage);
                         }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-sm transition">
                           <span>📲</span> إرسال المستخلص عبر واتساب (PDF مستقل)
@@ -975,18 +1020,18 @@
                     </div>
                   ) : (
                     <div class="bg-white dark:bg-slate-800 p-8 rounded-3xl text-center text-slate-400 font-bold border border-dashed dark:border-slate-700">
-                      يرجى اختيار العميل من القائمة العلوية لتوليد المستخلص
+                      يرجى اختيار العميل من القائمة العلوية ثم الضغط على "سحب أعمال العميل"
                     </div>
                   )}
                 </div>
               )}
 
-              {/* 10. كشف الحساب التفصيلي المخصص للشركاء (يوضح عمالة كام وسيارة كام ونسبة RTK) */}
+              {/* 10. كشف الحساب التفصيلي المخصص للشركاء */}
               {activeTab === 'statement' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-3 items-center">
                     <div class="w-full sm:w-1/2">
-                      <label class="block mb-1">اختر العميل لعرض كشف الحساب التفصيلي الداخلي للشركاء:</label>
+                      <label class="block mb-1">اختر العميل لعرض كشف الحساب التحليلي للشركاء:</label>
                       <select value={statementClient} onChange={e=>setStatementClient(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 text-xs">
                         <option value="">-- اختر العميل --</option>
                         {clientNames.map(c=><option key={c}>{c}</option>)}
@@ -995,8 +1040,8 @@
                   </div>
 
                   {statementClient && (() => {
-                    const cOps = operations.filter(o => o.clientName === statementClient);
-                    const cPays = payments.filter(p => p.clientName === statementClient);
+                    const cOps = operations.filter(o => (o.clientName||'').trim() === statementClient.trim());
+                    const cPays = payments.filter(p => (p.clientName||'').trim() === statementClient.trim());
                     const tBilled = cOps.reduce((s,o)=>s+parseNum(o.agreedAmount),0);
                     const tLabor = cOps.reduce((s,o)=>s+parseNum(o.laborCost),0);
                     const tCar = cOps.reduce((s,o)=>s+parseNum(o.carCost),0);
@@ -1065,7 +1110,7 @@
                 </div>
               )}
 
-              {/* 12. سجل الدخول والنشاطات (خاص بمدير النظام mohamedmo686686@gmail.com) */}
+              {/* 12. سجل الدخول والنشاطات */}
               {activeTab === 'logs' && isSuperAdmin && (
                 <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto p-4 space-y-3 font-bold">
                   <h3 class="text-sm font-black">🛡️ سجل نشاطات وحركات المستخدمين (Admin Only):</h3>
@@ -1099,9 +1144,9 @@
             </main>
           </div>
 
-          {/* النافذة السريعة لتسجيل وتعديل الطلعة اليومية */}
+          {/* النافذة المنبثقة للطلعة */}
           {opModalOpen && (
-            <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
               <div class="relative bg-white dark:bg-slate-800 w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50 max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
@@ -1164,7 +1209,7 @@
 
           {/* نافذة تسجيل الدفعة السريعة */}
           {payModalOpen && (
-            <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setPayModalOpen(false)}></div>
               <div class="relative bg-white dark:bg-slate-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50">
                 <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
@@ -1190,18 +1235,18 @@
           )}
 
           {/* Bottom Bar للهاتف */}
-          <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg">
+          <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg print-hidden">
             <button onClick={()=>setActiveTab('dashboard')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
               <span class="text-base">📊</span>
               <span class="text-[9px] mt-0.5">الرئيسية</span>
             </button>
-            <button onClick={()=>setActiveTab('operations')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='operations'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
-              <span class="text-base">📐</span>
-              <span class="text-[9px] mt-0.5">الأعمال</span>
-            </button>
             <button onClick={()=>setActiveTab('extracts')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='extracts'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
               <span class="text-base">📄</span>
               <span class="text-[9px] mt-0.5">المستخلص</span>
+            </button>
+            <button onClick={()=>setActiveTab('operations')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='operations'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
+              <span class="text-base">📐</span>
+              <span class="text-[9px] mt-0.5">الطلعات</span>
             </button>
             <button onClick={()=>setActiveTab('vault')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='vault'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
               <span class="text-base">💵</span>
@@ -1214,7 +1259,7 @@
           </nav>
 
           {/* Toast */}
-          {toast.show && <div class="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs z-50 shadow-2xl font-bold">{toast.message}</div>}
+          {toast.show && <div class="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs z-50 shadow-2xl font-bold print-hidden">{toast.message}</div>}
         </div>
       );
     }
