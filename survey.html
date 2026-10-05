@@ -68,7 +68,8 @@
     };
 
     const SUPER_ADMIN_EMAIL = "mohamedmohy676676@gmail.com";
-    const ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, "ahmnab23@gmail.com", "+201095545982"];
+    const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com", "ahmnab23@gmail.com"];
+    const ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, ...ENGINEER_EMAILS, "+201095545982"];
 
     let db = null;
     let auth = null;
@@ -130,7 +131,7 @@
         operations.forEach(o => {
           const t = String(o.opType || '');
           if (t.includes('RTK')) rtkCount++;
-          else if (t.includes('كروكي') || t.includes('قياس')) sketchCount++;
+          else if (t.includes('كروكي') || t.includes('قياس') || o.isSketch) sketchCount++;
           else otherCount++;
 
           const m = String(o.date || '').substring(0, 7) || 'غير محدد';
@@ -236,14 +237,16 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
+      // فحص الصلاحيات
       const userEmail = (user?.email || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
-      const isAdmin = isSuperAdmin || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
+      const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
+      const isAdmin = isSuperAdmin || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
 
-      // نموذج الإدخال
+      // نموذج الإدخال مع خياري الفدان والكروكي
       const [newOp, setNewOp] = useState({
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
-        isFaddan: false, faddanQty: 1, faddanPrice: "",
+        isFaddan: false, faddanQty: 1, faddanPrice: 250,
         isSketch: false, sketchesCount: 1,
         agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0
       });
@@ -339,7 +342,7 @@
         }
       };
 
-      // حساب التوزيعات التلقائية (مع قبول التعديل اليدوي على المبلغ المتفق عليه)
+      // حساب التوزيعات التلقائية
       const calculateOperationShares = (op) => {
         const total = parseNum(op.agreedAmount);
         const labor = parseNum(op.laborCost);
@@ -356,7 +359,7 @@
           engFee = 2000;
           deviceFee = 3500;
           officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
-        } else if (type.includes('كروكي') || type.includes('قياس')) {
+        } else if (type.includes('كروكي') || type.includes('قياس') || op.isSketch) {
           engFee = total * 0.80;
           officeFee = total * 0.20;
           deviceFee = 0;
@@ -369,7 +372,6 @@
         return { engFee, deviceFee, officeFee, totalExpenses };
       };
 
-      // تحديث المبلغ التلقائي عند تغيير نوع العمل (مع تركه قابلاً للتعديل)
       const handleOpTypeChange = (selectedType) => {
         let defaultAmount = newOp.agreedAmount;
         if (selectedType === 'يوم RTK') defaultAmount = 5500;
@@ -378,7 +380,7 @@
         setNewOp(prev => ({
           ...prev,
           opType: selectedType,
-          agreedAmount: defaultAmount
+          agreedAmount: prev.isFaddan ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : defaultAmount
         }));
       };
 
@@ -466,6 +468,7 @@
         }
       };
 
+      // تحميل بنود المستخلص مع الحفاظ التام على كمية الفدان وسعر الفئة أو الكروكيات
       const loadClientOpsIntoExtract = (targetClient, targetSite) => {
         const cName = (targetClient || '').trim();
         const sName = (targetSite || '').trim();
@@ -480,14 +483,30 @@
           return matchClient && matchSite;
         });
 
-        const loaded = filtered.map((o, idx) => ({
-          id: o.id || (Date.now() + idx),
-          date: o.date,
-          desc: o.workDescription ? o.workDescription : o.opType,
-          qty: 1,
-          unitPrice: parseNum(o.agreedAmount),
-          rate: 100
-        }));
+        const loaded = filtered.map((o, idx) => {
+          let itemQty = 1;
+          let itemPrice = parseNum(o.agreedAmount);
+          let itemDesc = o.workDescription ? o.workDescription : o.opType;
+
+          if (o.isFaddan) {
+            itemQty = parseNum(o.faddanQty) || 1;
+            itemPrice = parseNum(o.faddanPrice) || (parseNum(o.agreedAmount) / itemQty);
+            itemDesc = `${itemDesc} (${itemQty} فدان)`;
+          } else if (o.isSketch) {
+            itemQty = parseNum(o.sketchesCount) || 1;
+            itemPrice = parseNum(o.agreedAmount) / itemQty;
+            itemDesc = `${itemDesc} (${itemQty} كروكي)`;
+          }
+
+          return {
+            id: o.id || (Date.now() + idx),
+            date: o.date,
+            desc: itemDesc,
+            qty: itemQty,
+            unitPrice: itemPrice,
+            rate: 100
+          };
+        });
 
         setExtractItems(loaded);
         if (loaded.length > 0) {
@@ -561,9 +580,14 @@
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ], [isSuperAdmin]);
 
-      const livePreview = useMemo(() => {
-        return calculateOperationShares(newOp);
-      }, [newOp.opType, newOp.agreedAmount, newOp.laborCost, newOp.carCost]);
+      const liveExpenses = useMemo(() => {
+        const labor = parseNum(newOp.laborCost);
+        const car = parseNum(newOp.carCost);
+        const totalExp = labor + car;
+        const agreed = parseNum(newOp.agreedAmount);
+        const netAfterExp = agreed > 0 ? (agreed - totalExp) : 0;
+        return { labor, car, totalExp, netAfterExp };
+      }, [newOp.laborCost, newOp.carCost, newOp.agreedAmount]);
 
       if (authLoading) return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">جاري التهيئة...</div>;
 
@@ -582,7 +606,7 @@
       return (
         <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
           
-          {/* Header */}
+          {/* Header العلوي */}
           <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div class="flex items-center gap-2">
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
@@ -592,6 +616,10 @@
                   {isSuperAdmin ? (
                     <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
                       👑 مدير النظام
+                    </span>
+                  ) : isEngineer ? (
+                    <span class="bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      👷 مهندس معتمد
                     </span>
                   ) : (
                     <span class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full">
@@ -643,7 +671,7 @@
                     <div class="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
                       <div>
                         <span class="font-black text-sm">أقسام نظام المساحة</span>
-                        {isSuperAdmin && <span class="block text-[10px] text-amber-400 font-bold">👑 صلاحية مدير النظام كاملة</span>}
+                        {isSuperAdmin && <span class="block text-[10px] text-amber-400 font-bold">👑 صلاحية مدير النظام</span>}
                       </div>
                       <button onClick={()=>setDrawerOpen(false)} class="text-slate-400 hover:text-white text-lg">✕</button>
                     </div>
@@ -729,7 +757,7 @@
                     <button 
                       onClick={()=>{ 
                         setEditingOp(null); 
-                        setNewOp({ date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل", isFaddan: false, faddanQty: 1, faddanPrice: "", isSketch: false, sketchesCount: 1, agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0 }); 
+                        setNewOp({ date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل", isFaddan: false, faddanQty: 1, faddanPrice: 250, isSketch: false, sketchesCount: 1, agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0 }); 
                         setOpModalOpen(true); 
                       }}
                       class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 shadow-sm text-xs"
@@ -757,6 +785,8 @@
                               <span class="text-indigo-600 dark:text-indigo-400">{o.opType}</span>
                             </div>
                             {o.workDescription && <p class="text-[11px] text-slate-500 dark:text-slate-400 font-bold">📝 {o.workDescription}</p>}
+                            {o.isFaddan && <div class="text-[10px] text-amber-800 dark:text-amber-300 font-bold">🌾 حساب بالفدان: {o.faddanQty} فدان × {o.faddanPrice} ج.م</div>}
+                            {o.isSketch && <div class="text-[10px] text-blue-800 dark:text-blue-300 font-bold">📐 كروكيات: {o.sketchesCount} كروكي</div>}
                             <div class="grid grid-cols-2 gap-1 text-[10px] pt-1 border-t dark:border-slate-600">
                               <span>🚗 سيارة: <strong>{parseNum(o.carCost)}</strong></span>
                               <span>👷 عمالة: <strong>{parseNum(o.laborCost)}</strong></span>
@@ -772,7 +802,7 @@
                             </div>
                             <div class="flex items-center gap-1">
                               <button onClick={()=>{ setEditingOp(o); setNewOp(o); setOpModalOpen(true); }} class="bg-indigo-50 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 p-2 rounded-xl hover:bg-indigo-100" title="تعديل">
-                                ✏️
+                                ✏️️
                               </button>
                               {isAdmin && (
                                 <button onClick={()=>deleteItem('operations', o.id, operations, setOperations, 'طلعة')} class="bg-rose-50 dark:bg-slate-700 text-rose-600 p-2 rounded-xl hover:bg-rose-100" title="حذف">
@@ -1304,7 +1334,95 @@
                   </div>
                   <div>بيان الأعمال (الوصف الذي سيوضع في المستخلص) <input type="text" value={newOp.workDescription} onChange={e=>setNewOp({...newOp, workDescription: e.target.value})} placeholder="تخطيط 80 فدان موقع المحمية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
                   
-                  {/* حقل المبلغ النهائي المتفق عليه - يملأ تلقائياً وقابل للتعديل الحر */}
+                  {/* استعادة خيارات الفدان والكروكيات */}
+                  <div class="flex gap-4 py-1">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={newOp.isFaddan} 
+                        onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({
+                            ...prev, 
+                            isFaddan: checked, 
+                            isSketch: checked ? false : prev.isSketch,
+                            agreedAmount: checked ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : prev.agreedAmount
+                          }));
+                        }} 
+                        class="w-4 h-4 rounded"
+                      /> 
+                      🌾 حساب بالفدان
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={newOp.isSketch} 
+                        onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({
+                            ...prev, 
+                            isSketch: checked, 
+                            isFaddan: checked ? false : prev.isFaddan
+                          }));
+                        }} 
+                        class="w-4 h-4 rounded"
+                      /> 
+                      📐 كروكيات
+                    </label>
+                  </div>
+
+                  {newOp.isFaddan && (
+                    <div class="grid grid-cols-2 gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800">
+                      <div>
+                        عدد الأفدنة: 
+                        <input 
+                          type="number" 
+                          step="any" 
+                          value={newOp.faddanQty} 
+                          onChange={e=>{
+                            const q = e.target.value;
+                            setNewOp(prev => ({
+                              ...prev, 
+                              faddanQty: q, 
+                              agreedAmount: parseNum(q) * parseNum(prev.faddanPrice)
+                            }));
+                          }} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"
+                        />
+                      </div>
+                      <div>
+                        سعر الفدان (الفئة): 
+                        <input 
+                          type="number" 
+                          step="any" 
+                          value={newOp.faddanPrice} 
+                          onChange={e=>{
+                            const p = e.target.value;
+                            setNewOp(prev => ({
+                              ...prev, 
+                              faddanPrice: p, 
+                              agreedAmount: parseNum(prev.faddanQty) * parseNum(p)
+                            }));
+                          }} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {newOp.isSketch && (
+                    <div class="p-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800">
+                      عدد الكروكيات: 
+                      <input 
+                        type="number" 
+                        value={newOp.sketchesCount} 
+                        onChange={e=>setNewOp({...newOp, sketchesCount: e.target.value})} 
+                        class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"
+                      />
+                    </div>
+                  )}
+
+                  {/* حقل المبلغ النهائي المتفق عليه */}
                   <div class="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1">
                     <label class="block text-amber-900 dark:text-amber-300 font-black">💰 المبلغ النهائي المتفق عليه مع العميل (آلي مع إمكانية التعديل الحر):</label>
                     <input 
@@ -1316,10 +1434,10 @@
                       class="w-full border p-2.5 rounded-xl dark:bg-slate-700 bg-white text-indigo-700 dark:text-indigo-300 font-black text-sm" 
                       required
                     />
-                    <span class="text-[10px] text-amber-800 dark:text-amber-400 block">يتم احتساب القيمة تلقائياً حسب نوع العمل ويمكنك تغييرها بيدك متى أردت.</span>
+                    <span class="text-[10px] text-amber-800 dark:text-amber-400 block">يُحسب تلقائياً من الفدان أو نوع العمل، ويمكنك تغييره يدوياً في أي وقت.</span>
                   </div>
 
-                  {/* حساب المصاريف فقط */}
+                  {/* حساب المصاريف */}
                   <div class="grid grid-cols-2 gap-2 pt-1">
                     <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
                     <div>مصاريف سيارة <input type="number" value={newOp.carCost} onChange={e=>setNewOp({...newOp, carCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
@@ -1327,7 +1445,7 @@
 
                   <div>المحصل فوراً في الموقع (إن وجد) <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
 
-                  {/* شريط المعاينة التلقائية لنسب المهندس والجهاز والتكاليف */}
+                  {/* شريط المعاينة اللحظية للمهندس والجهاز والتكاليف */}
                   <div class="p-2.5 bg-emerald-50 dark:bg-slate-700 border border-emerald-200 dark:border-slate-600 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
                     <div class="flex justify-between">
                       <span>👷 أتعاب المهندس: <strong>{livePreview.engFee.toLocaleString()} ج.م</strong></span>
