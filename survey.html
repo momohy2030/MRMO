@@ -457,7 +457,7 @@
       useEffect(() => {
         if (!db) return;
         const ref = db.ref('survey_data');
-        ref.on('value', (snap) => {
+        const handleData = (snap) => {
           const d = snap.val() || {};
           
           if (d.operations) {
@@ -480,7 +480,7 @@
             setLoginLogs(arr);
             offlineStorage.set('login_logs', arr);
           }
-       if (d.settings) {
+          if (d.settings) {
             const defaultOpTypes = [
               "يوم RTK",
               "1/2RTK (نصف يوم)",
@@ -510,6 +510,12 @@
               return updated;
             });
           }
+        };
+
+        ref.on('value', handleData);
+        return () => { ref.off('value', handleData); };
+      }, []);
+
       const saveListSafely = (path, storageKey, data) => {
         offlineStorage.set(storageKey, data);
         if (navigator.onLine && db) {
@@ -1345,7 +1351,7 @@
                           🖨️ طباعة المستخلص
                         </button>
                         <button onClick={()=>{
-                          const summaryMessage = `🏢 *مكتب مساحة*\n📄 *مستخلص أعمال مساحية للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️️ *التاريخ:* ${todayDate}`;
+                          const summaryMessage = `🏢 *مكتب مساحة*\n📄 *مستخلص أعمال مساحية للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓 *التاريخ:* ${todayDate}`;
                           exportCleanPdfAndWhatsApp('printable-area', `مستخلص_${extractClient}.pdf`, summaryMessage);
                         }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-sm transition">
                           <span>📲</span> إرسال المستخلص عبر واتساب (PDF مفرود وأرقام واضحة)
