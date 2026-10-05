@@ -4,44 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة الأعمال المساحية - SURVEY ERP</title>
-
-  <!-- وسوم دعم التثبيت وتطبيقات الويب التقدمية (PWA) -->
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#0f172a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-  <!-- Service Worker مدمج وآمن لمنع ظهور شاشة You're offline وضمان العمل بدون إنترنت -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        const swCode = `
-          const CACHE_NAME = 'survey-erp-offline-v5';
-          self.addEventListener('install', (e) => { self.skipWaiting(); });
-          self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
-          self.addEventListener('fetch', (e) => {
-            if (e.request.method !== 'GET') return;
-            e.respondWith(
-              caches.match(e.request).then((cachedResponse) => {
-                if (cachedResponse) return cachedResponse;
-                return fetch(e.request).then((networkResponse) => {
-                  if (networkResponse && networkResponse.status === 200) {
-                    const responseClone = networkResponse.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
-                  }
-                  return networkResponse;
-                }).catch(() => caches.match(e.request));
-              })
-            );
-          });
-        `;
-        const blob = new Blob([swCode], { type: 'application/javascript' });
-        const swUrl = URL.createObjectURL(blob);
-        navigator.serviceWorker.register(swUrl).catch((err) => console.log('SW init error:', err));
-      });
-    }
-  </script>
-
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -125,6 +88,7 @@
       return isNaN(n) ? 0 : n;
     };
 
+    // مدير التخزين والمزامنة بدون إنترنت
     const offlineStorage = {
       get(key, fallback = []) {
         try {
@@ -144,7 +108,10 @@
         if (!navigator.onLine || !databaseInstance) return;
         const queue = this.get('offline_sync_queue', []);
         if (queue.length === 0) return;
-        queue.forEach(item => databaseInstance.ref(item.path).set(item.data));
+
+        queue.forEach(item => {
+          databaseInstance.ref(item.path).set(item.data);
+        });
         localStorage.removeItem('survey_offline_sync_queue');
       }
     };
@@ -165,12 +132,15 @@
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
         html2pdf().set(opt).from(element).save().then(() => {
-          window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}`, '_blank');
+          const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+          window.open(url, '_blank');
         }).catch(() => {
-          window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}`, '_blank');
+          const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+          window.open(url, '_blank');
         });
       } else {
-        window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}`, '_blank');
+        const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+        window.open(url, '_blank');
       }
     };
 
@@ -181,17 +151,24 @@
       const chart2Instance = useRef(null);
 
       const stats = useMemo(() => {
-        let rtkCount = 0; let sketchCount = 0; let otherCount = 0; let monthlyRevenue = {};
+        let rtkCount = 0;
+        let sketchCount = 0;
+        let otherCount = 0;
+        let monthlyRevenue = {};
+
         operations.forEach(o => {
           const t = String(o?.opType || '');
           if (t.includes('RTK')) rtkCount++;
           else if (t.includes('كروكي') || t.includes('قياس') || o?.isSketch) sketchCount++;
           else otherCount++;
+
           const m = String(o?.date || '').substring(0, 7) || 'غير محدد';
           monthlyRevenue[m] = (monthlyRevenue[m] || 0) + parseNum(o?.agreedAmount);
         });
+
         const months = Object.keys(monthlyRevenue).sort().slice(-6);
         const revenues = months.map(m => monthlyRevenue[m]);
+
         return { rtkCount, sketchCount, otherCount, months, revenues };
       }, [operations]);
 
@@ -202,17 +179,43 @@
         if (chart1Ref.current) {
           chart1Instance.current = new Chart(chart1Ref.current, {
             type: 'bar',
-            data: { labels: stats.months.length ? stats.months : ['لا توجد بيانات'], datasets: [{ label: 'قيمة الأعمال الشهرية (ج.م)', data: stats.revenues.length ? stats.revenues : [0], backgroundColor: '#6366f1', borderRadius: 8 }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            data: {
+              labels: stats.months.length ? stats.months : ['لا توجد بيانات'],
+              datasets: [{
+                label: 'قيمة الأعمال الشهرية (ج.م)',
+                data: stats.revenues.length ? stats.revenues : [0],
+                backgroundColor: '#6366f1',
+                borderRadius: 8
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } }
+            }
           });
         }
+
         if (chart2Ref.current) {
           chart2Instance.current = new Chart(chart2Ref.current, {
             type: 'doughnut',
-            data: { labels: ['أعمال جهاز RTK', 'قياس وكروكيات', 'أعمال مساحية أخرى'], datasets: [{ data: [stats.rtkCount, stats.sketchCount, stats.otherCount], backgroundColor: ['#4f46e5', '#f59e0b', '#10b981'] }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Cairo' } } } } }
+            data: {
+              labels: ['أعمال جهاز RTK', 'قياس وكروكيات', 'أعمال مساحية أخرى'],
+              datasets: [{
+                data: [stats.rtkCount, stats.sketchCount, stats.otherCount],
+                backgroundColor: ['#4f46e5', '#f59e0b', '#10b981']
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Cairo' } } }
+              }
+            }
           });
         }
+
         return () => {
           if (chart1Instance.current) chart1Instance.current.destroy();
           if (chart2Instance.current) chart2Instance.current.destroy();
@@ -221,8 +224,14 @@
 
       return (
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="bg-white dark:bg-slate-800 p-4 rounded-3xl border dark:border-slate-700 shadow-xs h-72 flex flex-col"><h4 class="font-bold text-xs text-slate-700 dark:text-slate-300 mb-2 text-center">📈 تطور قيمة الأعمال لآخر 6 شهور</h4><div class="relative w-full flex-1 min-h-0"><canvas ref={chart1Ref}></canvas></div></div>
-          <div class="bg-white dark:bg-slate-800 p-4 rounded-3xl border dark:border-slate-700 shadow-xs h-72 flex flex-col"><h4 class="font-bold text-xs text-slate-700 dark:text-slate-300 mb-2 text-center">📊 نسبة وتوزيع الأعمال (RTK / كروكيات)</h4><div class="relative w-full flex-1 min-h-0"><canvas ref={chart2Ref}></canvas></div></div>
+          <div class="bg-white dark:bg-slate-800 p-4 rounded-3xl border dark:border-slate-700 shadow-xs h-72 flex flex-col">
+            <h4 class="font-bold text-xs text-slate-700 dark:text-slate-300 mb-2 text-center">📈 تطور قيمة الأعمال لآخر 6 شهور</h4>
+            <div class="relative w-full flex-1 min-h-0"><canvas ref={chart1Ref}></canvas></div>
+          </div>
+          <div class="bg-white dark:bg-slate-800 p-4 rounded-3xl border dark:border-slate-700 shadow-xs h-72 flex flex-col">
+            <h4 class="font-bold text-xs text-slate-700 dark:text-slate-300 mb-2 text-center">📊 نسبة وتوزيع الأعمال (RTK / كروكيات)</h4>
+            <div class="relative w-full flex-1 min-h-0"><canvas ref={chart2Ref}></canvas></div>
+          </div>
         </div>
       );
     }
@@ -238,6 +247,7 @@
       const [payModalOpen, setPayModalOpen] = useState(false);
       const [editingOp, setEditingOp] = useState(null);
 
+      // استرجاع البيانات المخزنة محلياً عند بدء التشغيل فوراً لتعمل بدون إنترنت
       const [operations, setOperations] = useState(() => offlineStorage.get('operations', []));
       const [transactions, setTransactions] = useState(() => offlineStorage.get('transactions', []));
       const [payments, setPayments] = useState(() => offlineStorage.get('payments', []));
@@ -257,19 +267,28 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
-      const userEmail = (user?.email || localStorage.getItem('last_survey_user_email') || "").trim().toLowerCase();
+      // فحص الصلاحيات مع دعم الحساب المحفوظ محلياً
+      const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
       const isAdmin = isSuperAdmin || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
 
       const initialOpState = {
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
-        isFaddan: false, faddanQty: 1, faddanPrice: 250, isSketch: false, sketchesCount: 1,
-        agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0, engCalcMethod: "auto", engCustomPercent: 80, engCustomFixedAmount: 1500
+        isFaddan: false, faddanQty: 1, faddanPrice: 250,
+        isSketch: false, sketchesCount: 1,
+        agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0,
+        engCalcMethod: "auto",
+        engCustomPercent: 80,
+        engCustomFixedAmount: 1500
       };
 
       const [newOp, setNewOp] = useState(initialOpState);
-      const [newTx, setNewTx] = useState({ date: todayDate, type: "income", category: "إيراد عام", clientOrEntity: "", amount: "", notes: "" });
+
+      const [newTx, setNewTx] = useState({
+        date: todayDate, type: "income", category: "إيراد عام", clientOrEntity: "", amount: "", notes: ""
+      });
+
       const [newPayment, setNewPayment] = useState({ date: todayDate, clientName: "", siteLocation: "", amount: "", notes: "سداد دفعة من المستخلص" });
 
       const [extractClient, setExtractClient] = useState("");
@@ -279,12 +298,25 @@
       const [extractItems, setExtractItems] = useState([]);
       const [statementClient, setStatementClient] = useState("");
 
+      // مراقبة الاتصال بالإنترنت والمزامنة الذكية
       useEffect(() => {
-        const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت! 🟢"); if (db) offlineStorage.syncQueue(db); };
-        const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡"); };
+        const handleOnline = () => {
+          setIsOnline(true);
+          showToast("تم استعادة الاتصال بالإنترنت! جاري المزامنة 🟢");
+          if (db) offlineStorage.syncQueue(db);
+        };
+        const handleOffline = () => {
+          setIsOnline(false);
+          showToast("أنت تعمل الآن بدون إنترنت. الحفظ محلي بجهازك 📡");
+        };
+
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
-        return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
+
+        return () => {
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('offline', handleOffline);
+        };
       }, []);
 
       useEffect(() => {
@@ -300,41 +332,50 @@
 
       const logActivity = (actionText) => {
         if (!user) return;
-        const entry = { name: user.displayName || user.email, email: user.email, action: actionText, date: new Date().toLocaleString('ar-EG'), timestamp: Date.now() };
-        if (navigator.onLine && db) db.ref('survey_data/login_logs').push(entry);
+        const entry = {
+          name: user.displayName || user.email,
+          email: user.email,
+          action: actionText,
+          date: new Date().toLocaleString('ar-EG'),
+          timestamp: Date.now()
+        };
+        if (navigator.onLine && db) {
+          db.ref('survey_data/login_logs').push(entry);
+        }
       };
 
+      // التحقق من الحساب مع استعادة بيانات الدخول أوفلاين
       useEffect(() => {
-        const savedEmail = localStorage.getItem('last_survey_user_email');
-        if (!navigator.onLine && savedEmail) {
-          setUser({ email: savedEmail, displayName: localStorage.getItem('last_survey_user_name') || savedEmail });
-          setAuthLoading(false);
-          return;
-        }
-
         if (!auth) { setAuthLoading(false); return; }
-
-        const unsubscribe = auth.onAuthStateChanged((curr) => {
+        return auth.onAuthStateChanged((curr) => {
           if (curr) {
             setUser(curr);
-            localStorage.setItem('last_survey_user_email', curr.email);
-            localStorage.setItem('last_survey_user_name', curr.displayName || curr.email);
+            localStorage.setItem('last_user_email', curr.email);
+            localStorage.setItem('last_user_name', curr.displayName || curr.email);
             if (navigator.onLine && db && !sessionStorage.getItem('survey_log_done')) {
-              db.ref('survey_data/login_logs').push({ name: curr.displayName || curr.email, email: curr.email, action: "تسجيل الدخول", date: new Date().toLocaleString('ar-EG'), timestamp: Date.now() });
+              db.ref('survey_data/login_logs').push({
+                name: curr.displayName || curr.email,
+                email: curr.email,
+                action: "تسجيل الدخول للنظام",
+                date: new Date().toLocaleString('ar-EG'),
+                timestamp: Date.now()
+              });
               sessionStorage.setItem('survey_log_done', 'true');
             }
           } else {
+            // إذا كان المستخدم بدون نت ولكن لديه جلسة سابقة
+            const savedEmail = localStorage.getItem('last_user_email');
             if (savedEmail && !navigator.onLine) {
-              setUser({ email: savedEmail, displayName: localStorage.getItem('last_survey_user_name') || savedEmail });
+              setUser({ email: savedEmail, displayName: localStorage.getItem('last_user_name') || savedEmail });
             } else {
               setUser(null);
             }
           }
           setAuthLoading(false);
         });
-        return () => unsubscribe();
       }, []);
 
+      // استقبال التحديثات من Firebase وحفظها فوراً محلياً
       useEffect(() => {
         if (!db) return;
         const ref = db.ref('survey_data');
@@ -342,13 +383,34 @@
           const d = snap.val() || {};
           const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
           
-          if (d.operations) { const arr = toArr(d.operations).reverse(); setOperations(arr); offlineStorage.set('operations', arr); }
-          if (d.transactions) { const arr = toArr(d.transactions).reverse(); setTransactions(arr); offlineStorage.set('transactions', arr); }
-          if (d.payments) { const arr = toArr(d.payments).reverse(); setPayments(arr); offlineStorage.set('payments', arr); }
-          if (d.login_logs) { const arr = toArr(d.login_logs).reverse(); setLoginLogs(arr); offlineStorage.set('login_logs', arr); }
+          if (d.operations) {
+            const arr = toArr(d.operations).reverse();
+            setOperations(arr);
+            offlineStorage.set('operations', arr);
+          }
+          if (d.transactions) {
+            const arr = toArr(d.transactions).reverse();
+            setTransactions(arr);
+            offlineStorage.set('transactions', arr);
+          }
+          if (d.payments) {
+            const arr = toArr(d.payments).reverse();
+            setPayments(arr);
+            offlineStorage.set('payments', arr);
+          }
+          if (d.login_logs) {
+            const arr = toArr(d.login_logs).reverse();
+            setLoginLogs(arr);
+            offlineStorage.set('login_logs', arr);
+          }
           if (d.settings) {
             setSettings(prev => {
-              const updated = { ...prev, engineers: d.settings.engineers || prev.engineers, opTypes: d.settings.opTypes || prev.opTypes, logo: d.settings.logo || prev.logo };
+              const updated = {
+                ...prev,
+                engineers: d.settings.engineers || prev.engineers,
+                opTypes: d.settings.opTypes || prev.opTypes,
+                logo: d.settings.logo || prev.logo
+              };
               offlineStorage.set('settings', updated);
               return updated;
             });
@@ -356,10 +418,14 @@
         });
       }, []);
 
+      // حفظ أي قائمة سواء أونلاين أو أوفلاين
       const saveListSafely = (path, storageKey, data) => {
         offlineStorage.set(storageKey, data);
-        if (navigator.onLine && db) db.ref(`survey_data/${path}`).set(data);
-        else offlineStorage.addToQueue(`survey_data/${path}`, data);
+        if (navigator.onLine && db) {
+          db.ref(`survey_data/${path}`).set(data);
+        } else {
+          offlineStorage.addToQueue(`survey_data/${path}`, data);
+        }
       };
 
       const updateSettingArray = (key, title) => {
@@ -369,7 +435,7 @@
           const newSettings = { ...settings, [key]: updated };
           setSettings(newSettings);
           saveListSafely(`settings/${key}`, 'settings', newSettings);
-          logActivity(`إضافة ${title}: ${val.trim()}`);
+          logActivity(`إضافة ${title} جديد: ${val.trim()}`);
         }
       };
 
@@ -382,55 +448,93 @@
         const method = op?.engCalcMethod || 'auto';
 
         let engFee = 0, deviceFee = 0, officeFee = 0;
+
         const isEngDayDevHalf = method === 'engDay_devHalf' || type.includes('مهندس يوم + جهاز نصف يوم');
         const isHalfRtk = !isEngDayDevHalf && (type.includes('1/2') || type.includes('نص') || type.includes('نصف'));
         const isFullRtk = !isEngDayDevHalf && (type.includes('يوم RTK') || (type.includes('RTK') && !isHalfRtk));
 
-        if (isEngDayDevHalf || isHalfRtk) deviceFee = 1750;
-        else if (isFullRtk) deviceFee = 3500;
-        else deviceFee = 0;
+        if (isEngDayDevHalf || isHalfRtk) {
+          deviceFee = 1750;
+        } else if (isFullRtk) {
+          deviceFee = 3500;
+        } else {
+          deviceFee = 0;
+        }
 
-        if (isEngDayDevHalf) engFee = 2000;
-        else if (method === 'percent80') engFee = total * 0.80;
-        else if (method === 'percent70') engFee = total * 0.70;
-        else if (method === 'customPercent') engFee = total * ((parseNum(op?.engCustomPercent) || 80) / 100);
-        else if (method === 'customFixed') engFee = parseNum(op?.engCustomFixedAmount) || 0;
-        else {
+        if (isEngDayDevHalf) {
+          engFee = 2000;
+        } else if (method === 'percent80') {
+          engFee = total * 0.80;
+        } else if (method === 'percent70') {
+          engFee = total * 0.70;
+        } else if (method === 'customPercent') {
+          const pct = parseNum(op?.engCustomPercent) || 80;
+          engFee = total * (pct / 100);
+        } else if (method === 'customFixed') {
+          engFee = parseNum(op?.engCustomFixedAmount) || 0;
+        } else {
           if (isHalfRtk) engFee = 1500;
           else if (isFullRtk) engFee = 2000;
           else engFee = total * 0.80;
         }
 
         officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
-        return { engFee: Number(engFee) || 0, deviceFee: Number(deviceFee) || 0, officeFee: Number(officeFee) || 0, totalExpenses: Number(totalExpenses) || 0 };
+
+        return { 
+          engFee: Number(engFee) || 0, 
+          deviceFee: Number(deviceFee) || 0, 
+          officeFee: Number(officeFee) || 0, 
+          totalExpenses: Number(totalExpenses) || 0 
+        };
       };
 
       const handleOpTypeChange = (selectedType) => {
         let defaultAmount = newOp.agreedAmount;
         let defaultMethod = "auto";
-        if (selectedType === 'مهندس يوم + جهاز نصف يوم') { defaultAmount = 3750; defaultMethod = "engDay_devHalf"; }
-        else if (selectedType === 'يوم RTK') { defaultAmount = 5500; defaultMethod = "auto"; }
-        else if (selectedType.includes('1/2') || selectedType.includes('نص')) { defaultAmount = 3250; defaultMethod = "auto"; }
-        else { defaultMethod = "percent80"; }
+
+        if (selectedType === 'مهندس يوم + جهاز نصف يوم') {
+          defaultAmount = 3750;
+          defaultMethod = "engDay_devHalf";
+        } else if (selectedType === 'يوم RTK') {
+          defaultAmount = 5500;
+          defaultMethod = "auto";
+        } else if (selectedType.includes('1/2') || selectedType.includes('نص')) {
+          defaultAmount = 3250;
+          defaultMethod = "auto";
+        } else {
+          defaultMethod = "percent80";
+        }
         
-        setNewOp(prev => ({ ...prev, opType: selectedType, engCalcMethod: defaultMethod, agreedAmount: prev.isFaddan ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : defaultAmount }));
+        setNewOp(prev => ({
+          ...prev,
+          opType: selectedType,
+          engCalcMethod: defaultMethod,
+          agreedAmount: prev.isFaddan ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : defaultAmount
+        }));
       };
 
       const handleSaveOperation = (e) => {
         e.preventDefault();
         const finalAgreed = parseNum(newOp.agreedAmount);
-        const finalOp = { ...newOp, clientName: (newOp.clientName || '').trim(), siteLocation: (newOp.siteLocation || '').trim(), agreedAmount: finalAgreed };
+        const finalOp = { 
+          ...newOp, 
+          clientName: (newOp.clientName || '').trim(), 
+          siteLocation: (newOp.siteLocation || '').trim(), 
+          agreedAmount: finalAgreed 
+        };
         const shares = calculateOperationShares(finalOp);
 
         if (editingOp) {
           const updatedOps = operations.map(o => o.id === editingOp.id ? { ...o, ...finalOp, ...shares } : o);
           setOperations(updatedOps);
           saveListSafely('operations', 'operations', updatedOps);
-          logActivity(`تعديل طلعة: ${finalOp.clientName}`);
-          showToast(navigator.onLine ? "تم تحديث الطلعة بنجاح! ✏️" : "تم حفظ التعديل محلياً 💾");
+          logActivity(`تعديل طلعة للعميل: ${finalOp.clientName}`);
+          showToast(navigator.onLine ? "تم تحديث الطلعة بنجاح! ✏️" : "تم حفظ التعديل محلياً بجهازك 💾");
           setEditingOp(null);
         } else {
-          const opToSave = { id: Date.now(), ...finalOp, ...shares, createdBy: user?.email || 'Admin' };
+          const opToSave = {
+            id: Date.now(), ...finalOp, ...shares, createdBy: user?.email || 'Admin'
+          };
           const updatedOps = [opToSave, ...operations];
           setOperations(updatedOps);
           saveListSafely('operations', 'operations', updatedOps);
@@ -438,12 +542,16 @@
           if (parseNum(newOp.paidNow) > 0) {
             const autoPay = { id: Date.now() + 1, date: newOp.date, clientName: finalOp.clientName, siteLocation: finalOp.siteLocation, amount: parseNum(newOp.paidNow), notes: `دفعة مقدمة موقع (${finalOp.opType})` };
             const autoTx = { id: Date.now() + 2, date: newOp.date, type: "income", category: "تحصيل مساحة مقدم", clientOrEntity: `${finalOp.clientName}`, amount: parseNum(newOp.paidNow) };
-            const upPayments = [autoPay, ...payments]; const upTx = [autoTx, ...transactions];
-            setPayments(upPayments); setTransactions(upTx);
-            saveListSafely('payments', 'payments', upPayments); saveListSafely('transactions', 'transactions', upTx);
+            const upPayments = [autoPay, ...payments];
+            const upTx = [autoTx, ...transactions];
+            setPayments(upPayments);
+            setTransactions(upTx);
+            saveListSafely('payments', 'payments', upPayments);
+            saveListSafely('transactions', 'transactions', upTx);
           }
-          logActivity(`تسجيل طلعة جديدة: ${finalOp.clientName}`);
-          showToast(navigator.onLine ? "تم حفظ الطلعة بنجاح! 📐" : "تم حفظ الطلعة محلياً بدون إنترنت 💾");
+
+          logActivity(`تسجيل طلعة جديدة: ${finalOp.clientName} بقيمة ${finalAgreed} ج.م`);
+          showToast(navigator.onLine ? "تم حفظ الطلعة بنجاح! 📐" : "تم حفظ الطلعة بنجاح بدون إنترنت 💾");
         }
         setOpModalOpen(false);
       };
@@ -454,7 +562,8 @@
         if (amt <= 0) return alert("يرجى كتابة مبلغ صالح!");
         const item = { id: Date.now(), ...newTx, amount: amt };
         const updated = [item, ...transactions];
-        setTransactions(updated); saveListSafely('transactions', 'transactions', updated);
+        setTransactions(updated);
+        saveListSafely('transactions', 'transactions', updated);
         setNewTx({ date: todayDate, type: "income", category: "إيراد عام", clientOrEntity: "", amount: "", notes: "" });
         showToast("تم قيد الحركة بنجاح! 💵");
       };
@@ -463,19 +572,23 @@
         e.preventDefault();
         const item = { id: Date.now(), ...newPayment, clientName: (newPayment.clientName||'').trim(), amount: parseNum(newPayment.amount) };
         const tx = { id: Date.now()+1, date: item.date, type: 'income', category: 'سداد دفعة مستخلص', clientOrEntity: item.clientName, amount: item.amount };
-        const upPay = [item, ...payments]; const upTx = [tx, ...transactions];
+        const upPay = [item, ...payments];
+        const upTx = [tx, ...transactions];
         setPayments(upPay); setTransactions(upTx);
-        saveListSafely('payments', 'payments', upPay); saveListSafely('transactions', 'transactions', upTx);
+        saveListSafely('payments', 'payments', upPay);
+        saveListSafely('transactions', 'transactions', upTx);
         setPayModalOpen(false);
         setNewPayment({ date: todayDate, clientName: "", siteLocation: "", amount: "", notes: "سداد دفعة من المستخلص" });
         showToast("تم قيد الدفعة بنجاح! 💰");
       };
 
       const deleteItem = (path, id, list, setter, title) => {
-        if (!isAdmin) return showToast("مرفوض. للإدارة فقط 🔒");
+        if (!isAdmin) { showToast("مرفوض. للإدارة فقط 🔒"); return; }
         if (window.confirm("تأكيد الحذف النهائي؟")) {
           const updated = list.filter(item => item.id !== id);
-          setter(updated); saveListSafely(path, path, updated);
+          setter(updated);
+          saveListSafely(path, path, updated);
+          logActivity(`حذف ${title || 'عنصر'} من النظام`);
           showToast("تم الحذف بنجاح!");
         }
       };
@@ -484,15 +597,41 @@
         const cName = (targetClient || '').trim();
         const sName = (targetSite || '').trim();
         if (!cName) return setExtractItems([]);
-        const filtered = operations.filter(o => (o?.clientName||'').trim() === cName && (!sName || (o?.siteLocation||'').trim() === sName));
-        const loaded = filtered.map((o, idx) => {
-          let itemQty = 1; let itemPrice = parseNum(o?.agreedAmount); let itemDesc = o?.workDescription ? o.workDescription : (o?.opType || 'عمل مساحي');
-          if (o?.isFaddan) { itemQty = parseNum(o.faddanQty) || 1; itemPrice = parseNum(o.faddanPrice) || (parseNum(o.agreedAmount) / itemQty); itemDesc = `${itemDesc} (${itemQty} فدان)`; }
-          else if (o?.isSketch) { itemQty = parseNum(o.sketchesCount) || 1; itemPrice = parseNum(o.agreedAmount) / itemQty; itemDesc = `${itemDesc} (${itemQty} كروكي)`; }
-          return { id: o?.id || (Date.now() + idx), date: o?.date || todayDate, desc: itemDesc, qty: itemQty, unitPrice: itemPrice, rate: 100 };
+
+        const filtered = operations.filter(o => {
+          const matchClient = (o?.clientName || '').trim() === cName;
+          const matchSite = !sName || (o?.siteLocation || '').trim() === sName;
+          return matchClient && matchSite;
         });
+
+        const loaded = filtered.map((o, idx) => {
+          let itemQty = 1;
+          let itemPrice = parseNum(o?.agreedAmount);
+          let itemDesc = o?.workDescription ? o.workDescription : (o?.opType || 'عمل مساحي');
+
+          if (o?.isFaddan) {
+            itemQty = parseNum(o.faddanQty) || 1;
+            itemPrice = parseNum(o.faddanPrice) || (parseNum(o.agreedAmount) / itemQty);
+            itemDesc = `${itemDesc} (${itemQty} فدان)`;
+          } else if (o?.isSketch) {
+            itemQty = parseNum(o.sketchesCount) || 1;
+            itemPrice = parseNum(o.agreedAmount) / itemQty;
+            itemDesc = `${itemDesc} (${itemQty} كروكي)`;
+          }
+
+          return {
+            id: o?.id || (Date.now() + idx),
+            date: o?.date || todayDate,
+            desc: itemDesc,
+            qty: itemQty,
+            unitPrice: itemPrice,
+            rate: 100
+          };
+        });
+
         setExtractItems(loaded);
-        showToast(loaded.length > 0 ? `تم تحميل ${loaded.length} أعمال بنجاح!` : `لا توجد أعمال مطابقة.`);
+        if (loaded.length > 0) showToast(`تم تحميل ${loaded.length} أعمال بنجاح!`);
+        else showToast(`لا توجد أعمال مطابقة.`);
       };
 
       useEffect(() => {
@@ -500,7 +639,28 @@
         else setExtractItems([]);
       }, [extractClient, extractSite, operations]);
 
-      const clientNames = Array.from(new Set([...operations.map(o => (o?.clientName || '').trim()), ...payments.map(p => (p?.clientName || '').trim())])).filter(Boolean);
+      const handleAddEmptyExtractRow = () => {
+        setExtractItems([
+          ...extractItems,
+          { id: Date.now(), date: todayDate, desc: "بند أعمال مساحية", qty: 1, unitPrice: 1000, rate: 100 }
+        ]);
+      };
+
+      const handleRemoveExtractRow = (id) => {
+        setExtractItems(extractItems.filter(item => item.id !== id));
+      };
+
+      const extractTotalWork = extractItems.reduce((sum, item) => sum + (parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100)), 0);
+      const clientOpsForPayment = operations.filter(o => (o?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (o?.siteLocation||'').trim() === extractSite.trim()));
+      const clientPaysForPayment = payments.filter(p => (p?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (p?.siteLocation||'').trim() === extractSite.trim()));
+      const clientTotalPaid = clientOpsForPayment.reduce((s,o)=>s+parseNum(o?.paidNow),0) + clientPaysForPayment.reduce((s,p)=>s+parseNum(p?.amount),0);
+      const extractRemainingBalance = extractTotalWork - clientTotalPaid;
+
+      const clientNames = Array.from(new Set([
+        ...operations.map(o => (o?.clientName || '').trim()),
+        ...payments.map(p => (p?.clientName || '').trim())
+      ])).filter(Boolean);
+
       const siteLocationsList = Array.from(new Set(operations.map(o => (o?.siteLocation || '').trim()).filter(Boolean)));
 
       const monthlyTx = transactions.filter(t => t?.date && t.date.startsWith(vaultMonth));
@@ -522,22 +682,28 @@
         { id: "operations", label: "الأعمال والطلعات", icon: "📐" },
         { id: "vault", label: "الخزينة", icon: "💵" },
         { id: "payments", label: "الدفعات", icon: "💰" },
-        { id: "rtk", label: "جهاز RTK", icon: "🛰" },
+        { id: "rtk", label: "جهاز RTK", icon: "🛰️️" },
         { id: "expenses", label: "مصاريف التشغيل", icon: "🚗" },
         { id: "engineers", label: "حساب المهندسين", icon: "👷" },
         { id: "extracts", label: "المستخلصات", icon: "📄" },
         { id: "statement", label: "كشف الحساب", icon: "📑" },
         { id: "office", label: "أرباح المكتب", icon: "🏢" },
-        ...(isSuperAdmin ? [{ id: "logs", label: "سجل الدخول", icon: "🛡️" }] : []),
+        ...(isSuperAdmin ? [{ id: "logs", label: "سجل الدخول والمراقبة", icon: "🛡️" }] : []),
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ], [isSuperAdmin]);
 
       const liveExpenses = useMemo(() => {
-        const labor = parseNum(newOp?.laborCost); const car = parseNum(newOp?.carCost);
-        return { labor, car, totalExp: labor + car };
-      }, [newOp?.laborCost, newOp?.carCost]);
+        const labor = parseNum(newOp?.laborCost);
+        const car = parseNum(newOp?.carCost);
+        const totalExp = labor + car;
+        const agreed = parseNum(newOp?.agreedAmount);
+        const netAfterExp = agreed > 0 ? Math.max(0, agreed - totalExp) : 0;
+        return { labor, car, totalExp, netAfterExp };
+      }, [newOp?.laborCost, newOp?.carCost, newOp?.agreedAmount]);
 
-      const livePreview = useMemo(() => calculateOperationShares(newOp), [newOp?.opType, newOp?.agreedAmount, newOp?.laborCost, newOp?.carCost, newOp?.isSketch, newOp?.engCalcMethod]);
+      const livePreview = useMemo(() => {
+        return calculateOperationShares(newOp);
+      }, [newOp?.opType, newOp?.agreedAmount, newOp?.laborCost, newOp?.carCost, newOp?.isSketch, newOp?.engCalcMethod, newOp?.engCustomPercent, newOp?.engCustomFixedAmount]);
 
       if (authLoading) return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">جاري فتح النظام...</div>;
 
@@ -555,6 +721,8 @@
 
       return (
         <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
+          
+          {/* شريط حالة الاتصال بالإنترنت */}
           {!isOnline && (
             <div class="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
               <span>📡</span>
@@ -562,21 +730,43 @@
             </div>
           )}
 
+          {/* Header */}
           <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div class="flex items-center gap-2">
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
               <div>
                 <div class="flex items-center gap-2">
                   <h1 class="text-sm font-black leading-tight text-indigo-700 dark:text-indigo-400">مساحة ERP</h1>
-                  {isSuperAdmin ? <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">👑 مدير النظام</span> : <span class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full">مستخدم</span>}
+                  {isSuperAdmin ? (
+                    <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                      👑 مدير النظام
+                    </span>
+                  ) : isEngineer ? (
+                    <span class="bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      👷 مهندس معتمد
+                    </span>
+                  ) : (
+                    <span class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      مستخدم
+                    </span>
+                  )}
                 </div>
-                <div class="text-[10px] text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none">{user.email || user.displayName}</div>
+                <div class="text-[10px] text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none">
+                  {user.email}
+                </div>
               </div>
             </div>
+
             <div class="flex items-center gap-2">
-              <button onClick={() => setSettings(p=>({...p, theme: p.theme==='dark'?'light':'dark'}))} class="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">{settings.theme === 'dark' ? '☀️' : '🌙'}</button>
-              <a href="index.html" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition"><span>🏗️</span> <span class="hidden sm:inline">الإنشاءات</span></a>
-              <button onClick={()=>setDrawerOpen(true)} class="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">☰</button>
+              <button onClick={() => setSettings(p=>({...p, theme: p.theme==='dark'?'light':'dark'}))} class="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">
+                {settings.theme === 'dark' ? '☀️' : '🌙'}
+              </button>
+              <a href="index.html" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition">
+                <span>🏗️</span> <span class="hidden sm:inline">الإنشاءات</span>
+              </a>
+              <button onClick={()=>setDrawerOpen(true)} class="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">
+                ☰
+              </button>
             </div>
           </header>
 
@@ -590,7 +780,7 @@
                 ))}
               </div>
               <div class="p-3 border-t border-slate-800 text-[11px]">
-                <div class="truncate text-slate-400 mb-1">{user.email || user.displayName}</div>
+                <div class="truncate text-slate-400 mb-1">{user.email}</div>
                 <button onClick={()=>auth.signOut()} class="w-full bg-rose-600/20 text-rose-400 py-2 rounded-xl font-bold">تسجيل الخروج</button>
               </div>
             </aside>
@@ -601,7 +791,10 @@
                 <div class="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-4 flex flex-col justify-between">
                   <div>
                     <div class="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-                      <div><span class="font-black text-sm">أقسام نظام المساحة</span></div>
+                      <div>
+                        <span class="font-black text-sm">أقسام نظام المساحة</span>
+                        {isSuperAdmin && <span class="block text-[10px] text-amber-400 font-bold">👑 صلاحية مدير النظام</span>}
+                      </div>
                       <button onClick={()=>setDrawerOpen(false)} class="text-slate-400 hover:text-white text-lg">✕</button>
                     </div>
                     <nav class="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">
@@ -612,12 +805,16 @@
                       ))}
                     </nav>
                   </div>
-                  <div class="pt-3 border-t border-slate-800 text-xs"><button onClick={()=>auth.signOut()} class="w-full bg-rose-600/20 text-rose-400 py-2.5 rounded-xl font-bold">تسجيل الخروج</button></div>
+                  <div class="pt-3 border-t border-slate-800 text-xs">
+                    <button onClick={()=>auth.signOut()} class="w-full bg-rose-600/20 text-rose-400 py-2.5 rounded-xl font-bold">تسجيل الخروج</button>
+                  </div>
                 </div>
               </div>
             )}
 
             <main class="flex-1 overflow-y-auto p-3.5 sm:p-5 text-xs max-w-7xl mx-auto w-full">
+              
+              {/* 1. لوحة التحكم */}
               {activeTab === 'dashboard' && (
                 <div class="space-y-4">
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
@@ -630,6 +827,7 @@
                 </div>
               )}
 
+              {/* 2. تبويب العملاء */}
               {activeTab === 'clients_list' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700">
@@ -643,8 +841,15 @@
                         const due = totalBilled - totalPaid;
                         return (
                           <div key={c} class="p-4 rounded-2xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 space-y-2">
-                            <div class="flex justify-between items-start"><h4 class="font-black text-sm text-slate-900 dark:text-white">{c}</h4><span class="text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 px-2 py-0.5 rounded-lg">{ops.length} طلعات</span></div>
-                            <div class="text-[11px] space-y-0.5 text-slate-600 dark:text-slate-400"><div>إجمالي الحساب: <strong>{totalBilled.toLocaleString()} ج.م</strong></div><div>المسدد: <strong class="text-emerald-600">{totalPaid.toLocaleString()} ج.م</strong></div><div>المتبقي: <strong class={due>0?'text-rose-600':'text-slate-700'}>{due.toLocaleString()} ج.م</strong></div></div>
+                            <div class="flex justify-between items-start">
+                              <h4 class="font-black text-sm text-slate-900 dark:text-white">{c}</h4>
+                              <span class="text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 px-2 py-0.5 rounded-lg">{ops.length} طلعات</span>
+                            </div>
+                            <div class="text-[11px] space-y-0.5 text-slate-600 dark:text-slate-400">
+                              <div>إجمالي الحساب: <strong>{totalBilled.toLocaleString()} ج.م</strong></div>
+                              <div>المسدد: <strong class="text-emerald-600">{totalPaid.toLocaleString()} ج.م</strong></div>
+                              <div>المتبقي: <strong class={due>0?'text-rose-600':'text-slate-700'}>{due.toLocaleString()} ج.م</strong></div>
+                            </div>
                             <div class="flex gap-2 pt-2 border-t dark:border-slate-700">
                               <button onClick={()=>{ setExtractClient(c); setActiveTab('extracts'); }} class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 rounded-xl text-[11px]">📑 مستخلص</button>
                               <button onClick={()=>{ setStatementClient(c); setActiveTab('statement'); }} class="flex-1 bg-slate-800 hover:bg-black text-white py-1.5 rounded-xl text-[11px]">📊 كشف تفصيلي</button>
@@ -657,73 +862,200 @@
                 </div>
               )}
 
+              {/* 3. تبويب الأعمال والطلعات */}
               {activeTab === 'operations' && (
                 <div class="space-y-4">
                   <div class="flex flex-col sm:flex-row gap-2 justify-between items-stretch sm:items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border dark:border-slate-700 shadow-xs">
-                    <div class="flex gap-2 items-center"><label class="font-bold whitespace-nowrap text-xs">عرض شهر:</label><input type="month" value={opsFilterMonth} onChange={e=>setOpsFilterMonth(e.target.value)} class="border p-2 rounded-xl dark:bg-slate-700 font-bold text-xs"/></div>
-                    <button onClick={()=>{ setEditingOp(null); setNewOp(initialOpState); setOpModalOpen(true); }} class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 shadow-sm text-xs">➕ تسجيل طلعة جديدة</button>
+                    <div class="flex gap-2 items-center">
+                      <label class="font-bold whitespace-nowrap text-xs">عرض شهر:</label>
+                      <input 
+                        type="month" 
+                        value={opsFilterMonth} 
+                        onChange={e=>setOpsFilterMonth(e.target.value)}
+                        class="border p-2 rounded-xl dark:bg-slate-700 font-bold text-xs"
+                      />
+                    </div>
+                    <button 
+                      onClick={()=>{ 
+                        setEditingOp(null); 
+                        setNewOp(initialOpState); 
+                        setOpModalOpen(true); 
+                      }}
+                      class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 shadow-sm text-xs"
+                    >
+                      ➕ تسجيل طلعة جديدة
+                    </button>
                   </div>
+
                   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {operations.filter(o => (!opsFilterMonth || (o?.date||'').startsWith(opsFilterMonth))).map(o => (
-                      <div key={o.id} class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-2 relative">
-                        <div class="flex justify-between items-start"><div><h3 class="font-black text-sm text-slate-900 dark:text-white">{o.clientName}</h3><span class="text-[11px] font-bold text-amber-700 dark:text-amber-400">📍 {o.siteLocation || 'الموقع العام'}</span></div><span class="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-300">{o.date}</span></div>
-                        <div class="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-xl text-xs space-y-1">
-                          <div class="flex justify-between font-bold"><span>نوع العمل:</span><span class="text-indigo-600 dark:text-indigo-400">{o.opType}</span></div>
-                          {o.workDescription && <p class="text-[11px] text-slate-500 dark:text-slate-400 font-bold">📝 {o.workDescription}</p>}
-                          {o.isFaddan && <div class="text-[10px] text-amber-800 dark:text-amber-300 font-bold">🌾 حساب بالفدان: {o.faddanQty} فدان × {o.faddanPrice} ج.م</div>}
-                          {o.isSketch && <div class="text-[10px] text-blue-800 dark:text-blue-300 font-bold">📐 كروكيات: {o.sketchesCount} كروكي</div>}
-                          <div class="grid grid-cols-2 gap-1 text-[10px] pt-1 border-t dark:border-slate-600"><span>🚗 سيارة: <strong>{parseNum(o.carCost)}</strong></span><span>👷 عمالة: <strong>{parseNum(o.laborCost)}</strong></span><span>👷 أتعاب المهندس: <strong class="text-emerald-600">{parseNum(o.engFee)} ج.م</strong></span><span>🛰 حصة الجهاز: <strong class={parseNum(o.deviceFee)>0 ? "text-purple-600" : "text-slate-400"}>{parseNum(o.deviceFee)} ج.م</strong></span></div>
-                        </div>
-                        <div class="flex justify-between items-center pt-2 border-t dark:border-slate-700 font-bold text-xs">
-                          <div><span class="text-slate-400 text-[10px] block">المبلغ المتفق عليه:</span><strong class="text-sm font-black text-slate-900 dark:text-white">{parseNum(o.agreedAmount).toLocaleString()} ج.م</strong></div>
-                          <div class="flex items-center gap-1">
-                            <button onClick={()=>{ setEditingOp(o); setNewOp({...initialOpState, ...o, agreedAmount: o.agreedAmount||"", faddanQty: o.faddanQty||1, faddanPrice: o.faddanPrice||250, sketchesCount: o.sketchesCount||1}); setOpModalOpen(true); }} class="bg-indigo-50 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 p-2 rounded-xl" title="تعديل">✏️</button>
-                            {isAdmin && <button onClick={()=>deleteItem('operations', o.id, operations, setOperations, 'طلعة')} class="bg-rose-50 dark:bg-slate-700 text-rose-600 p-2 rounded-xl" title="حذف">🗑️</button>}
+                    {operations
+                      .filter(o => (!opsFilterMonth || (o?.date||'').startsWith(opsFilterMonth)))
+                      .map(o => (
+                        <div key={o.id} class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-2 relative">
+                          <div class="flex justify-between items-start">
+                            <div>
+                              <h3 class="font-black text-sm text-slate-900 dark:text-white">{o.clientName}</h3>
+                              <span class="text-[11px] font-bold text-amber-700 dark:text-amber-400">📍 {o.siteLocation || 'الموقع العام'}</span>
+                            </div>
+                            <span class="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-300">{o.date}</span>
+                          </div>
+
+                          <div class="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-xl text-xs space-y-1">
+                            <div class="flex justify-between font-bold">
+                              <span>نوع العمل:</span>
+                              <span class="text-indigo-600 dark:text-indigo-400">{o.opType}</span>
+                            </div>
+                            {o.workDescription && <p class="text-[11px] text-slate-500 dark:text-slate-400 font-bold">📝 {o.workDescription}</p>}
+                            {o.isFaddan && <div class="text-[10px] text-amber-800 dark:text-amber-300 font-bold">🌾 حساب بالفدان: {o.faddanQty} فدان × {o.faddanPrice} ج.م</div>}
+                            {o.isSketch && <div class="text-[10px] text-blue-800 dark:text-blue-300 font-bold">📐 كروكيات: {o.sketchesCount} كروكي</div>}
+                            <div class="grid grid-cols-2 gap-1 text-[10px] pt-1 border-t dark:border-slate-600">
+                              <span>🚗 سيارة: <strong>{parseNum(o.carCost)}</strong></span>
+                              <span>👷 عمالة: <strong>{parseNum(o.laborCost)}</strong></span>
+                              <span>👷 أتعاب المهندس: <strong class="text-emerald-600">{parseNum(o.engFee)} ج.م</strong></span>
+                              <span>🛰 حصة الجهاز: <strong class={parseNum(o.deviceFee)>0 ? "text-purple-600" : "text-slate-400"}>{parseNum(o.deviceFee)} ج.م</strong></span>
+                            </div>
+                          </div>
+
+                          <div class="flex justify-between items-center pt-2 border-t dark:border-slate-700 font-bold text-xs">
+                            <div>
+                              <span class="text-slate-400 text-[10px] block">المبلغ المتفق عليه:</span>
+                              <strong class="text-sm font-black text-slate-900 dark:text-white">{parseNum(o.agreedAmount).toLocaleString()} ج.م</strong>
+                            </div>
+                            <div class="flex items-center gap-1">
+                              <button onClick={()=>{ 
+                                setEditingOp(o); 
+                                setNewOp({
+                                  ...initialOpState,
+                                  ...o,
+                                  agreedAmount: o.agreedAmount || "",
+                                  faddanQty: o.faddanQty || 1,
+                                  faddanPrice: o.faddanPrice || 250,
+                                  sketchesCount: o.sketchesCount || 1,
+                                  engCalcMethod: o.engCalcMethod || "auto",
+                                  engCustomPercent: o.engCustomPercent || 80,
+                                  engCustomFixedAmount: o.engCustomFixedAmount || 1500
+                                }); 
+                                setOpModalOpen(true); 
+                              }} class="bg-indigo-50 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 p-2 rounded-xl hover:bg-indigo-100" title="تعديل">
+                                ✏️
+                              </button>
+                              {isAdmin && (
+                                <button onClick={()=>deleteItem('operations', o.id, operations, setOperations, 'طلعة')} class="bg-rose-50 dark:bg-slate-700 text-rose-600 p-2 rounded-xl hover:bg-rose-100" title="حذف">
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
               )}
 
+              {/* 4. تبويب الخزينة */}
               {activeTab === 'vault' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-3">
-                    <div class="flex items-center gap-2"><label>تصفية شهر:</label><input type="month" value={vaultMonth} onChange={e=>setVaultMonth(e.target.value)} class="border p-2 rounded-xl dark:bg-slate-700 text-xs"/></div>
+                    <div class="flex items-center gap-2">
+                      <label>تصفية شهر:</label>
+                      <input type="month" value={vaultMonth} onChange={e=>setVaultMonth(e.target.value)} class="border p-2 rounded-xl dark:bg-slate-700 text-xs"/>
+                    </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600"><span class="block text-indigo-700 dark:text-indigo-300 mb-1">حركة الشهر ({vaultMonth}):</span><div class="grid grid-cols-3 gap-1 text-center"><div><span class="text-[9px] text-slate-500">وارد</span><strong class="text-emerald-600 block">{mIn.toLocaleString()}</strong></div><div><span class="text-[9px] text-slate-500">صادر</span><strong class="text-rose-600 block">{mOut.toLocaleString()}</strong></div><div><span class="text-[9px] text-indigo-600">صافي</span><strong class="text-indigo-600 block">{mNet.toLocaleString()}</strong></div></div></div>
-                      <div class="p-3 bg-indigo-50/60 dark:bg-indigo-950/40 rounded-xl border border-indigo-200 dark:border-indigo-800"><span class="block text-indigo-900 dark:text-indigo-200 mb-1">التراكمي حتى ({vaultMonth}):</span><div class="grid grid-cols-3 gap-1 text-center"><div><span class="text-[9px] text-slate-500">وارد</span><strong class="text-emerald-700 block">{cumIn.toLocaleString()}</strong></div><div><span class="text-[9px] text-slate-500">منصرف</span><strong class="text-rose-700 block">{cumOut.toLocaleString()}</strong></div><div><span class="text-[9px] text-indigo-800">الصافي باليد</span><strong class="text-indigo-700 dark:text-indigo-300 block">{cumNet.toLocaleString()}</strong></div></div></div>
+                      <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600">
+                        <span class="block text-indigo-700 dark:text-indigo-300 mb-1">حركة الشهر ({vaultMonth}):</span>
+                        <div class="grid grid-cols-3 gap-1 text-center">
+                          <div><span class="text-[9px] text-slate-500">وارد</span><strong class="text-emerald-600 block">{mIn.toLocaleString()}</strong></div>
+                          <div><span class="text-[9px] text-slate-500">صادر</span><strong class="text-rose-600 block">{mOut.toLocaleString()}</strong></div>
+                          <div><span class="text-[9px] text-indigo-600">صافي</span><strong class="text-indigo-600 block">{mNet.toLocaleString()}</strong></div>
+                        </div>
+                      </div>
+                      <div class="p-3 bg-indigo-50/60 dark:bg-indigo-950/40 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                        <span class="block text-indigo-900 dark:text-indigo-200 mb-1">التراكمي حتى ({vaultMonth}):</span>
+                        <div class="grid grid-cols-3 gap-1 text-center">
+                          <div><span class="text-[9px] text-slate-500">وارد</span><strong class="text-emerald-700 block">{cumIn.toLocaleString()}</strong></div>
+                          <div><span class="text-[9px] text-slate-500">منصرف</span><strong class="text-rose-700 block">{cumOut.toLocaleString()}</strong></div>
+                          <div><span class="text-[9px] text-indigo-800">الصافي باليد</span><strong class="text-indigo-700 dark:text-indigo-300 block">{cumNet.toLocaleString()}</strong></div>
+                        </div>
+                      </div>
                     </div>
                   </div>
+
                   <form onSubmit={handleAddTransaction} class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-3">
                     <h3 class="text-xs font-black text-indigo-700 dark:text-indigo-400">💵 تسجيل حركة بالخزينة (وارد / صادر):</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                      <div><label class="block text-[11px] mb-1">النوع:</label><select value={newTx.type} onChange={e=>setNewTx({...newTx, type: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"><option value="income">📥 وارد (إيداع)</option><option value="expense">📤 صادر (منصرف)</option></select></div>
-                      <div><label class="block text-[11px] mb-1">التاريخ:</label><input type="date" value={newTx.date} onChange={e=>setNewTx({...newTx, date: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700" required/></div>
-                      <div><label class="block text-[11px] mb-1">البند / التصنيف:</label><input type="text" value={newTx.category} onChange={e=>setNewTx({...newTx, category: e.target.value})} placeholder="مصاريف بوفيه..." class="w-full border p-2 rounded-xl dark:bg-slate-700" required/></div>
-                      <div><label class="block text-[11px] mb-1">المبلغ (ج.م):</label><input type="number" step="any" value={newTx.amount} onChange={e=>setNewTx({...newTx, amount: e.target.value})} placeholder="0.00" class="w-full border p-2 rounded-xl dark:bg-slate-700 text-emerald-600 font-black" required/></div>
-                      <div><label class="block text-[11px] mb-1">ملاحظات:</label><input type="text" value={newTx.notes} onChange={e=>setNewTx({...newTx, notes: e.target.value})} placeholder="ملاحظات..." class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
+                      <div>
+                        <label class="block text-[11px] mb-1">النوع:</label>
+                        <select value={newTx.type} onChange={e=>setNewTx({...newTx, type: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700">
+                          <option value="income">📥 وارد (إيداع)</option>
+                          <option value="expense">📤 صادر (منصرف)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-[11px] mb-1">التاريخ:</label>
+                        <input type="date" value={newTx.date} onChange={e=>setNewTx({...newTx, date: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700" required/>
+                      </div>
+                      <div>
+                        <label class="block text-[11px] mb-1">البند / التصنيف:</label>
+                        <input type="text" value={newTx.category} onChange={e=>setNewTx({...newTx, category: e.target.value})} placeholder="مصاريف بوفيه، إيراد عام..." class="w-full border p-2 rounded-xl dark:bg-slate-700" required/>
+                      </div>
+                      <div>
+                        <label class="block text-[11px] mb-1">المبلغ (ج.م):</label>
+                        <input type="number" step="any" value={newTx.amount} onChange={e=>setNewTx({...newTx, amount: e.target.value})} placeholder="0.00" class="w-full border p-2 rounded-xl dark:bg-slate-700 text-emerald-600 font-black" required/>
+                      </div>
+                      <div>
+                        <label class="block text-[11px] mb-1">الجهة / الملاحظات:</label>
+                        <input type="text" value={newTx.notes} onChange={e=>setNewTx({...newTx, notes: e.target.value})} placeholder="ملاحظات..." class="w-full border p-2 rounded-xl dark:bg-slate-700"/>
+                      </div>
                     </div>
-                    <button type="submit" class="w-full bg-slate-800 hover:bg-black dark:bg-indigo-600 text-white py-2.5 rounded-xl font-bold">حفظ الحركة في الخزينة</button>
+                    <button type="submit" class="w-full bg-slate-800 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold shadow-xs">
+                      حفظ الحركة في الخزينة
+                    </button>
                   </form>
+
                   <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto">
                     <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">التاريخ</th><th class="p-2">النوع والبند</th><th class="p-2.5">الملاحظات</th><th class="p-2 text-center">المبلغ</th>{isAdmin && <th class="p-2 text-center">إجراء</th>}</tr></thead>
-                    <tbody>{monthlyTx.map(t=>(<tr key={t.id} class="border-b dark:border-slate-700"><td class="p-2 whitespace-nowrap text-slate-500 font-mono">{t.date}</td><td class="p-2"><span class={t.type==='income'?'text-emerald-600 font-bold':'text-rose-600 font-bold'}>{t.type==='income'?'📥 وارد: ':'📤 صادر: '} {t.category}</span></td><td class="p-2 text-slate-400">{t.notes || t.clientOrEntity || '-'}</td><td class="p-2 font-black text-center">{parseNum(t.amount).toLocaleString()} ج.م</td>{isAdmin && <td class="p-2 text-center"><button onClick={()=>deleteItem('transactions',t.id,transactions,setTransactions,'حركة خزينة')} class="text-rose-600 p-1">🗑️</button></td>}</tr>))}</tbody></table>
+                    <tbody>
+                      {monthlyTx.map(t=>(
+                        <tr key={t.id} class="border-b dark:border-slate-700">
+                          <td class="p-2 whitespace-nowrap text-slate-500 font-mono">{t.date}</td>
+                          <td class="p-2"><span class={t.type==='income'?'text-emerald-600 font-bold':'text-rose-600 font-bold'}>{t.type==='income'?'📥 وارد: ':'📤 صادر: '} {t.category}</span></td>
+                          <td class="p-2 text-slate-400">{t.notes || t.clientOrEntity || '-'}</td>
+                          <td class="p-2 font-black text-center">{parseNum(t.amount).toLocaleString()} ج.م</td>
+                          {isAdmin && <td class="p-2 text-center"><button onClick={()=>deleteItem('transactions',t.id,transactions,setTransactions,'حركة خزينة')} class="text-rose-600 p-1">🗑️</button></td>}
+                        </tr>
+                      ))}
+                    </tbody></table>
                   </div>
                 </div>
               )}
 
+              {/* 5. الدفعات */}
               {activeTab === 'payments' && (
                 <div class="space-y-4 font-bold">
-                  <div class="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border dark:border-slate-700"><span class="text-xs">سجل دفعات العملاء:</span><button onClick={()=>setPayModalOpen(true)} class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-black">➕ إضافة دفعة جديدة</button></div>
+                  <div class="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border dark:border-slate-700">
+                    <span class="text-xs">سجل دفعات العملاء:</span>
+                    <button onClick={()=>setPayModalOpen(true)} class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-black shadow-xs">
+                      ➕ إضافة دفعة جديدة
+                    </button>
+                  </div>
+
                   <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto">
                     <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2.5">التاريخ</th><th class="p-2.5">العميل</th><th class="p-2.5">الموقع</th><th class="p-2.5">الملاحظات</th><th class="p-2.5 text-center">المبلغ المسدد</th>{isAdmin&&<th class="p-2.5 text-center">إجراء</th>}</tr></thead>
-                    <tbody>{payments.map(p=><tr key={p.id} class="border-b dark:border-slate-700"><td class="p-2.5 whitespace-nowrap text-slate-500 font-mono">{p.date}</td><td class="p-2.5 font-black text-slate-900 dark:text-white">{p.clientName}</td><td class="p-2.5 text-amber-700">{p.siteLocation||'عام'}</td><td class="p-2.5 text-slate-600 dark:text-slate-400">{p.notes || '-'}</td><td class="p-2.5 text-center text-emerald-600 font-black">{parseNum(p.amount).toLocaleString()} ج.م</td>{isAdmin&&<td class="p-2.5 text-center"><button onClick={()=>deleteItem('payments',p.id,payments,setPayments,'دفعة')} class="text-rose-600 p-1">🗑️</button></td>}</tr>)}</tbody></table>
+                    <tbody>
+                      {payments.map(p=><tr key={p.id} class="border-b dark:border-slate-700">
+                        <td class="p-2.5 whitespace-nowrap text-slate-500 font-mono">{p.date}</td>
+                        <td class="p-2.5 font-black text-slate-900 dark:text-white">{p.clientName}</td>
+                        <td class="p-2.5 text-amber-700">{p.siteLocation||'عام'}</td>
+                        <td class="p-2.5 text-slate-600 dark:text-slate-400">{p.notes || '-'}</td>
+                        <td class="p-2.5 text-center text-emerald-600 font-black">{parseNum(p.amount).toLocaleString()} ج.م</td>
+                        {isAdmin&&<td class="p-2.5 text-center"><button onClick={()=>deleteItem('payments',p.id,payments,setPayments,'دفعة')} class="text-rose-600 p-1">🗑️</button></td>}
+                      </tr>)}
+                    </tbody></table>
                   </div>
                 </div>
               )}
 
+              {/* 6. جهاز RTK */}
               {activeTab === 'rtk' && (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs text-center font-bold space-y-4">
                   <h3 class="text-base text-indigo-700 dark:text-indigo-400">إيرادات جهاز RTK المجمعة</h3>
@@ -737,68 +1069,237 @@
                 </div>
               )}
 
+              {/* 7. مصاريف التشغيل */}
               {activeTab === 'expenses' && (
                 <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 overflow-x-auto font-bold space-y-3">
                   <h3 class="text-sm font-black">🚗 تفصيل مصاريف العمالة والسيارات لكل عملية:</h3>
                   <table class="w-full text-right border dark:border-slate-700"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border">التاريخ</th><th class="p-2 border">العميل</th><th class="p-2 border">الموقع</th><th class="p-2 border text-center text-amber-700">مصاريف عمالة</th><th class="p-2 border text-center text-blue-700">مصاريف سيارة</th><th class="p-2 border text-center text-rose-600">إجمالي المصروف</th></tr></thead>
-                  <tbody>{operations.map(o=>{ const l = parseNum(o?.laborCost); const c = parseNum(o?.carCost); const t = l + c; return (<tr key={o.id} class="border-b dark:border-slate-700"><td class="p-2 border whitespace-nowrap">{o.date}</td><td class="p-2 border whitespace-nowrap font-bold">{o.clientName}</td><td class="p-2 border text-amber-700 whitespace-nowrap">{o.siteLocation}</td><td class="p-2 border text-center text-amber-700">{l.toLocaleString()}</td><td class="p-2 border text-center text-blue-700">{c.toLocaleString()}</td><td class="p-2 border text-center font-bold text-rose-600">{t.toLocaleString()} ج.م</td></tr>); })}</tbody></table>
+                  <tbody>
+                    {operations.map(o=>{
+                      const l = parseNum(o?.laborCost);
+                      const c = parseNum(o?.carCost);
+                      const t = l + c;
+                      return (
+                        <tr key={o.id} class="border-b dark:border-slate-700">
+                          <td class="p-2 border whitespace-nowrap">{o.date}</td>
+                          <td class="p-2 border whitespace-nowrap font-bold">{o.clientName}</td>
+                          <td class="p-2 border text-amber-700 whitespace-nowrap">{o.siteLocation}</td>
+                          <td class="p-2 border text-center text-amber-700">{l.toLocaleString()}</td>
+                          <td class="p-2 border text-center text-blue-700">{c.toLocaleString()}</td>
+                          <td class="p-2 border text-center font-bold text-rose-600">{t.toLocaleString()} ج.م</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody></table>
                 </div>
               )}
 
+              {/* 8. حساب المهندسين */}
               {activeTab === 'engineers' && (
                 <div class="space-y-4 font-bold">
-                  <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs"><label class="mb-1 block">اختر المهندس:</label><select value={extractEngineer} onChange={e=>setExtractEngineer(e.target.value)} class="w-full sm:w-1/2 border p-2.5 rounded-xl dark:bg-slate-700">{settings.engineers.map(e=><option key={e}>{e}</option>)}</select></div>
+                  <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs">
+                    <label class="mb-1 block">اختر المهندس:</label>
+                    <select value={extractEngineer} onChange={e=>setExtractEngineer(e.target.value)} class="w-full sm:w-1/2 border p-2.5 rounded-xl dark:bg-slate-700">
+                      {settings.engineers.map(e=><option key={e}>{e}</option>)}
+                    </select>
+                  </div>
                   {extractEngineer && (() => {
                     const engOps = operations.filter(o => o?.engineer === extractEngineer);
                     const totalEngDues = engOps.reduce((s,o)=>s+parseNum(o?.engFee),0);
                     return (
                       <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs">
                         <div class="flex justify-between items-center mb-3"><h3>حساب: {extractEngineer}</h3><span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 px-3 py-1 rounded-xl">المستحق: {totalEngDues.toLocaleString()} ج.م</span></div>
-                        <div class="overflow-x-auto"><table class="w-full text-right border"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border">التاريخ</th><th class="p-2 border">العمل والموقع</th><th class="p-2 border text-center text-emerald-600">الأتعاب</th></tr></thead>
-                        <tbody>{engOps.map(o=><tr key={o.id}><td class="p-2 border whitespace-nowrap">{o.date}</td><td class="p-2 border">{o.clientName} ({o.siteLocation})</td><td class="p-2 border text-center font-bold text-emerald-600">{parseNum(o.engFee).toLocaleString()}</td></tr>)}</tbody></table></div>
+                        <div class="overflow-x-auto">
+                          <table class="w-full text-right border"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border">التاريخ</th><th class="p-2 border">العمل والموقع</th><th class="p-2 border text-center text-emerald-600">الأتعاب</th></tr></thead>
+                          <tbody>{engOps.map(o=><tr key={o.id}><td class="p-2 border whitespace-nowrap">{o.date}</td><td class="p-2 border">{o.clientName} ({o.siteLocation})</td><td class="p-2 border text-center font-bold text-emerald-600">{parseNum(o.engFee).toLocaleString()}</td></tr>)}</tbody></table>
+                        </div>
                       </div>
-                    );
+                    )
                   })()}
                 </div>
               )}
 
+              {/* 9. المستخلصات */}
               {activeTab === 'extracts' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs print-hidden flex flex-col sm:flex-row gap-3 items-center">
-                    <div class="w-full sm:w-1/3"><label class="block mb-1">اختر العميل:</label><select value={extractClient} onChange={e=>setExtractClient(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-black text-xs"><option value="">-- اضغط لاختيار العميل --</option>{clientNames.map(c=><option key={c}>{c}</option>)}</select></div>
-                    <div class="w-full sm:w-1/3"><label class="block mb-1">الموقع بالمزرعة (اختياري):</label><input list="sites-list" value={extractSite} onChange={e=>setExtractSite(e.target.value)} placeholder="الموقع العام..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-xs"/><datalist id="sites-list">{siteLocationsList.map(s=><option key={s} value={s}/>)}</datalist></div>
-                    <div class="w-full sm:w-1/3 flex items-end"><button onClick={()=>loadClientOpsIntoExtract(extractClient, extractSite)} class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl text-xs font-black shadow-xs">📥 سحب أعمال العميل</button></div>
+                    <div class="w-full sm:w-1/3">
+                      <label class="block mb-1">اختر العميل:</label>
+                      <select value={extractClient} onChange={e=>setExtractClient(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-black text-xs">
+                        <option value="">-- اضغط لاختيار العميل --</option>
+                        {clientNames.map(c=><option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div class="w-full sm:w-1/3">
+                      <label class="block mb-1">الموقع بالمزرعة (اختياري):</label>
+                      <input list="sites-list" value={extractSite} onChange={e=>setExtractSite(e.target.value)} placeholder="الموقع العام، المحمية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-xs"/>
+                      <datalist id="sites-list">{siteLocationsList.map(s=><option key={s} value={s}/>)}</datalist>
+                    </div>
+                    <div class="w-full sm:w-1/3 flex items-end">
+                      <button 
+                        onClick={()=>loadClientOpsIntoExtract(extractClient, extractSite)} 
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1.5"
+                      >
+                        📥 سحب أعمال العميل
+                      </button>
+                    </div>
                   </div>
+
                   {extractClient ? (
                     <div>
                       <div id="printable-area" class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm print-area text-slate-800 space-y-5">
                         <div class="flex justify-between items-start border-b border-slate-200 pb-4">
-                          <div><h2 class="text-xl font-black text-slate-900 tracking-tight">مستخلص أعمال مساحية</h2><div class="flex items-center gap-2 text-xs text-slate-500 font-bold mt-1"><span>رقم المستخلص: <strong class="text-indigo-600">#{extractNumber}</strong></span><span>•</span><span>التاريخ: {todayDate}</span></div></div>
-                          <div class="flex items-center gap-4"><div class="text-left"><span class="block text-xs text-slate-400">العميل / المالك:</span><strong class="text-base font-black text-slate-900">{extractClient}</strong>{extractSite && <span class="block text-xs text-amber-700 font-bold">الموقع: {extractSite}</span>}</div>{settings.logo && <img src={settings.logo} class="h-14 object-contain rounded-lg border p-1" />}</div>
+                          <div>
+                            <h2 class="text-xl font-black text-slate-900 tracking-tight">مستخلص أعمال مساحية</h2>
+                            <div class="flex items-center gap-2 text-xs text-slate-500 font-bold mt-1">
+                              <span>رقم المستخلص: <strong class="text-indigo-600">#{extractNumber}</strong></span>
+                              <span>•</span>
+                              <span>التاريخ: {todayDate}</span>
+                            </div>
+                          </div>
+                          <div class="flex items-center gap-4">
+                            <div class="text-left">
+                              <span class="block text-xs text-slate-400">العميل / المالك:</span>
+                              <strong class="text-base font-black text-slate-900">{extractClient}</strong>
+                              {extractSite && <span class="block text-xs text-amber-700 font-bold">الموقع: {extractSite}</span>}
+                            </div>
+                            {settings.logo && <img src={settings.logo} class="h-14 object-contain rounded-lg border p-1" />}
+                          </div>
                         </div>
-                        <div class="overflow-x-auto"><table class="w-full text-right border-collapse text-xs"><thead><tr class="bg-slate-50 text-slate-600 border-b border-slate-200"><th class="p-2.5 text-center w-8">م</th><th class="p-2.5 w-24">التاريخ</th><th class="p-2.5">بيان الأعمال</th><th class="p-2.5 text-center w-20">الكمية</th><th class="p-2.5 text-center w-24">الفئة</th><th class="p-2.5 text-center w-24">نسبة الإنجاز</th><th class="p-2.5 text-center w-28">الصافي</th><th class="p-2.5 text-center w-8 print-hidden"></th></tr></thead>
-                        <tbody class="divide-y divide-slate-100">{extractItems.map((item, idx) => { const net = parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100); return (<tr key={item.id} class="hover:bg-slate-50/60"><td class="p-2.5 text-center text-slate-400 font-bold">{idx + 1}</td><td class="p-2.5 text-slate-500 font-mono whitespace-nowrap">{item.date || '-'}</td><td class="p-2.5 font-bold text-slate-900"><input type="text" value={item.desc} onChange={e=>{ const up = extractItems.map(it=>it.id===item.id?{...it, desc: e.target.value}:it); setExtractItems(up); }} class="w-full bg-transparent font-bold outline-none"/></td><td class="p-2 text-center"><input type="number" step="any" value={item.qty} onChange={e=>{ const up = extractItems.map(it=>it.id===item.id?{...it, qty: e.target.value}:it); setExtractItems(up); }} class="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/></td><td class="p-2 text-center"><input type="number" step="any" value={item.unitPrice} onChange={e=>{ const up = extractItems.map(it=>it.id===item.id?{...it, unitPrice: e.target.value}:it); setExtractItems(up); }} class="w-20 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/></td><td class="p-2 text-center"><select value={item.rate} onChange={e=>{ const up = extractItems.map(it=>it.id===item.id?{...it, rate: e.target.value}:it); setExtractItems(up); }} class="border border-slate-200 rounded-lg p-1 font-bold bg-white text-center outline-none"><option value="100">%100</option><option value="90">%90</option><option value="50">%50</option></select></td><td class="p-2.5 text-center font-black text-indigo-700 text-sm">{net.toLocaleString()} ج.م</td><td class="p-2.5 text-center print-hidden"><button onClick={()=>handleRemoveExtractRow(item.id)} class="text-rose-500 font-bold p-1">✕</button></td></tr>); })}</tbody></table></div>
-                        <div class="print-hidden pt-1"><button onClick={handleAddEmptyExtractRow} class="text-xs font-bold text-indigo-600">➕ إضافة بند يدوي إضافي</button></div>
+
+                        <div class="overflow-x-auto">
+                          <table class="w-full text-right border-collapse text-xs">
+                            <thead>
+                              <tr class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                <th class="p-2.5 text-center w-8">م</th>
+                                <th class="p-2.5 w-24">التاريخ</th>
+                                <th class="p-2.5">بيان الأعمال</th>
+                                <th class="p-2.5 text-center w-20">الكمية</th>
+                                <th class="p-2.5 text-center w-24">الفئة</th>
+                                <th class="p-2.5 text-center w-24">نسبة الإنجاز</th>
+                                <th class="p-2.5 text-center w-28">الصافي</th>
+                                <th class="p-2.5 text-center w-8 print-hidden"></th>
+                              </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                              {extractItems.map((item, idx) => {
+                                const net = parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100);
+                                return (
+                                  <tr key={item.id} class="hover:bg-slate-50/60">
+                                    <td class="p-2.5 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                    <td class="p-2.5 text-slate-500 font-mono whitespace-nowrap">{item.date || '-'}</td>
+                                    <td class="p-2.5 font-bold text-slate-900">
+                                      <input type="text" value={item.desc} onChange={e=>{
+                                        const up = extractItems.map(it=>it.id===item.id?{...it, desc: e.target.value}:it);
+                                        setExtractItems(up);
+                                      }} class="w-full bg-transparent font-bold outline-none"/>
+                                    </td>
+                                    <td class="p-2 text-center">
+                                      <input type="number" step="any" value={item.qty} onChange={e=>{
+                                        const up = extractItems.map(it=>it.id===item.id?{...it, qty: e.target.value}:it);
+                                        setExtractItems(up);
+                                      }} class="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/>
+                                    </td>
+                                    <td class="p-2 text-center">
+                                      <input type="number" step="any" value={item.unitPrice} onChange={e=>{
+                                        const up = extractItems.map(it=>it.id===item.id?{...it, unitPrice: e.target.value}:it);
+                                        setExtractItems(up);
+                                      }} class="w-20 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none"/>
+                                    </td>
+                                    <td class="p-2 text-center">
+                                      <select value={item.rate} onChange={e=>{
+                                        const up = extractItems.map(it=>it.id===item.id?{...it, rate: e.target.value}:it);
+                                        setExtractItems(up);
+                                      }} class="border border-slate-200 rounded-lg p-1 font-bold bg-white text-center outline-none">
+                                        <option value="100">%100</option>
+                                        <option value="90">%90</option>
+                                        <option value="50">%50</option>
+                                      </select>
+                                    </td>
+                                    <td class="p-2.5 text-center font-black text-indigo-700 text-sm">
+                                      {net.toLocaleString()} ج.م
+                                    </td>
+                                    <td class="p-2.5 text-center print-hidden">
+                                      <button onClick={()=>handleRemoveExtractRow(item.id)} class="text-rose-500 hover:text-rose-700 font-bold p-1">✕</button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div class="print-hidden pt-1">
+                          <button onClick={handleAddEmptyExtractRow} class="text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                            ➕ إضافة بند يدوي إضافي
+                          </button>
+                        </div>
+
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200">
-                          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center"><span class="text-[11px] text-slate-500 font-bold block mb-0.5">إجمالي الأعمال المنجزة</span><strong class="text-lg font-black text-slate-900">{extractTotalWork.toLocaleString()} ج.م</strong></div>
-                          <div class="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-center"><span class="text-[11px] text-emerald-800 font-bold block mb-0.5">المسدد من العميل حتى تاريخه</span><strong class="text-lg font-black text-emerald-700">{clientTotalPaid.toLocaleString()} ج.م</strong></div>
-                          <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-center"><span class="text-[11px] text-rose-800 font-bold block mb-0.5">المتبقي المستحق المطلوب سداده</span><strong class="text-xl font-black text-rose-600">{extractRemainingBalance.toLocaleString()} ج.م</strong></div>
+                          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+                            <span class="text-[11px] text-slate-500 font-bold block mb-0.5">إجمالي الأعمال المنجزة</span>
+                            <strong class="text-lg font-black text-slate-900">{extractTotalWork.toLocaleString()} ج.م</strong>
+                          </div>
+                          <div class="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-center">
+                            <span class="text-[11px] text-emerald-800 font-bold block mb-0.5">المسدد من العميل حتى تاريخه</span>
+                            <strong class="text-lg font-black text-emerald-700">{clientTotalPaid.toLocaleString()} ج.م</strong>
+                          </div>
+                          <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-center">
+                            <span class="text-[11px] text-rose-800 font-bold block mb-0.5">المتبقي المستحق المطلوب سداده</span>
+                            <strong class="text-xl font-black text-rose-600">{extractRemainingBalance.toLocaleString()} ج.م</strong>
+                          </div>
+                        </div>
+
+                        <div class="pt-6 flex justify-between items-end border-t border-slate-200 text-xs font-bold text-slate-600">
+                          <div>
+                            <span>المهندس المشرف:</span>
+                            <strong class="block text-sm text-slate-900 mt-1">{extractEngineer}</strong>
+                          </div>
+                          <div class="text-center">
+                            <span>الاعتماد والختم:</span>
+                            <span class="block mt-3 text-slate-300">............................................</span>
+                          </div>
                         </div>
                       </div>
+
                       <div class="flex flex-col sm:flex-row justify-end gap-2.5 pt-4 print-hidden">
-                        <button onClick={()=>window.print()} class="bg-slate-800 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold">🖨️ طباعة المستخلص</button>
-                        <button onClick={()=>{ const summaryMessage = `🏢 *مكتب الاستشارات والأعمال المساحية*\n📄 *مستخلص تصفية أعمال للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️ *التاريخ:* ${todayDate}`; exportCleanPdfAndWhatsApp('printable-area', `مستخلص_${extractClient}.pdf`, summaryMessage); }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-black"><span>📲</span> إرسال المستخلص عبر واتساب (PDF مستقل)</button>
+                        <button onClick={()=>window.print()} class="bg-slate-800 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-1.5 transition">
+                          🖨️ طباعة المستخلص
+                        </button>
+                        <button onClick={()=>{
+                          const summaryMessage = `🏢 *مكتب الاستشارات والأعمال المساحية*\n📄 *مستخلص تصفية أعمال للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️ *التاريخ:* ${todayDate}`;
+                          exportCleanPdfAndWhatsApp('printable-area', `مستخلص_${extractClient}.pdf`, summaryMessage);
+                        }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-sm transition">
+                          <span>📲</span> إرسال المستخلص عبر واتساب (PDF مستقل)
+                        </button>
                       </div>
                     </div>
                   ) : (
-                    <div class="bg-white dark:bg-slate-800 p-8 rounded-3xl text-center text-slate-400 font-bold border border-dashed dark:border-slate-700">يرجى اختيار العميل من القائمة العلوية ثم الضغط على "سحب أعمال العميل"</div>
+                    <div class="bg-white dark:bg-slate-800 p-8 rounded-3xl text-center text-slate-400 font-bold border border-dashed dark:border-slate-700">
+                      يرجى اختيار العميل من القائمة العلوية ثم الضغط على "سحب أعمال العميل"
+                    </div>
                   )}
                 </div>
               )}
 
+              {/* 10. كشف الحساب */}
               {activeTab === 'statement' && (
                 <div class="space-y-4 font-bold">
-                  <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-3 items-center print-hidden"><div class="w-full sm:w-1/2"><label class="block mb-1">اختر العميل لعرض كشف الحساب التحليلي للشركاء:</label><select value={statementClient} onChange={e=>setStatementClient(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 text-xs"><option value="">-- اختر العميل --</option>{clientNames.map(c=><option key={c}>{c}</option>)}</select></div>{statementClient && <div class="w-full sm:w-1/2 flex justify-end gap-2 items-end"><button onClick={()=>window.print()} class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs">🖨️ طباعة كشف الشركاء</button></div>}</div>
+                  <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-3 items-center print-hidden">
+                    <div class="w-full sm:w-1/2">
+                      <label class="block mb-1">اختر العميل لعرض كشف الحساب التحليلي للشركاء:</label>
+                      <select value={statementClient} onChange={e=>setStatementClient(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 text-xs">
+                        <option value="">-- اختر العميل --</option>
+                        {clientNames.map(c=><option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    {statementClient && (
+                      <div class="w-full sm:w-1/2 flex justify-end gap-2 items-end">
+                        <button onClick={()=>window.print()} class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs">🖨️ طباعة كشف الشركاء</button>
+                      </div>
+                    )}
+                  </div>
+
                   {statementClient && (() => {
                     const cOps = operations.filter(o => (o?.clientName||'').trim() === statementClient.trim());
                     const cPays = payments.filter(p => (p?.clientName||'').trim() === statementClient.trim());
@@ -807,11 +1308,23 @@
                     const tCar = cOps.reduce((s,o)=>s+parseNum(o?.carCost),0);
                     const tRtk = cOps.reduce((s,o)=>s+parseNum(o?.deviceFee),0);
                     const tEng = cOps.reduce((s,o)=>s+parseNum(o?.engFee),0);
+                    const tOffice = cOps.reduce((s,o)=>s+parseNum(o?.officeFee),0);
                     const tPaid = cPays.reduce((s,p)=>s+parseNum(p?.amount),0) + cOps.reduce((s,o)=>s+parseNum(o?.paidNow),0);
                     const netDue = tBilled - tPaid;
+
                     return (
                       <div id="printable-area" class="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 print-area text-slate-900">
-                        <div class="flex justify-between items-start border-b pb-3"><div><h3 class="text-base font-black text-slate-900">📊 كشف حساب تحليلي تفصيلي للشركاء</h3><div class="text-xs text-slate-500 font-bold mt-1"><span>العميل: <strong class="text-indigo-700">{statementClient}</strong></span><span> • التاريخ: {todayDate}</span></div></div>{settings.logo && <img src={settings.logo} class="h-14 object-contain rounded-lg border p-1" />}</div>
+                        <div class="flex justify-between items-start border-b pb-3">
+                          <div>
+                            <h3 class="text-base font-black text-slate-900">📊 كشف حساب تحليلي تفصيلي للشركاء</h3>
+                            <div class="text-xs text-slate-500 font-bold mt-1">
+                              <span>العميل: <strong class="text-indigo-700">{statementClient}</strong></span>
+                              <span> • التاريخ: {todayDate}</span>
+                            </div>
+                          </div>
+                          {settings.logo && <img src={settings.logo} class="h-14 object-contain rounded-lg border p-1" />}
+                        </div>
+
                         <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-xs">
                           <div class="p-2.5 bg-slate-50 rounded-xl border">إجمالي العمل: <strong class="block text-indigo-700 font-black text-sm">{tBilled.toLocaleString()}</strong></div>
                           <div class="p-2.5 bg-amber-50 rounded-xl border">عمالة: <strong class="block text-amber-700 font-black text-sm">{tLabor.toLocaleString()}</strong></div>
@@ -820,14 +1333,46 @@
                           <div class="p-2.5 bg-emerald-50 rounded-xl border">أتعاب المهندسين: <strong class="block text-emerald-700 font-black text-sm">{tEng.toLocaleString()}</strong></div>
                           <div class="p-2.5 bg-rose-50 rounded-xl border">المتبقي على العميل: <strong class="block text-rose-700 font-black text-sm">{netDue.toLocaleString()}</strong></div>
                         </div>
-                        <div class="overflow-x-auto"><table class="w-full text-right border text-xs"><thead><tr><th class="p-2 border">التاريخ</th><th class="p-2 border">العمل والموقع</th><th class="p-2 border text-center">المبلغ</th><th class="p-2 border text-center text-amber-700">عمالة</th><th class="p-2 border text-center text-blue-700">سيارة</th><th class="p-2 border text-center text-purple-700">حصة RTK</th><th class="p-2 border text-center text-emerald-700">أتعاب المهندس</th><th class="p-2 border text-center text-indigo-700">صافي المكتب</th><th class="p-2 border text-center text-emerald-600">المحصل فورا</th></tr></thead>
-                        <tbody>{cOps.map(o => (<tr key={o.id} class="border-b"><td class="p-2 border whitespace-nowrap text-slate-500 font-mono">{o.date}</td><td class="p-2 border font-bold">{o.opType} ({o.workDescription || '-'}) <span class="text-amber-700 text-[10px]">[{o.siteLocation||'عام'}]</span></td><td class="p-2 border text-center font-bold text-indigo-600">{parseNum(o.agreedAmount).toLocaleString()}</td><td class="p-2 border text-center text-amber-700">{parseNum(o.laborCost).toLocaleString()}</td><td class="p-2 border text-center text-blue-700">{parseNum(o.carCost).toLocaleString()}</td><td class="p-2 border text-center text-purple-700">{parseNum(o.deviceFee).toLocaleString()}</td><td class="p-2 border text-center text-emerald-700">{parseNum(o.engFee).toLocaleString()}</td><td class="p-2 border text-center text-indigo-700">{parseNum(o.officeFee).toLocaleString()}</td><td class="p-2 border text-center text-emerald-600 font-bold">{parseNum(o.paidNow).toLocaleString()}</td></tr>))}</tbody></table></div>
+
+                        <div class="overflow-x-auto">
+                          <table class="w-full text-right border text-xs">
+                            <thead class="bg-slate-100">
+                              <tr>
+                                <th class="p-2 border">التاريخ</th>
+                                <th class="p-2 border">العمل والموقع</th>
+                                <th class="p-2 border text-center">المبلغ</th>
+                                <th class="p-2 border text-center text-amber-700">عمالة</th>
+                                <th class="p-2 border text-center text-blue-700">سيارة</th>
+                                <th class="p-2 border text-center text-purple-700">حصة RTK</th>
+                                <th class="p-2 border text-center text-emerald-700">أتعاب المهندس</th>
+                                <th class="p-2 border text-center text-indigo-700">صافي المكتب</th>
+                                <th class="p-2 border text-center text-emerald-600">المحصل فورا</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {cOps.map(o => (
+                                <tr key={o.id} class="border-b">
+                                  <td class="p-2 border whitespace-nowrap text-slate-500 font-mono">{o.date}</td>
+                                  <td class="p-2 border font-bold">{o.opType} ({o.workDescription || '-'}) <span class="text-amber-700 text-[10px]">[{o.siteLocation||'عام'}]</span></td>
+                                  <td class="p-2 border text-center font-bold text-indigo-600">{parseNum(o.agreedAmount).toLocaleString()}</td>
+                                  <td class="p-2 border text-center text-amber-700">{parseNum(o.laborCost).toLocaleString()}</td>
+                                  <td class="p-2 border text-center text-blue-700">{parseNum(o.carCost).toLocaleString()}</td>
+                                  <td class="p-2 border text-center text-purple-700">{parseNum(o.deviceFee).toLocaleString()}</td>
+                                  <td class="p-2 border text-center text-emerald-700">{parseNum(o.engFee).toLocaleString()}</td>
+                                  <td class="p-2 border text-center text-indigo-700">{parseNum(o.officeFee).toLocaleString()}</td>
+                                  <td class="p-2 border text-center text-emerald-600 font-bold">{parseNum(o.paidNow).toLocaleString()}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     );
                   })()}
                 </div>
               )}
 
+              {/* 11. أرباح المكتب */}
               {activeTab === 'office' && (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs text-center font-bold space-y-4">
                   <h3 class="text-base">أرباح المكتب المجمعة</h3>
@@ -842,17 +1387,24 @@
                 </div>
               )}
 
+              {/* 12. سجل الدخول والمراقبة */}
               {activeTab === 'logs' && isSuperAdmin && (
                 <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto p-4 space-y-3 font-bold">
                   <h3 class="text-sm font-black text-indigo-700 dark:text-indigo-400">🛡 سجل نشاطات وحركات المستخدمين (خاص بمدير النظام):</h3>
                   <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">الوقت</th><th class="p-2">المستخدم</th><th class="p-2">البريد</th><th class="p-2">النشاط والإجراء المنفذ</th></tr></thead>
-                  <tbody>{loginLogs.map((l,i)=><tr key={i} class="border-b dark:border-slate-700"><td class="p-2 whitespace-nowrap text-slate-500 font-mono text-[11px]">{l.date}</td><td class="p-2">{l.name}</td><td class="p-2 text-slate-400 font-mono text-[11px]">{l.email}</td><td class="p-2 text-indigo-600 dark:text-indigo-400 font-black">{l.action || 'زيارة وتسجيل الدخول'}</td></tr>)}</tbody></table>
+                  <tbody>{loginLogs.map((l,i)=><tr key={i} class="border-b dark:border-slate-700">
+                    <td class="p-2 whitespace-nowrap text-slate-500 font-mono text-[11px]">{l.date}</td>
+                    <td class="p-2">{l.name}</td>
+                    <td class="p-2 text-slate-400 font-mono text-[11px]">{l.email}</td>
+                    <td class="p-2 text-indigo-600 dark:text-indigo-400 font-black">{l.action || 'زيارة وتسجيل الدخول'}</td>
+                  </tr>)}</tbody></table>
                 </div>
               )}
 
+              {/* 13. الإعدادات */}
               {activeTab === 'settings' && (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs max-w-sm font-bold space-y-3">
-                  <h3>🖼 شعار الترويسة المعتمد:</h3>
+                  <h3>🖼️️ شعار الترويسة المعتمد:</h3>
                   <input type="file" accept="image/*" onChange={(e)=>{
                     if(!isAdmin) return;
                     const f = e.target.files[0]; if(!f) return;
@@ -865,84 +1417,288 @@
                     }; r.readAsDataURL(f);
                   }} class="w-full p-2 border rounded-xl dark:bg-slate-700"/>
                   {settings.logo && <img src={settings.logo} class="h-16 object-contain mt-2 border p-2 rounded-xl" />}
-                  {isSuperAdmin && (<div class="pt-3 border-t dark:border-slate-700"><button onClick={()=>setActiveTab('logs')} class="w-full bg-amber-600 hover:bg-amber-700 text-white p-2.5 rounded-xl text-xs font-black shadow-xs">🛡️ فتح سجل النشاطات والمراقبة</button></div>)}
+
+                  {isSuperAdmin && (
+                    <div class="pt-3 border-t dark:border-slate-700">
+                      <button onClick={()=>setActiveTab('logs')} class="w-full bg-amber-600 hover:bg-amber-700 text-white p-2.5 rounded-xl text-xs font-black shadow-xs">
+                        🛡️ فتح سجل النشاطات والمراقبة
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
+
             </main>
           </div>
 
+          {/* نافذة تسجيل وتعديل الطلعة */}
           {opModalOpen && (
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
               <div class="relative bg-white dark:bg-slate-800 w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50 max-h-[90vh] overflow-y-auto">
-                <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3"><h3 class="font-black text-sm">{editingOp ? '✏️ تعديل طلعة مسجلة' : '➕ تسجيل طلعة يومية جديدة'}</h3><button onClick={()=>setOpModalOpen(false)} class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button></div>
+                <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                  <h3 class="font-black text-sm">{editingOp ? '✏️ تعديل طلعة مسجلة' : '➕ تسجيل طلعة يومية جديدة'}</h3>
+                  <button onClick={()=>setOpModalOpen(false)} class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                </div>
                 <form onSubmit={handleSaveOperation} class="space-y-3 text-xs font-bold">
                   <div class="grid grid-cols-2 gap-2">
                     <div>التاريخ <input type="date" value={newOp.date} onChange={e=>setNewOp({...newOp, date: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
-                    <div>اسم العميل <input type="text" value={newOp.clientName} onChange={e=>setNewOp({...newOp, clientName: e.target.value})} placeholder="الواحة..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                    <div>اسم العميل <input type="text" value={newOp.clientName} onChange={e=>setNewOp({...newOp, clientName: e.target.value})} placeholder="الواحة البحرية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
-                    <div>الموقع بالمزرعة <input type="text" value={newOp.siteLocation} onChange={e=>setNewOp({...newOp, siteLocation: e.target.value})} placeholder="المحمية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1 bg-amber-50 dark:bg-amber-950/40" required/></div>
-                    <div>نوع العمل <div class="flex gap-1 mt-1"><select value={newOp.opType} onChange={e=>handleOpTypeChange(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">{settings.opTypes.map(o=><option key={o}>{o}</option>)}</select><button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button></div></div>
+                    <div>الموقع بالمزرعة <input type="text" value={newOp.siteLocation} onChange={e=>setNewOp({...newOp, siteLocation: e.target.value})} placeholder="المحمية، خط 2400..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1 bg-amber-50 dark:bg-amber-950/40" required/></div>
+                    <div>نوع العمل 
+                      <div class="flex gap-1 mt-1">
+                        <select value={newOp.opType} onChange={e=>handleOpTypeChange(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
+                          {settings.opTypes.map(o=><option key={o}>{o}</option>)}
+                        </select>
+                        <button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button>
+                      </div>
+                    </div>
                   </div>
-                  <div>المهندس المشرف <div class="flex gap-1 mt-1"><select value={newOp.engineer} onChange={e=>setNewOp({...newOp, engineer: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">{settings.engineers.map(e=><option key={e}>{e}</option>)}</select><button type="button" onClick={()=>updateSettingArray('engineers','مهندس')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button></div></div>
-                  <div>بيان الأعمال <input type="text" value={newOp.workDescription} onChange={e=>setNewOp({...newOp, workDescription: e.target.value})} placeholder="تخطيط..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  <div>المهندس المشرف
+                    <div class="flex gap-1 mt-1">
+                      <select value={newOp.engineer} onChange={e=>setNewOp({...newOp, engineer: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
+                        {settings.engineers.map(e=><option key={e}>{e}</option>)}
+                      </select>
+                      <button type="button" onClick={()=>updateSettingArray('engineers','مهندس')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button>
+                    </div>
+                  </div>
+                  <div>بيان الأعمال (الوصف الذي سيوضع في المستخلص) <input type="text" value={newOp.workDescription} onChange={e=>setNewOp({...newOp, workDescription: e.target.value})} placeholder="تخطيط 80 فدان موقع المحمية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
                   
                   <div class="flex gap-4 py-1">
-                    <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={newOp.isFaddan} onChange={e=>{ const checked = e.target.checked; setNewOp(prev => ({ ...prev, isFaddan: checked, isSketch: checked ? false : prev.isSketch, agreedAmount: checked ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : prev.agreedAmount })); }} class="w-4 h-4 rounded"/> 🌾 حساب بالفدان</label>
-                    <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={newOp.isSketch} onChange={e=>{ const checked = e.target.checked; setNewOp(prev => ({ ...prev, isSketch: checked, isFaddan: checked ? false : prev.isFaddan })); }} class="w-4 h-4 rounded"/> 📐 كروكيات</label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={newOp.isFaddan} 
+                        onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({
+                            ...prev, 
+                            isFaddan: checked, 
+                            isSketch: checked ? false : prev.isSketch,
+                            agreedAmount: checked ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : prev.agreedAmount
+                          }));
+                        }} 
+                        class="w-4 h-4 rounded"
+                      /> 
+                      🌾 حساب بالفدان
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={newOp.isSketch} 
+                        onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({
+                            ...prev, 
+                            isSketch: checked, 
+                            isFaddan: checked ? false : prev.isFaddan
+                          }));
+                        }} 
+                        class="w-4 h-4 rounded"
+                      /> 
+                      📐 كروكيات
+                    </label>
                   </div>
 
                   {newOp.isFaddan && (
                     <div class="grid grid-cols-2 gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800">
-                      <div>عدد الأفدنة: <input type="number" step="any" value={newOp.faddanQty} onChange={e=>{ const q = e.target.value; setNewOp(prev => ({ ...prev, faddanQty: q, agreedAmount: parseNum(q) * parseNum(prev.faddanPrice) })); }} class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"/></div>
-                      <div>سعر الفدان: <input type="number" step="any" value={newOp.faddanPrice} onChange={e=>{ const p = e.target.value; setNewOp(prev => ({ ...prev, faddanPrice: p, agreedAmount: parseNum(prev.faddanQty) * parseNum(p) })); }} class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"/></div>
+                      <div>
+                        عدد الأفدنة: 
+                        <input 
+                          type="number" 
+                          step="any" 
+                          value={newOp.faddanQty} 
+                          onChange={e=>{
+                            const q = e.target.value;
+                            setNewOp(prev => ({
+                              ...prev, 
+                              faddanQty: q, 
+                              agreedAmount: parseNum(q) * parseNum(prev.faddanPrice)
+                            }));
+                          }} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"
+                        />
+                      </div>
+                      <div>
+                        سعر الفدان (الفئة): 
+                        <input 
+                          type="number" 
+                          step="any" 
+                          value={newOp.faddanPrice} 
+                          onChange={e=>{
+                            const p = e.target.value;
+                            setNewOp(prev => ({
+                              ...prev, 
+                              faddanPrice: p, 
+                              agreedAmount: parseNum(prev.faddanQty) * parseNum(p)
+                            }));
+                          }} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"
+                        />
+                      </div>
                     </div>
                   )}
 
-                  {newOp.isSketch && (<div class="p-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800">عدد الكروكيات: <input type="number" value={newOp.sketchesCount} onChange={e=>setNewOp({...newOp, sketchesCount: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"/></div>)}
+                  {newOp.isSketch && (
+                    <div class="p-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800">
+                      عدد الكروكيات: 
+                      <input 
+                        type="number" 
+                        value={newOp.sketchesCount} 
+                        onChange={e=>setNewOp({...newOp, sketchesCount: e.target.value})} 
+                        class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"
+                      />
+                    </div>
+                  )}
 
                   <div class="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1">
-                    <label class="block text-amber-900 dark:text-amber-300 font-black">💰 المبلغ النهائي المتفق عليه:</label>
-                    <input type="number" step="any" value={newOp.agreedAmount} onChange={e=>setNewOp({...newOp, agreedAmount: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 bg-white text-indigo-700 dark:text-indigo-300 font-black text-sm" required/>
+                    <label class="block text-amber-900 dark:text-amber-300 font-black">💰 المبلغ النهائي المتفق عليه مع العميل (آلي مع إمكانية التعديل الحر):</label>
+                    <input 
+                      type="number" 
+                      step="any"
+                      value={newOp.agreedAmount} 
+                      onChange={e=>setNewOp({...newOp, agreedAmount: e.target.value})} 
+                      placeholder="أدخل المبلغ المتفق عليه..." 
+                      class="w-full border p-2.5 rounded-xl dark:bg-slate-700 bg-white text-indigo-700 dark:text-indigo-300 font-black text-sm" 
+                      required
+                    />
+                    <span class="text-[10px] text-amber-800 dark:text-amber-400 block">يُحسب تلقائياً من الفدان أو نوع العمل، ويمكنك تغييره يدوياً في أي وقت.</span>
+                  </div>
+
+                  <div class="p-3 bg-indigo-50 dark:bg-slate-700/60 rounded-2xl border border-indigo-200 dark:border-slate-600 space-y-2">
+                    <label class="block text-indigo-900 dark:text-indigo-300 font-black text-[11px]">⚙️ طريقة احتساب أتعاب المهندس في هذه العملية:</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'auto'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'auto' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        ⚡ تلقائي
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'engDay_devHalf'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'engDay_devHalf' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        🛰️ مهندس يوم + جهاز 1/2
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent80'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent80' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        🎯 نسبة 80% مهندس
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent70'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent70' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        🎯 نسبة 70% مهندس
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'customFixed'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'customFixed' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        💵 مبلغ مقطوع ثابت
+                      </button>
+                    </div>
+
+                    {newOp.engCalcMethod === 'customFixed' && (
+                      <div class="pt-1">
+                        <label class="block text-[10px] text-slate-600 dark:text-slate-300 mb-1">أدخل مبلغ أتعاب المهندس المقطوع (ج.م):</label>
+                        <input 
+                          type="number" 
+                          step="any" 
+                          value={newOp.engCustomFixedAmount} 
+                          onChange={e=>setNewOp({...newOp, engCustomFixedAmount: e.target.value})} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-800 bg-white font-bold text-emerald-600"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div class="grid grid-cols-2 gap-2 pt-1">
                     <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
                     <div>مصاريف سيارة <input type="number" value={newOp.carCost} onChange={e=>setNewOp({...newOp, carCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
                   </div>
+
                   <div>المحصل فوراً في الموقع (إن وجد) <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
 
-                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">{editingOp ? 'حفظ التعديلات' : 'حفظ الطلعة اليومية'}</button>
+                  <div class="p-2.5 bg-emerald-50 dark:bg-slate-700 border border-emerald-200 dark:border-slate-600 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
+                    <div class="flex justify-between">
+                      <span>👷 أتعاب المهندس: <strong>{(livePreview.engFee || 0).toLocaleString()} ج.م</strong></span>
+                      <span>🛰 حصة الجهاز: <strong>{(livePreview.deviceFee || 0).toLocaleString()} ج.م</strong></span>
+                    </div>
+                    <div class="flex justify-between text-rose-600 dark:text-rose-400 pt-1 border-t dark:border-slate-600">
+                      <span>🚗 مصاريف الطلعة (عمالة + سيارة): <strong>{(liveExpenses.totalExp || 0).toLocaleString()} ج.م</strong></span>
+                      <span>🏢 صافي المكتب: <strong>{(livePreview.officeFee || 0).toLocaleString()} ج.م</strong></span>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">
+                    {editingOp ? 'حفظ التعديلات' : 'حفظ الطلعة اليومية'}
+                  </button>
                 </form>
               </div>
             </div>
           )}
 
+          {/* نافذة تسجيل الدفعة */}
           {payModalOpen && (
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setPayModalOpen(false)}></div>
               <div class="relative bg-white dark:bg-slate-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50">
-                <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3"><h3 class="font-black text-sm">💰 تسجيل دفعة مسددة من العميل</h3><button onClick={()=>setPayModalOpen(false)} class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button></div>
+                <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                  <h3 class="font-black text-sm">💰 تسجيل دفعة مسددة من العميل</h3>
+                  <button onClick={()=>setPayModalOpen(false)} class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                </div>
                 <form onSubmit={handleAddPayment} class="space-y-3 text-xs font-bold">
                   <div>التاريخ <input type="date" value={newPayment.date} onChange={e=>setNewPayment({...newPayment, date: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
-                  <div>العميل <select value={newPayment.clientName} onChange={e=>setNewPayment({...newPayment, clientName: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required><option value="">-- اختر العميل --</option>{clientNames.map(c=><option key={c}>{c}</option>)}</select></div>
+                  <div>العميل 
+                    <select value={newPayment.clientName} onChange={e=>setNewPayment({...newPayment, clientName: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required>
+                      <option value="">-- اختر العميل --</option>
+                      {clientNames.map(c=><option key={c}>{c}</option>)}
+                    </select>
+                  </div>
                   <div>المبلغ المسدد <input type="number" value={newPayment.amount} onChange={e=>setNewPayment({...newPayment, amount: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1 text-emerald-600 font-black text-sm" required/></div>
-                  <div>ملاحظات <input type="text" value={newPayment.notes} onChange={e=>setNewPayment({...newPayment, notes: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1"/></div>
-                  <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">قيد الدفعة في الحساب</button>
+                  <div>البيان / الملاحظات <input type="text" value={newPayment.notes} onChange={e=>setNewPayment({...newPayment, notes: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1"/></div>
+                  <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">
+                    قيد الدفعة في الحساب
+                  </button>
                 </form>
               </div>
             </div>
           )}
 
+          {/* Bottom Bar */}
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg print-hidden">
-            <button onClick={()=>setActiveTab('dashboard')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span class="text-base">📊</span><span class="text-[9px] mt-0.5">الرئيسية</span></button>
-            <button onClick={()=>setActiveTab('extracts')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='extracts'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span class="text-base">📄</span><span class="text-[9px] mt-0.5">المستخلص</span></button>
-            <button onClick={()=>setActiveTab('operations')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='operations'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span class="text-base">📐</span><span class="text-[9px] mt-0.5">الطلعات</span></button>
-            <button onClick={()=>setActiveTab('vault')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='vault'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span class="text-base">💵</span><span class="text-[9px] mt-0.5">الخزينة</span></button>
-            <button onClick={()=>setDrawerOpen(true)} class="flex flex-col items-center py-1 px-2 text-slate-500"><span class="text-base">☰</span><span class="text-[9px] mt-0.5">المزيد</span></button>
+            <button onClick={()=>setActiveTab('dashboard')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
+              <span class="text-base">📊</span>
+              <span class="text-[9px] mt-0.5">الرئيسية</span>
+            </button>
+            <button onClick={()=>setActiveTab('extracts')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='extracts'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
+              <span class="text-base">📄</span>
+              <span class="text-[9px] mt-0.5">المستخلص</span>
+            </button>
+            <button onClick={()=>setActiveTab('operations')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='operations'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
+              <span class="text-base">📐</span>
+              <span class="text-[9px] mt-0.5">الطلعات</span>
+            </button>
+            <button onClick={()=>setActiveTab('vault')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='vault'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
+              <span class="text-base">💵</span>
+              <span class="text-[9px] mt-0.5">الخزينة</span>
+            </button>
+            <button onClick={()=>setDrawerOpen(true)} class="flex flex-col items-center py-1 px-2 text-slate-500">
+              <span class="text-base">☰</span>
+              <span class="text-[9px] mt-0.5">المزيد</span>
+            </button>
           </nav>
 
+          {/* Toast */}
           {toast.show && <div class="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs z-50 shadow-2xl font-bold print-hidden">{toast.message}</div>}
         </div>
       );
