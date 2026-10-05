@@ -129,13 +129,13 @@
         let monthlyRevenue = {};
 
         operations.forEach(o => {
-          const t = String(o.opType || '');
+          const t = String(o?.opType || '');
           if (t.includes('RTK')) rtkCount++;
-          else if (t.includes('كروكي') || t.includes('قياس') || o.isSketch) sketchCount++;
+          else if (t.includes('كروكي') || t.includes('قياس') || o?.isSketch) sketchCount++;
           else otherCount++;
 
-          const m = String(o.date || '').substring(0, 7) || 'غير محدد';
-          monthlyRevenue[m] = (monthlyRevenue[m] || 0) + parseNum(o.agreedAmount);
+          const m = String(o?.date || '').substring(0, 7) || 'غير محدد';
+          monthlyRevenue[m] = (monthlyRevenue[m] || 0) + parseNum(o?.agreedAmount);
         });
 
         const months = Object.keys(monthlyRevenue).sort().slice(-6);
@@ -237,19 +237,19 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
-      // فحص الصلاحيات
       const userEmail = (user?.email || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
       const isAdmin = isSuperAdmin || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
 
-      // نموذج الإدخال مع خياري الفدان والكروكي
-      const [newOp, setNewOp] = useState({
+      const initialOpState = {
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
         isFaddan: false, faddanQty: 1, faddanPrice: 250,
         isSketch: false, sketchesCount: 1,
         agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0
-      });
+      };
+
+      const [newOp, setNewOp] = useState(initialOpState);
 
       const [newTx, setNewTx] = useState({
         date: todayDate, type: "income", category: "إيراد عام", clientOrEntity: "", amount: "", notes: ""
@@ -342,13 +342,12 @@
         }
       };
 
-      // حساب التوزيعات التلقائية
       const calculateOperationShares = (op) => {
-        const total = parseNum(op.agreedAmount);
-        const labor = parseNum(op.laborCost);
-        const car = parseNum(op.carCost);
+        const total = parseNum(op?.agreedAmount);
+        const labor = parseNum(op?.laborCost);
+        const car = parseNum(op?.carCost);
         const totalExpenses = labor + car;
-        const type = String(op.opType || '');
+        const type = String(op?.opType || '');
         let engFee = 0, deviceFee = 0, officeFee = 0;
 
         if (type.includes('1/2') || type.includes('نص') || type.includes('نصف')) {
@@ -359,7 +358,7 @@
           engFee = 2000;
           deviceFee = 3500;
           officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
-        } else if (type.includes('كروكي') || type.includes('قياس') || op.isSketch) {
+        } else if (type.includes('كروكي') || type.includes('قياس') || op?.isSketch) {
           engFee = total * 0.80;
           officeFee = total * 0.20;
           deviceFee = 0;
@@ -369,7 +368,12 @@
           officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
         }
 
-        return { engFee, deviceFee, officeFee, totalExpenses };
+        return { 
+          engFee: Number(engFee) || 0, 
+          deviceFee: Number(deviceFee) || 0, 
+          officeFee: Number(officeFee) || 0, 
+          totalExpenses: Number(totalExpenses) || 0 
+        };
       };
 
       const handleOpTypeChange = (selectedType) => {
@@ -404,7 +408,7 @@
           setEditingOp(null);
         } else {
           const opToSave = {
-            id: Date.now(), ...finalOp, ...shares, createdBy: user.email
+            id: Date.now(), ...finalOp, ...shares, createdBy: user?.email || 'Admin'
           };
           const updatedOps = [opToSave, ...operations];
           setOperations(updatedOps);
@@ -468,7 +472,6 @@
         }
       };
 
-      // تحميل بنود المستخلص مع الحفاظ التام على كمية الفدان وسعر الفئة أو الكروكيات
       const loadClientOpsIntoExtract = (targetClient, targetSite) => {
         const cName = (targetClient || '').trim();
         const sName = (targetSite || '').trim();
@@ -478,29 +481,29 @@
         }
 
         const filtered = operations.filter(o => {
-          const matchClient = (o.clientName || '').trim() === cName;
-          const matchSite = !sName || (o.siteLocation || '').trim() === sName;
+          const matchClient = (o?.clientName || '').trim() === cName;
+          const matchSite = !sName || (o?.siteLocation || '').trim() === sName;
           return matchClient && matchSite;
         });
 
         const loaded = filtered.map((o, idx) => {
           let itemQty = 1;
-          let itemPrice = parseNum(o.agreedAmount);
-          let itemDesc = o.workDescription ? o.workDescription : o.opType;
+          let itemPrice = parseNum(o?.agreedAmount);
+          let itemDesc = o?.workDescription ? o.workDescription : (o?.opType || 'عمل مساحي');
 
-          if (o.isFaddan) {
+          if (o?.isFaddan) {
             itemQty = parseNum(o.faddanQty) || 1;
             itemPrice = parseNum(o.faddanPrice) || (parseNum(o.agreedAmount) / itemQty);
             itemDesc = `${itemDesc} (${itemQty} فدان)`;
-          } else if (o.isSketch) {
+          } else if (o?.isSketch) {
             itemQty = parseNum(o.sketchesCount) || 1;
             itemPrice = parseNum(o.agreedAmount) / itemQty;
             itemDesc = `${itemDesc} (${itemQty} كروكي)`;
           }
 
           return {
-            id: o.id || (Date.now() + idx),
-            date: o.date,
+            id: o?.id || (Date.now() + idx),
+            date: o?.date || todayDate,
             desc: itemDesc,
             qty: itemQty,
             unitPrice: itemPrice,
@@ -539,30 +542,30 @@
         return sum + (parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100));
       }, 0);
 
-      const clientOpsForPayment = operations.filter(o => (o.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (o.siteLocation||'').trim() === extractSite.trim()));
-      const clientPaysForPayment = payments.filter(p => (p.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (p.siteLocation||'').trim() === extractSite.trim()));
-      const clientTotalPaid = clientOpsForPayment.reduce((s,o)=>s+parseNum(o.paidNow),0) + clientPaysForPayment.reduce((s,p)=>s+parseNum(p.amount),0);
+      const clientOpsForPayment = operations.filter(o => (o?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (o?.siteLocation||'').trim() === extractSite.trim()));
+      const clientPaysForPayment = payments.filter(p => (p?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (p?.siteLocation||'').trim() === extractSite.trim()));
+      const clientTotalPaid = clientOpsForPayment.reduce((s,o)=>s+parseNum(o?.paidNow),0) + clientPaysForPayment.reduce((s,p)=>s+parseNum(p?.amount),0);
       const extractRemainingBalance = extractTotalWork - clientTotalPaid;
 
       const clientNames = Array.from(new Set([
-        ...operations.map(o => (o.clientName || '').trim()),
-        ...payments.map(p => (p.clientName || '').trim())
+        ...operations.map(o => (o?.clientName || '').trim()),
+        ...payments.map(p => (p?.clientName || '').trim())
       ])).filter(Boolean);
 
-      const siteLocationsList = Array.from(new Set(operations.map(o => (o.siteLocation || '').trim()).filter(Boolean)));
+      const siteLocationsList = Array.from(new Set(operations.map(o => (o?.siteLocation || '').trim()).filter(Boolean)));
 
-      const monthlyTx = transactions.filter(t => t.date && t.date.startsWith(vaultMonth));
-      const mIn = monthlyTx.filter(t=>t.type==='income').reduce((s,t)=>s+parseNum(t.amount),0);
-      const mOut = monthlyTx.filter(t=>t.type==='expense').reduce((s,t)=>s+parseNum(t.amount),0);
+      const monthlyTx = transactions.filter(t => t?.date && t.date.startsWith(vaultMonth));
+      const mIn = monthlyTx.filter(t=>t?.type==='income').reduce((s,t)=>s+parseNum(t?.amount),0);
+      const mOut = monthlyTx.filter(t=>t?.type==='expense').reduce((s,t)=>s+parseNum(t?.amount),0);
       const mNet = mIn - mOut;
 
-      const cumulativeTx = transactions.filter(t => t.date && t.date.substring(0, 7) <= vaultMonth);
-      const cumIn = cumulativeTx.filter(t=>t.type==='income').reduce((s,t)=>s+parseNum(t.amount),0);
-      const cumOut = cumulativeTx.filter(t=>t.type==='expense').reduce((s,t)=>s+parseNum(t.amount),0);
+      const cumulativeTx = transactions.filter(t => t?.date && t.date.substring(0, 7) <= vaultMonth);
+      const cumIn = cumulativeTx.filter(t=>t?.type==='income').reduce((s,t)=>s+parseNum(t?.amount),0);
+      const cumOut = cumulativeTx.filter(t=>t?.type==='expense').reduce((s,t)=>s+parseNum(t?.amount),0);
       const cumNet = cumIn - cumOut;
 
-      const totalRtk = operations.reduce((s,o)=>s+(o.deviceFee||0),0);
-      const totalOffice = operations.reduce((s,o)=>s+(o.officeFee||0),0);
+      const totalRtk = operations.reduce((s,o)=>s+(parseNum(o?.deviceFee)||0),0);
+      const totalOffice = operations.reduce((s,o)=>s+(parseNum(o?.officeFee)||0),0);
 
       const navTabs = useMemo(() => [
         { id: "dashboard", label: "لوحة التحكم", icon: "📊" },
@@ -580,14 +583,19 @@
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ], [isSuperAdmin]);
 
+      // معاينة آمنة تماماً تمنع الشاشة البيضاء نهائياً
       const liveExpenses = useMemo(() => {
-        const labor = parseNum(newOp.laborCost);
-        const car = parseNum(newOp.carCost);
+        const labor = parseNum(newOp?.laborCost);
+        const car = parseNum(newOp?.carCost);
         const totalExp = labor + car;
-        const agreed = parseNum(newOp.agreedAmount);
-        const netAfterExp = agreed > 0 ? (agreed - totalExp) : 0;
+        const agreed = parseNum(newOp?.agreedAmount);
+        const netAfterExp = agreed > 0 ? Math.max(0, agreed - totalExp) : 0;
         return { labor, car, totalExp, netAfterExp };
-      }, [newOp.laborCost, newOp.carCost, newOp.agreedAmount]);
+      }, [newOp?.laborCost, newOp?.carCost, newOp?.agreedAmount]);
+
+      const livePreview = useMemo(() => {
+        return calculateOperationShares(newOp);
+      }, [newOp?.opType, newOp?.agreedAmount, newOp?.laborCost, newOp?.carCost, newOp?.isSketch]);
 
       if (authLoading) return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">جاري التهيئة...</div>;
 
@@ -606,7 +614,7 @@
       return (
         <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
           
-          {/* Header العلوي */}
+          {/* Header */}
           <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div class="flex items-center gap-2">
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
@@ -697,9 +705,9 @@
               {activeTab === 'dashboard' && (
                 <div class="space-y-4">
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                    <div class="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span class="text-slate-500 font-bold block text-[10px]">إجمالي الأعمال</span><strong class="text-indigo-600 dark:text-indigo-400 text-sm sm:text-base font-black">{operations.reduce((s,o)=>s+parseNum(o.agreedAmount),0).toLocaleString()} ج.م</strong></div>
-                    <div class="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span class="text-slate-500 font-bold block text-[10px]">إجمالي التحصيلات</span><strong class="text-emerald-600 text-sm sm:text-base font-black">{payments.reduce((s,p)=>s+parseNum(p.amount),0).toLocaleString()} ج.م</strong></div>
-                    <div class="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span class="text-slate-500 font-bold block text-[10px]">مصاريف التشغيل</span><strong class="text-rose-600 text-sm sm:text-base font-black">{operations.reduce((s,o)=>s+parseNum(o.laborCost)+parseNum(o.carCost),0).toLocaleString()} ج.م</strong></div>
+                    <div class="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span class="text-slate-500 font-bold block text-[10px]">إجمالي الأعمال</span><strong class="text-indigo-600 dark:text-indigo-400 text-sm sm:text-base font-black">{operations.reduce((s,o)=>s+parseNum(o?.agreedAmount),0).toLocaleString()} ج.م</strong></div>
+                    <div class="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span class="text-slate-500 font-bold block text-[10px]">إجمالي التحصيلات</span><strong class="text-emerald-600 text-sm sm:text-base font-black">{payments.reduce((s,p)=>s+parseNum(p?.amount),0).toLocaleString()} ج.م</strong></div>
+                    <div class="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span class="text-slate-500 font-bold block text-[10px]">مصاريف التشغيل</span><strong class="text-rose-600 text-sm sm:text-base font-black">{operations.reduce((s,o)=>s+parseNum(o?.laborCost)+parseNum(o?.carCost),0).toLocaleString()} ج.م</strong></div>
                     <div class="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 p-3 sm:p-4 rounded-2xl shadow-xs"><span class="text-indigo-900 dark:text-indigo-200 font-bold block text-[10px]">سيولة الخزينة</span><strong class="text-indigo-700 dark:text-indigo-300 text-base sm:text-lg font-black">{cumNet.toLocaleString()} ج.م</strong></div>
                   </div>
                   <DashboardCharts operations={operations} />
@@ -713,10 +721,10 @@
                     <h3 class="text-sm font-black mb-3">👥 دليل العملاء والمزارع المسجلة:</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {clientNames.map(c => {
-                        const ops = operations.filter(o => (o.clientName||'').trim() === c);
-                        const pays = payments.filter(p => (p.clientName||'').trim() === c);
-                        const totalBilled = ops.reduce((s,o)=>s+parseNum(o.agreedAmount),0);
-                        const totalPaid = pays.reduce((s,p)=>s+parseNum(p.amount),0) + ops.reduce((s,o)=>s+parseNum(o.paidNow),0);
+                        const ops = operations.filter(o => (o?.clientName||'').trim() === c);
+                        const pays = payments.filter(p => (p?.clientName||'').trim() === c);
+                        const totalBilled = ops.reduce((s,o)=>s+parseNum(o?.agreedAmount),0);
+                        const totalPaid = pays.reduce((s,p)=>s+parseNum(p?.amount),0) + ops.reduce((s,o)=>s+parseNum(o?.paidNow),0);
                         const due = totalBilled - totalPaid;
                         return (
                           <div key={c} class="p-4 rounded-2xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 space-y-2">
@@ -757,7 +765,7 @@
                     <button 
                       onClick={()=>{ 
                         setEditingOp(null); 
-                        setNewOp({ date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل", isFaddan: false, faddanQty: 1, faddanPrice: 250, isSketch: false, sketchesCount: 1, agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0 }); 
+                        setNewOp(initialOpState); 
                         setOpModalOpen(true); 
                       }}
                       class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 shadow-sm text-xs"
@@ -768,7 +776,7 @@
 
                   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {operations
-                      .filter(o => (!opsFilterMonth || (o.date||'').startsWith(opsFilterMonth)))
+                      .filter(o => (!opsFilterMonth || (o?.date||'').startsWith(opsFilterMonth)))
                       .map(o => (
                         <div key={o.id} class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-2 relative">
                           <div class="flex justify-between items-start">
@@ -801,12 +809,23 @@
                               <strong class="text-sm font-black text-slate-900 dark:text-white">{parseNum(o.agreedAmount).toLocaleString()} ج.م</strong>
                             </div>
                             <div class="flex items-center gap-1">
-                              <button onClick={()=>{ setEditingOp(o); setNewOp(o); setOpModalOpen(true); }} class="bg-indigo-50 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 p-2 rounded-xl hover:bg-indigo-100" title="تعديل">
-                                ✏️️
+                              <button onClick={()=>{ 
+                                setEditingOp(o); 
+                                setNewOp({
+                                  ...initialOpState,
+                                  ...o,
+                                  agreedAmount: o.agreedAmount || "",
+                                  faddanQty: o.faddanQty || 1,
+                                  faddanPrice: o.faddanPrice || 250,
+                                  sketchesCount: o.sketchesCount || 1
+                                }); 
+                                setOpModalOpen(true); 
+                              }} class="bg-indigo-50 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 p-2 rounded-xl hover:bg-indigo-100" title="تعديل">
+                                ✏️
                               </button>
                               {isAdmin && (
                                 <button onClick={()=>deleteItem('operations', o.id, operations, setOperations, 'طلعة')} class="bg-rose-50 dark:bg-slate-700 text-rose-600 p-2 rounded-xl hover:bg-rose-100" title="حذف">
-                                  🗑
+                                  🗑️
                                 </button>
                               )}
                             </div>
@@ -913,7 +932,7 @@
                         <td class="p-2.5 text-amber-700">{p.siteLocation||'عام'}</td>
                         <td class="p-2.5 text-slate-600 dark:text-slate-400">{p.notes || '-'}</td>
                         <td class="p-2.5 text-center text-emerald-600 font-black">{parseNum(p.amount).toLocaleString()} ج.م</td>
-                        {isAdmin&&<td class="p-2.5 text-center"><button onClick={()=>deleteItem('payments',p.id,payments,setPayments,'دفعة')} class="text-rose-600 p-1">🗑</button></td>}
+                        {isAdmin&&<td class="p-2.5 text-center"><button onClick={()=>deleteItem('payments',p.id,payments,setPayments,'دفعة')} class="text-rose-600 p-1">🗑️</button></td>}
                       </tr>)}
                     </tbody></table>
                   </div>
@@ -941,8 +960,8 @@
                   <table class="w-full text-right border dark:border-slate-700"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border">التاريخ</th><th class="p-2 border">العميل</th><th class="p-2 border">الموقع</th><th class="p-2 border text-center text-amber-700">مصاريف عمالة</th><th class="p-2 border text-center text-blue-700">مصاريف سيارة</th><th class="p-2 border text-center text-rose-600">إجمالي المصروف</th></tr></thead>
                   <tbody>
                     {operations.map(o=>{
-                      const l = parseNum(o.laborCost);
-                      const c = parseNum(o.carCost);
+                      const l = parseNum(o?.laborCost);
+                      const c = parseNum(o?.carCost);
                       const t = l + c;
                       return (
                         <tr key={o.id} class="border-b dark:border-slate-700">
@@ -969,8 +988,8 @@
                     </select>
                   </div>
                   {extractEngineer && (() => {
-                    const engOps = operations.filter(o=>o.engineer === extractEngineer);
-                    const totalEngDues = engOps.reduce((s,o)=>s+parseNum(o.engFee),0);
+                    const engOps = operations.filter(o => o?.engineer === extractEngineer);
+                    const totalEngDues = engOps.reduce((s,o)=>s+parseNum(o?.engFee),0);
                     return (
                       <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs">
                         <div class="flex justify-between items-center mb-3"><h3>حساب: {extractEngineer}</h3><span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 px-3 py-1 rounded-xl">المستحق: {totalEngDues.toLocaleString()} ج.م</span></div>
@@ -1169,15 +1188,15 @@
                   </div>
 
                   {statementClient && (() => {
-                    const cOps = operations.filter(o => (o.clientName||'').trim() === statementClient.trim());
-                    const cPays = payments.filter(p => (p.clientName||'').trim() === statementClient.trim());
-                    const tBilled = cOps.reduce((s,o)=>s+parseNum(o.agreedAmount),0);
-                    const tLabor = cOps.reduce((s,o)=>s+parseNum(o.laborCost),0);
-                    const tCar = cOps.reduce((s,o)=>s+parseNum(o.carCost),0);
-                    const tRtk = cOps.reduce((s,o)=>s+parseNum(o.deviceFee),0);
-                    const tEng = cOps.reduce((s,o)=>s+parseNum(o.engFee),0);
-                    const tOffice = cOps.reduce((s,o)=>s+parseNum(o.officeFee),0);
-                    const tPaid = cPays.reduce((s,p)=>s+parseNum(p.amount),0) + cOps.reduce((s,o)=>s+parseNum(o.paidNow),0);
+                    const cOps = operations.filter(o => (o?.clientName||'').trim() === statementClient.trim());
+                    const cPays = payments.filter(p => (p?.clientName||'').trim() === statementClient.trim());
+                    const tBilled = cOps.reduce((s,o)=>s+parseNum(o?.agreedAmount),0);
+                    const tLabor = cOps.reduce((s,o)=>s+parseNum(o?.laborCost),0);
+                    const tCar = cOps.reduce((s,o)=>s+parseNum(o?.carCost),0);
+                    const tRtk = cOps.reduce((s,o)=>s+parseNum(o?.deviceFee),0);
+                    const tEng = cOps.reduce((s,o)=>s+parseNum(o?.engFee),0);
+                    const tOffice = cOps.reduce((s,o)=>s+parseNum(o?.officeFee),0);
+                    const tPaid = cPays.reduce((s,p)=>s+parseNum(p?.amount),0) + cOps.reduce((s,o)=>s+parseNum(o?.paidNow),0);
                     const netDue = tBilled - tPaid;
 
                     return (
@@ -1299,7 +1318,7 @@
             </main>
           </div>
 
-          {/* نافذة تسجيل وتعديل الطلعة */}
+          {/* نافذة تسجيل وتعديل الطلعة المأمنة */}
           {opModalOpen && (
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
@@ -1445,15 +1464,15 @@
 
                   <div>المحصل فوراً في الموقع (إن وجد) <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
 
-                  {/* شريط المعاينة اللحظية للمهندس والجهاز والتكاليف */}
+                  {/* شريط المعاينة المحمي بالكامل ضد الانهيار */}
                   <div class="p-2.5 bg-emerald-50 dark:bg-slate-700 border border-emerald-200 dark:border-slate-600 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
                     <div class="flex justify-between">
-                      <span>👷 أتعاب المهندس: <strong>{livePreview.engFee.toLocaleString()} ج.م</strong></span>
-                      <span>🛰 حصة الجهاز: <strong>{livePreview.deviceFee.toLocaleString()} ج.م</strong></span>
+                      <span>👷 أتعاب المهندس: <strong>{(livePreview.engFee || 0).toLocaleString()} ج.م</strong></span>
+                      <span>🛰 حصة الجهاز: <strong>{(livePreview.deviceFee || 0).toLocaleString()} ج.م</strong></span>
                     </div>
                     <div class="flex justify-between text-rose-600 dark:text-rose-400 pt-1 border-t dark:border-slate-600">
-                      <span>🚗 مصاريف الطلعة (عمالة + سيارة): <strong>{livePreview.totalExpenses.toLocaleString()} ج.م</strong></span>
-                      <span>🏢 صافي المكتب: <strong>{livePreview.officeFee.toLocaleString()} ج.م</strong></span>
+                      <span>🚗 مصاريف الطلعة (عمالة + سيارة): <strong>{(liveExpenses.totalExp || 0).toLocaleString()} ج.م</strong></span>
+                      <span>🏢 صافي المكتب: <strong>{(livePreview.officeFee || 0).toLocaleString()} ج.م</strong></span>
                     </div>
                   </div>
 
