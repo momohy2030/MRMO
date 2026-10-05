@@ -33,13 +33,8 @@
       font-family: 'Cairo', sans-serif; 
       -webkit-tap-highlight-color: transparent;
     }
-    .scrollbar-hide::-webkit-scrollbar { 
-      display: none; 
-    }
-    .scrollbar-hide { 
-      -ms-overflow-style: none; 
-      scrollbar-width: none; 
-    }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     @media print {
       body { background-color: white !important; font-size: 11px; }
       .print-hidden { display: none !important; }
@@ -75,7 +70,7 @@
     const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL, "+201000000000", "+201095545982"];
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
     
-    // قائمة الحسابات المحظورة صراحة من قطاع الإنشاءات والمسموح لها فقط بقطاع المساحة
+    // الحساب المحظور صراحة من قطاع الإنشاءات
     const BLOCKED_CONSTRUCTION_EMAILS = ["ahmnab23@gmail.com"];
 
     let db = null;
@@ -117,6 +112,34 @@
       const clean = String(val).replace(/,/g, '').replace(/،/g, '.').trim();
       const n = parseFloat(clean);
       return isNaN(n) ? 0 : n;
+    };
+
+    // مدير التخزين المحلي والمزامنة بدون إنترنت لقطاع الإنشاءات
+    const constructionStorage = {
+      get(key, fallback = []) {
+        try {
+          const item = localStorage.getItem(`construction_${key}`);
+          return item ? JSON.parse(item) : fallback;
+        } catch { return fallback; }
+      },
+      set(key, data) {
+        try { localStorage.setItem(`construction_${key}`, JSON.stringify(data)); } catch (e) {}
+      },
+      addToQueue(path, data) {
+        const queue = this.get('offline_sync_queue', []);
+        queue.push({ id: Date.now(), path, data });
+        this.set('offline_sync_queue', queue);
+      },
+      syncQueue(databaseInstance) {
+        if (!navigator.onLine || !databaseInstance) return;
+        const queue = this.get('offline_sync_queue', []);
+        if (queue.length === 0) return;
+
+        queue.forEach(item => {
+          databaseInstance.ref(item.path).set(item.data);
+        });
+        localStorage.removeItem('construction_offline_sync_queue');
+      }
     };
 
     const generatePdfAndOpenWhatsApp = (elementId, filename, textMessage, targetPhone = ADMIN_WHATSAPP_NUMBER) => {
@@ -211,6 +234,7 @@
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
       const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+      const [isOnline, setIsOnline] = useState(navigator.onLine);
       const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
 
       const [loginMethod, setLoginMethod] = useState("choose");
@@ -220,15 +244,17 @@
       const [loginError, setLoginError] = useState("");
 
       const [loading, setLoading] = useState(false);
-      const [projects, setProjects] = useState(initialProjects);
-      const [expenses, setExpenses] = useState([]);
-      const [extracts, setExtracts] = useState([]);
-      const [payments, setPayments] = useState([]);
-      const [advances, setAdvances] = useState([]);
-      const [supplierPayments, setSupplierPayments] = useState([]);
-      const [loginLogs, setLoginLogs] = useState([]);
-      const [settings, setSettings] = useState(initialSettings);
-      const [userRolesMap, setUserRolesMap] = useState({});
+
+      // استرجاع البيانات من التخزين المحلي فوراً لتعمل بدون نت
+      const [projects, setProjects] = useState(() => constructionStorage.get('projects', initialProjects));
+      const [expenses, setExpenses] = useState(() => constructionStorage.get('expenses', []));
+      const [extracts, setExtracts] = useState(() => constructionStorage.get('extracts', []));
+      const [payments, setPayments] = useState(() => constructionStorage.get('payments', []));
+      const [advances, setAdvances] = useState(() => constructionStorage.get('advances', []));
+      const [supplierPayments, setSupplierPayments] = useState(() => constructionStorage.get('supplier_payments', []));
+      const [loginLogs, setLoginLogs] = useState(() => constructionStorage.get('login_logs', []));
+      const [settings, setSettings] = useState(() => constructionStorage.get('settings', initialSettings));
+      const [userRolesMap, setUserRolesMap] = useState(() => constructionStorage.get('roles', {}));
 
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
       const [activeTab, setActiveTab] = useState("dashboard");
@@ -247,6 +273,27 @@
 
       const todayDate = new Date().toISOString().split('T')[0];
 
+      // مراقبة الاتصال التلقائي والمزامنة
+      useEffect(() => {
+        const handleOnline = () => {
+          setIsOnline(true);
+          showToast("تم الاتصال بالإنترنت! جاري مزامنة السجلات 🟢");
+          if (db) constructionStorage.syncQueue(db);
+        };
+        const handleOffline = () => {
+          setIsOnline(false);
+          showToast("تم الانتقال للعمل بدون إنترنت (حفظ محلي) 📡");
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('offline', handleOffline);
+        };
+      }, []);
+
       useEffect(() => {
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
@@ -264,22 +311,24 @@
       };
 
       const recordLoginLog = (currentUser, roleName) => {
-        if (!db) return;
+        if (!currentUser) return;
         const now = new Date();
         const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         const logEntry = { 
-          uid: currentUser.uid, 
-          name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم", 
-          identifier: currentUser.email || currentUser.phoneNumber || "غير محدد", 
+          uid: currentUser.uid || 'offline-user', 
+          name: currentUser.displayName || currentUser.name || currentUser.identifier || "مستخدم", 
+          identifier: currentUser.identifier || "غير محدد", 
           role: roleName, 
           device: isMobile ? "📱 هاتف محمول" : "💻 كمبيوتر", 
           timestamp: now.toISOString(), 
           formattedDate: now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG') 
         };
-        db.ref('login_logs').push(logEntry);
+        if (navigator.onLine && db) {
+          db.ref('login_logs').push(logEntry);
+        }
       };
 
-      // التحقق من الحساب وحظر البريد المحدد من قطاع الإنشاءات
+      // التحقق من الحساب مع فحص الحظر الصريح لـ ahmnab23@gmail.com
       useEffect(() => {
         if (!auth) { 
           setAuthLoading(false); 
@@ -289,7 +338,7 @@
           if (currentUser) {
             const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase().trim();
             
-            // شرط حظر الحساب صراحة من قطاع الإنشاءات
+            // حظر حساب ahmnab23 من قطاع الإنشاءات
             if (BLOCKED_CONSTRUCTION_EMAILS.some(b => identifier.includes(b.toLowerCase()))) {
               setAccessDeniedMessage("عفواً، حسابك مصرح له بالدخول لقطاع المساحة فقط وغير مصرح له بدخول قطاع الإنشاءات.");
               auth.signOut();
@@ -304,17 +353,23 @@
               name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", 
               identifier 
             });
+            localStorage.setItem('last_const_user_email', identifier);
+            localStorage.setItem('last_const_user_name', currentUser.displayName || identifier);
           } else {
-            setUser(null);
+            const savedEmail = localStorage.getItem('last_const_user_email');
+            if (savedEmail && !navigator.onLine) {
+              setUser({ identifier: savedEmail, name: localStorage.getItem('last_const_user_name') || savedEmail });
+            } else {
+              setUser(null);
+            }
           }
           setAuthLoading(false);
         });
       }, []);
 
+      // استقبال البيانات وحفظها محلياً
       useEffect(() => {
-        if (!user || !db) return;
-        setLoading(true);
-
+        if (!db) return;
         const rootRef = db.ref('/');
         const handleValue = (snapshot) => {
           try {
@@ -324,24 +379,54 @@
             const loadedProjects = toArr(data.projects);
             const finalProjects = loadedProjects.length > 0 ? loadedProjects : initialProjects;
             setProjects(finalProjects);
+            constructionStorage.set('projects', finalProjects);
 
-            setExpenses([...toArr(data.expenses)].reverse());
-            setExtracts([...toArr(data.extracts)].reverse());
-            setPayments([...toArr(data.payments)].reverse());
-            setAdvances([...toArr(data.advances)].reverse());
-            setSupplierPayments([...toArr(data.supplier_payments)].reverse());
-            setLoginLogs([...toArr(data.login_logs)].reverse());
-            setUserRolesMap(data.roles || {});
+            if (data.expenses) {
+              const expList = toArr(data.expenses).reverse();
+              setExpenses(expList);
+              constructionStorage.set('expenses', expList);
+            }
+            if (data.extracts) {
+              const extList = toArr(data.extracts).reverse();
+              setExtracts(extList);
+              constructionStorage.set('extracts', extList);
+            }
+            if (data.payments) {
+              const payList = toArr(data.payments).reverse();
+              setPayments(payList);
+              constructionStorage.set('payments', payList);
+            }
+            if (data.advances) {
+              const advList = toArr(data.advances).reverse();
+              setAdvances(advList);
+              constructionStorage.set('advances', advList);
+            }
+            if (data.supplier_payments) {
+              const spList = toArr(data.supplier_payments).reverse();
+              setSupplierPayments(spList);
+              constructionStorage.set('supplier_payments', spList);
+            }
+            if (data.login_logs) {
+              const logsList = toArr(data.login_logs).reverse();
+              setLoginLogs(logsList);
+              constructionStorage.set('login_logs', logsList);
+            }
+            if (data.roles) {
+              setUserRolesMap(data.roles);
+              constructionStorage.set('roles', data.roles);
+            }
 
             const savedSettings = data.settings || {};
-            setSettings({
+            const finalSettings = {
               mainCategories: toArr(savedSettings.mainCategories).length ? toArr(savedSettings.mainCategories) : initialSettings.mainCategories,
               subCategories: toArr(savedSettings.subCategories).length ? toArr(savedSettings.subCategories) : initialSettings.subCategories,
               costTypes: toArr(savedSettings.costTypes).length ? toArr(savedSettings.costTypes) : initialSettings.costTypes,
               suppliers: toArr(savedSettings.suppliers).length ? toArr(savedSettings.suppliers) : initialSettings.suppliers,
               employees: toArr(savedSettings.employees).length ? toArr(savedSettings.employees) : initialSettings.employees,
               logo: savedSettings.logo || ""
-            });
+            };
+            setSettings(finalSettings);
+            constructionStorage.set('settings', finalSettings);
 
             setSelectedProjId(prev => {
               if (prev && finalProjects.some(p => cleanId(p.id) === cleanId(prev))) return prev;
@@ -357,6 +442,16 @@
         rootRef.on('value', handleValue);
         return () => { rootRef.off('value', handleValue); };
       }, [user]);
+
+      // دالة حفظ آمنة تدعم الأوفلاين
+      const saveSafeConstructionData = (path, storageKey, data) => {
+        constructionStorage.set(storageKey, data);
+        if (navigator.onLine && db) {
+          db.ref(path).set(data);
+        } else {
+          constructionStorage.addToQueue(path, data);
+        }
+      };
 
       const currentUserEmail = (user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
@@ -380,6 +475,7 @@
         return "مهندس الموقع (Site Engineer)";
       }, [isAdmin, isAccountant]);
 
+      // تحويل غير المديرين تلقائياً إذا حاولوا فتح تبويب لوحة التحكم المحجوب
       useEffect(() => {
         if (!isAdmin && activeTab === 'dashboard') {
           setActiveTab('projects');
@@ -431,8 +527,9 @@
             return; 
           }
           const updatedArray = [...currentArray, cleanVal];
-          setSettings(prev => ({ ...prev, [settingKey]: updatedArray }));
-          if (db) db.ref(`settings/${settingKey}`).set(updatedArray);
+          const newSettings = { ...settings, [settingKey]: updatedArray };
+          setSettings(newSettings);
+          saveSafeConstructionData(`settings/${settingKey}`, 'settings', newSettings);
           showToast(`تم إضافة "${cleanVal}" للقائمة بنجاح!`);
         }
       };
@@ -499,7 +596,7 @@
         }
         if (window.confirm("هل أنت متأكد من الحذف نهائياً؟")) {
           const newList = list.filter(item => item.id !== id);
-          if (db) db.ref(path).set(newList);
+          saveSafeConstructionData(path, path, newList);
           if (path === 'expenses') setExpenses(newList); 
           if (path === 'extracts') setExtracts(newList); 
           if (path === 'payments') setPayments(newList); 
@@ -559,7 +656,7 @@
           setProjects(list);
         }
 
-        if (db && path) db.ref(path).set(list);
+        if (path) saveSafeConstructionData(path, path, list);
         setEditItemData(null);
         showToast("تم حفظ التعديلات بنجاح! ✏️");
       };
@@ -642,7 +739,7 @@
                 if (parsed.advances) setAdvances(parsed.advances);
                 if (parsed.supplier_payments) setSupplierPayments(parsed.supplier_payments);
                 if (parsed.settings) setSettings(parsed.settings);
-                if (db) db.ref('/').update(parsed);
+                if (db && navigator.onLine) db.ref('/').update(parsed);
                 showToast("تم استيراد قاعدة البيانات بنجاح! 📥");
               }
             } catch (err) {
@@ -677,7 +774,7 @@
                 }));
                 const updated = [...mapped, ...expenses];
                 setExpenses(updated);
-                if (db) db.ref('expenses').set(updated);
+                saveSafeConstructionData('expenses', 'expenses', updated);
                 showToast(`تم استيراد ${rows.length} حركة مصروفات بنجاح! 📥`);
               }
             } catch (err) {
@@ -697,7 +794,7 @@
         const key = cleanEmail.replace(/\./g, '_');
         const updated = { ...userRolesMap, [key]: newRoleInput.role };
         setUserRolesMap(updated);
-        if (db) db.ref('roles').set(updated);
+        saveSafeConstructionData('roles', 'roles', updated);
         setNewRoleInput({ email: "", role: "engineer" });
         showToast(`تم تعيين صلاحية (${newRoleInput.role}) بنجاح! 🛡️`);
       };
@@ -800,7 +897,7 @@
 
       const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
-      // التبويبات المتاحة (تم حجب الإعدادات عن غير الأدمن)
+      // التبويبات المتاحة (تم حجب الإعدادات وسجل الدخول عن غير الأدمن)
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "لوحة التحكم", icon: "📊" }] : [{ id: "my_custody", label: "لوحة عهدتي", icon: "💼" }]),
         { id: "projects", label: "المشاريع", icon: "📁" },
@@ -885,6 +982,15 @@
 
       return (
         <div class="min-h-screen pb-24 md:pb-10">
+          
+          {/* شريط حالة الاتصال بالإنترنت */}
+          {!isOnline && (
+            <div class="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
+              <span>📡</span>
+              <span>أنت تعمل الآن بدون اتصال بالإنترنت في قطاع الإنشاءات. يتم حفظ العمليات محلياً على جهازك وسترفع تلقائياً فور توفر الشبكة.</span>
+            </div>
+          )}
+
           <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 print-hidden border-b border-slate-800">
             <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
               <div class="flex items-center gap-2.5">
@@ -1114,10 +1220,10 @@
                       e.preventDefault();
                       if (!newProj.id || !newProj.name) return;
                       const clean = cleanId(newProj.id);
-                      const projectToAdd = { ...newProj, id: clean, budget: parseNum(newProj.budget), createdBy: user.name };
+                      const projectToAdd = { ...newProj, id: clean, budget: parseNum(newProj.budget), createdBy: user?.name || 'مستخدم' };
                       const updatedProjects = [...projects, projectToAdd];
                       setProjects(updatedProjects);
-                      if (db) db.ref('projects').set(updatedProjects);
+                      saveSafeConstructionData('projects', 'projects', updatedProjects);
                       setSelectedProjId(clean);
                       setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
                       showToast(`تمت إضافة المشروع بنجاح!`);
@@ -1187,11 +1293,11 @@
                       projectId: targetProj, 
                       ...newAdv, 
                       amount: parseNum(newAdv.amount), 
-                      createdBy: user.name 
+                      createdBy: user?.name || 'مستخدم' 
                     };
                     const updated = [newItem, ...advances];
                     setAdvances(updated);
-                    if(db) db.ref('advances').set(updated);
+                    saveSafeConstructionData('advances', 'advances', updated);
                     setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" });
                     showToast(`تم تسجيل العهدة بنجاح!`);
                   }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 mb-4">
@@ -1254,7 +1360,7 @@
                                 {canEditOrDelete && (
                                   <td class="p-2.5 text-center whitespace-nowrap bg-emerald-50/90 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                                     <div class="flex items-center justify-center gap-1.5">
-                                      <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1 rounded-lg font-bold text-[10px] shadow-xs">✏️️ تعديل</button>
+                                      <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1 rounded-lg font-bold text-[10px] shadow-xs">✏ تعديل</button>
                                       {isAdmin && <button onClick={() => deleteItem('advances', a.id, advances)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>}
                                     </div>
                                   </td>
@@ -1290,11 +1396,11 @@
                     quantity: parseNum(newExp.quantity),
                     unitPrice: parseNum(newExp.unitPrice),
                     amount: totalAmt, 
-                    createdBy: user.name 
+                    createdBy: user?.name || 'مستخدم' 
                   };
                   const updated = [newItem, ...expenses];
                   setExpenses(updated);
-                  if (db) db.ref('expenses').set(updated);
+                  saveSafeConstructionData('expenses', 'expenses', updated);
                   setNewExp({...newExp, quantity: 1, unitPrice: "", description: "", date: todayDate, receiptImg: ""});
                   showToast(`تم حفظ المصروف بنجاح!`);
                 }} class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
@@ -1403,10 +1509,10 @@
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     const targetProj = cleanId(selectedProjId);
-                    const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user.name};
+                    const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user?.name || 'مستخدم'};
                     const updated = [newItem, ...payments];
                     setPayments(updated);
-                    if (db) db.ref('payments').set(updated);
+                    saveSafeConstructionData('payments', 'payments', updated);
                     setNewPay({date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: ""});
                     showToast("تم تسجيل الدفعة بنجاح! 💵");
                   }} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
@@ -1570,10 +1676,10 @@
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
-                    const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newSuppPay, amount: parseNum(newSuppPay.amount), createdBy: user.name };
+                    const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newSuppPay, amount: parseNum(newSuppPay.amount), createdBy: user?.name || 'مستخدم' };
                     const updated = [newItem, ...supplierPayments];
                     setSupplierPayments(updated);
-                    if(db) db.ref('supplier_payments').set(updated);
+                    saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
                     setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" });
                     showToast(`تم تسجيل الدفعة للمورد بنجاح!`);
                   }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
@@ -1810,11 +1916,11 @@
                       totalWork, 
                       deductions: parseNum(newExt.deductions), 
                       net, 
-                      createdBy: user.name 
+                      createdBy: user?.name || 'مستخدم' 
                     };
                     const updated = [newItem, ...extracts];
                     setExtracts(updated);
-                    if (db) db.ref('extracts').set(updated);
+                    saveSafeConstructionData('extracts', 'extracts', updated);
                     setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""});
                     showToast("تم اعتماد المستخلص وحفظه!");
                   }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
@@ -1884,7 +1990,7 @@
                       <tbody>
                         {projExtracts.length === 0 ? <tr><td colSpan={isAdmin ? 10 : 9} class="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
                         projExtracts.map((ex) => {
-                          const extractMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📄 *إشعار اعتماد مستخلص أعمال رسمـي*\n🏗️ *المشروع:* ${currentProj.name} (${currentProj.id})\n🔢 *رقم المستخلص:* ${ex.extractNo}\n📝 *بيان الأعمال:* ${ex.workDescription}\n📐 *الكمية المنفذة:* ${ex.quantity} | *الفئة التعاقدية:* ${parseNum(ex.unitPrice).toLocaleString()} ج.م\n💵 *إجمالي قيمة الأعمال:* ${parseNum(ex.totalWork).toLocaleString()} ج.م\n📉 *الاستقطاعات وتأمين الأعمال:* ${parseNum(ex.deductions).toLocaleString()} ج.م\n✅ *الصافي المعتمد للصرف:* ${parseNum(ex.net).toLocaleString()} ج.م\n🗓️️ *التاريخ:* ${ex.date}`;
+                          const extractMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📄 *إشعار اعتماد مستخلص أعمال رسمـي*\n🏗️ *المشروع:* ${currentProj.name} (${currentProj.id})\n🔢 *رقم المستخلص:* ${ex.extractNo}\n📝 *بيان الأعمال:* ${ex.workDescription}\n📐 *الكمية المنفذة:* ${ex.quantity} | *الفئة التعاقدية:* ${parseNum(ex.unitPrice).toLocaleString()} ج.م\n💵 *إجمالي قيمة الأعمال:* ${parseNum(ex.totalWork).toLocaleString()} ج.م\n📉 *الاستقطاعات وتأمين الأعمال:* ${parseNum(ex.deductions).toLocaleString()} ج.م\n✅ *الصافي المعتمد للصرف:* ${parseNum(ex.net).toLocaleString()} ج.م\n🗓 *التاريخ:* ${ex.date}`;
                           return (
                             <tr key={ex.id} class="hover:bg-slate-50">
                               <td class="p-2 border border-slate-300">{ex.date}</td>
@@ -1945,7 +2051,7 @@
             {/* 10. الدخول */}
             {activeTab === "audit_log" && isAdmin && (
               <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm text-xs">
-                <h3 class="font-bold text-slate-800 dark:text-white mb-2.5 border-b dark:border-slate-700 pb-2">🛡️️ سجل دخول المستخدمين</h3>
+                <h3 class="font-bold text-slate-800 dark:text-white mb-2.5 border-b dark:border-slate-700 pb-2">🛡 سجل دخول المستخدمين</h3>
                 <div class="overflow-x-auto">
                   <table class="w-full text-right">
                     <thead><tr class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-b"><th class="p-2.5">المستخدم</th><th class="p-2.5">المعرف</th><th class="p-2.5">الرتبة</th><th class="p-2.5">الجهاز</th><th class="p-2.5">الوقت</th></tr></thead>
@@ -2081,8 +2187,11 @@
                       const reader = new FileReader();
                       reader.onload = (evt) => {
                         const base64 = evt.target.result;
-                        if(db) db.ref('settings/logo').set(base64);
-                        setSettings(prev=>({...prev, logo: base64}));
+                        setSettings(prev=> {
+                          const updated = { ...prev, logo: base64 };
+                          saveSafeConstructionData('settings/logo', 'settings', updated);
+                          return updated;
+                        });
                         showToast("تم تحديث وحفظ اللوجو بنجاح! 🖼️");
                       };
                       reader.readAsDataURL(file);
@@ -2187,8 +2296,8 @@
                               {canEditOrDelete && (
                                 <td class="p-2 border text-center whitespace-nowrap bg-slate-50 print-hidden">
                                   <div class="flex items-center justify-center gap-1.5">
-                                    <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
-                                    <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded font-bold text-[10px]">🗑️ حذف</button>
+                                    <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
+                                    <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
                                   </div>
                                 </td>
                               )}
@@ -2449,7 +2558,7 @@
             </button>
           </nav>
 
-          {/* نافذة التنبيهات */}
+          {/* نافذة التنبيهات التفاعلية */}
           {toast.show && (
             <div class="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
               <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
