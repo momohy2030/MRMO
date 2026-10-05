@@ -525,14 +525,33 @@
         }
       };
 
-      const updateSettingArray = (key, title) => {
+ const updateSettingArray = (key, title) => {
         const val = prompt(`إضافة ${title} جديد:`);
         if (val && val.trim()) {
-          const updated = [...settings[key], val.trim()];
-          const newSettings = { ...settings, [key]: updated };
+          const cleanVal = val.trim();
+          const currentList = toArr(settings[key]);
+          
+          if (currentList.includes(cleanVal)) {
+            showToast("هذا البند موجود مسبقاً!");
+            return;
+          }
+
+          const updatedList = [...currentList, cleanVal];
+          const newSettings = { ...settings, [key]: updatedList };
+
           setSettings(newSettings);
-          saveListSafely(`settings/${key}`, 'settings', newSettings);
-          logActivity(`إضافة ${title} جديد: ${val.trim()}`);
+          // حفظ كامل إعدادات settings في المسار الصحيح
+          saveListSafely('settings', 'settings', newSettings);
+
+          // تحديد العنصر المضاف فوراً داخل حقل الإدخال
+          if (key === 'opTypes') {
+            handleOpTypeChange(cleanVal);
+          } else if (key === 'engineers') {
+            setNewOp(prev => ({ ...prev, engineer: cleanVal }));
+          }
+
+          logActivity(`إضافة ${title} جديد: ${cleanVal}`);
+          showToast(`تمت إضافة ${cleanVal} بنجاح! ➕`);
         }
       };
 
