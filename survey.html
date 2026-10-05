@@ -480,21 +480,25 @@
             setLoginLogs(arr);
             offlineStorage.set('login_logs', arr);
           }
-          if (d.settings) {
+         if (d.settings) {
             setSettings(prev => {
+              const defaultOpTypes = ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"];
+              const loadedOps = toArr(d.settings.opTypes);
+              // التأكد من أن القائمة المحملة لا تحتوي بالخطأ على أسماء المهندسين
+              const cleanOps = (loadedOps.length && !loadedOps.some(x => String(x).includes('م أحمد') || String(x).includes('م أيمن'))) 
+                ? loadedOps 
+                : defaultOpTypes;
+
               const updated = {
                 ...prev,
                 engineers: toArr(d.settings.engineers).length ? toArr(d.settings.engineers) : prev.engineers,
-                opTypes: toArr(d.settings.opTypes).length ? toArr(d.settings.opTypes) : prev.opTypes,
+                opTypes: cleanOps,
                 logo: d.settings.logo || prev.logo
               };
               offlineStorage.set('settings', updated);
               return updated;
             });
           }
-        });
-      }, []);
-
       const saveListSafely = (path, storageKey, data) => {
         offlineStorage.set(storageKey, data);
         if (navigator.onLine && db) {
