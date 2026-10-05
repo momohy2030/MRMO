@@ -4,7 +4,42 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة الأعمال المساحية - SURVEY ERP</title>
-  
+
+  <!-- Service Worker المدمج لتخزين كافة ملفات الـ CDN محلياً والفتح بدون إنترنت -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swCode = `
+          const CACHE_NAME = 'survey-erp-offline-v2';
+          self.addEventListener('install', (e) => {
+            self.skipWaiting();
+          });
+          self.addEventListener('activate', (e) => {
+            e.waitUntil(clients.claim());
+          });
+          self.addEventListener('fetch', (e) => {
+            if (e.request.method !== 'GET') return;
+            e.respondWith(
+              caches.match(e.request).then((cachedResponse) => {
+                if (cachedResponse) return cachedResponse;
+                return fetch(e.request).then((networkResponse) => {
+                  if (networkResponse && networkResponse.status === 200) {
+                    const responseClone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
+                  }
+                  return networkResponse;
+                }).catch(() => caches.match(e.request));
+              })
+            );
+          });
+        `;
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch((err) => console.log('SW init:', err));
+      });
+    }
+  </script>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -88,7 +123,7 @@
       return isNaN(n) ? 0 : n;
     };
 
-    // مدير التخزين والمزامنة بدون إنترنت
+    // مدير التخزين والمزامنة بدون إنترنت لقطاع المساحة
     const offlineStorage = {
       get(key, fallback = []) {
         try {
@@ -247,7 +282,7 @@
       const [payModalOpen, setPayModalOpen] = useState(false);
       const [editingOp, setEditingOp] = useState(null);
 
-      // استرجاع البيانات المخزنة محلياً عند بدء التشغيل فوراً لتعمل بدون إنترنت
+      // استرجاع فوري للبيانات من الذاكرة المحلية حتى يفتح التطبيق بدون إنترنت
       const [operations, setOperations] = useState(() => offlineStorage.get('operations', []));
       const [transactions, setTransactions] = useState(() => offlineStorage.get('transactions', []));
       const [payments, setPayments] = useState(() => offlineStorage.get('payments', []));
@@ -268,7 +303,7 @@
       const [toast, setToast] = useState({ show: false, message: "" });
 
       // فحص الصلاحيات مع دعم الحساب المحفوظ محلياً
-      const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
+      const userEmail = (user?.email || localStorage.getItem('last_survey_user_email') || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
       const isAdmin = isSuperAdmin || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
@@ -298,7 +333,7 @@
       const [extractItems, setExtractItems] = useState([]);
       const [statementClient, setStatementClient] = useState("");
 
-      // مراقبة الاتصال بالإنترنت والمزامنة الذكية
+      // مراقبة حالة الاتصال بالإنترنت والمزامنة التلقائية
       useEffect(() => {
         const handleOnline = () => {
           setIsOnline(true);
@@ -307,7 +342,7 @@
         };
         const handleOffline = () => {
           setIsOnline(false);
-          showToast("أنت تعمل الآن بدون إنترنت. الحفظ محلي بجهازك 📡");
+          showToast("أنت تعمل الآن في وضع عدم الاتصال (بدون إنترنت) 📡");
         };
 
         window.addEventListener('online', handleOnline);
@@ -344,14 +379,30 @@
         }
       };
 
-      // التحقق من الحساب مع استعادة بيانات الدخول أوفلاين
+      // التحقق من الحساب مع حل مشكلة الفتح بدون إنترنت (تخطي شاشة تسجيل الدخول للجلسات السابقة)
       useEffect(() => {
-        if (!auth) { setAuthLoading(false); return; }
-        return auth.onAuthStateChanged((curr) => {
+        const savedEmail = localStorage.getItem('last_survey_user_email');
+        
+        // إذا كان الجهاز بدون نت وتوجد جلسة سابقة مسجلة، ادخل فوراً
+        if (!navigator.onLine && savedEmail) {
+          setUser({
+            email: savedEmail,
+            displayName: localStorage.getItem('last_survey_user_name') || savedEmail
+          });
+          setAuthLoading(false);
+          return;
+        }
+
+        if (!auth) { 
+          setAuthLoading(false); 
+          return; 
+        }
+
+        const unsubscribe = auth.onAuthStateChanged((curr) => {
           if (curr) {
             setUser(curr);
-            localStorage.setItem('last_user_email', curr.email);
-            localStorage.setItem('last_user_name', curr.displayName || curr.email);
+            localStorage.setItem('last_survey_user_email', curr.email);
+            localStorage.setItem('last_survey_user_name', curr.displayName || curr.email);
             if (navigator.onLine && db && !sessionStorage.getItem('survey_log_done')) {
               db.ref('survey_data/login_logs').push({
                 name: curr.displayName || curr.email,
@@ -363,16 +414,16 @@
               sessionStorage.setItem('survey_log_done', 'true');
             }
           } else {
-            // إذا كان المستخدم بدون نت ولكن لديه جلسة سابقة
-            const savedEmail = localStorage.getItem('last_user_email');
             if (savedEmail && !navigator.onLine) {
-              setUser({ email: savedEmail, displayName: localStorage.getItem('last_user_name') || savedEmail });
+              setUser({ email: savedEmail, displayName: localStorage.getItem('last_survey_user_name') || savedEmail });
             } else {
               setUser(null);
             }
           }
           setAuthLoading(false);
         });
+
+        return () => unsubscribe();
       }, []);
 
       // استقبال التحديثات من Firebase وحفظها فوراً محلياً
@@ -682,7 +733,7 @@
         { id: "operations", label: "الأعمال والطلعات", icon: "📐" },
         { id: "vault", label: "الخزينة", icon: "💵" },
         { id: "payments", label: "الدفعات", icon: "💰" },
-        { id: "rtk", label: "جهاز RTK", icon: "🛰️️" },
+        { id: "rtk", label: "جهاز RTK", icon: "🛰" },
         { id: "expenses", label: "مصاريف التشغيل", icon: "🚗" },
         { id: "engineers", label: "حساب المهندسين", icon: "👷" },
         { id: "extracts", label: "المستخلصات", icon: "📄" },
@@ -1336,7 +1387,7 @@
 
                         <div class="overflow-x-auto">
                           <table class="w-full text-right border text-xs">
-                            <thead class="bg-slate-100">
+                            <thead>
                               <tr>
                                 <th class="p-2 border">التاريخ</th>
                                 <th class="p-2 border">العمل والموقع</th>
@@ -1404,7 +1455,7 @@
               {/* 13. الإعدادات */}
               {activeTab === 'settings' && (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs max-w-sm font-bold space-y-3">
-                  <h3>🖼️️ شعار الترويسة المعتمد:</h3>
+                  <h3>🖼 شعار الترويسة المعتمد:</h3>
                   <input type="file" accept="image/*" onChange={(e)=>{
                     if(!isAdmin) return;
                     const f = e.target.files[0]; if(!f) return;
