@@ -1,6 +1,6 @@
 {
-  "name": "MOMOHY ERP",
-  "short_name": "MOMOHY",
+  "name": "Survey",
+  "short_name": "Survey",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f172a",
