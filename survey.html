@@ -88,6 +88,34 @@
       return isNaN(n) ? 0 : n;
     };
 
+    // مدير التخزين والمزامنة بدون إنترنت
+    const offlineStorage = {
+      get(key, fallback = []) {
+        try {
+          const item = localStorage.getItem(`survey_${key}`);
+          return item ? JSON.parse(item) : fallback;
+        } catch { return fallback; }
+      },
+      set(key, data) {
+        try { localStorage.setItem(`survey_${key}`, JSON.stringify(data)); } catch (e) {}
+      },
+      addToQueue(path, data) {
+        const queue = this.get('offline_sync_queue', []);
+        queue.push({ id: Date.now(), path, data });
+        this.set('offline_sync_queue', queue);
+      },
+      syncQueue(databaseInstance) {
+        if (!navigator.onLine || !databaseInstance) return;
+        const queue = this.get('offline_sync_queue', []);
+        if (queue.length === 0) return;
+
+        queue.forEach(item => {
+          databaseInstance.ref(item.path).set(item.data);
+        });
+        localStorage.removeItem('survey_offline_sync_queue');
+      }
+    };
+
     const exportCleanPdfAndWhatsApp = (elementId, filename, textMessage) => {
       let targetPhone = window.prompt("أدخل رقم هاتف المستلم (أو اتركه فارغاً لاختيار المحادثة مباشرة في واتساب):", "");
       if (targetPhone === null) return;
@@ -211,6 +239,7 @@
     function App() {
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
+      const [isOnline, setIsOnline] = useState(navigator.onLine);
 
       const [activeTab, setActiveTab] = useState("dashboard");
       const [drawerOpen, setDrawerOpen] = useState(false);
@@ -218,24 +247,18 @@
       const [payModalOpen, setPayModalOpen] = useState(false);
       const [editingOp, setEditingOp] = useState(null);
 
-      const [operations, setOperations] = useState([]);
-      const [transactions, setTransactions] = useState([]);
-      const [payments, setPayments] = useState([]);
-      const [loginLogs, setLoginLogs] = useState([]);
+      // استرجاع البيانات المخزنة محلياً عند بدء التشغيل فوراً لتعمل بدون إنترنت
+      const [operations, setOperations] = useState(() => offlineStorage.get('operations', []));
+      const [transactions, setTransactions] = useState(() => offlineStorage.get('transactions', []));
+      const [payments, setPayments] = useState(() => offlineStorage.get('payments', []));
+      const [loginLogs, setLoginLogs] = useState(() => offlineStorage.get('login_logs', []));
       
-      const [settings, setSettings] = useState({
+      const [settings, setSettings] = useState(() => offlineStorage.get('settings', {
         engineers: ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"],
-        opTypes: [
-          "يوم RTK", 
-          "1/2RTK (نصف يوم)", 
-          "مهندس يوم + جهاز نصف يوم", 
-          "قياس وكروكي", 
-          "تخطيط شبكة", 
-          "تخطيط جور"
-        ],
+        opTypes: ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"],
         logo: "",
         theme: localStorage.getItem('theme') || 'light'
-      });
+      }));
 
       const todayDate = new Date().toISOString().split('T')[0];
       const currentMonthStr = todayDate.substring(0, 7);
@@ -244,8 +267,8 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
-      // فحص الصلاحيات
-      const userEmail = (user?.email || "").trim().toLowerCase();
+      // فحص الصلاحيات مع دعم الحساب المحفوظ محلياً
+      const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
       const isAdmin = isSuperAdmin || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
@@ -255,7 +278,7 @@
         isFaddan: false, faddanQty: 1, faddanPrice: 250,
         isSketch: false, sketchesCount: 1,
         agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0,
-        engCalcMethod: "auto", // auto, engDay_devHalf, percent80, percent70, customPercent, customFixed
+        engCalcMethod: "auto",
         engCustomPercent: 80,
         engCustomFixedAmount: 1500
       };
@@ -273,8 +296,28 @@
       const [extractNumber, setExtractNumber] = useState("1");
       const [extractEngineer, setExtractEngineer] = useState("م أحمد نبيل");
       const [extractItems, setExtractItems] = useState([]);
-
       const [statementClient, setStatementClient] = useState("");
+
+      // مراقبة الاتصال بالإنترنت والمزامنة الذكية
+      useEffect(() => {
+        const handleOnline = () => {
+          setIsOnline(true);
+          showToast("تم استعادة الاتصال بالإنترنت! جاري المزامنة 🟢");
+          if (db) offlineStorage.syncQueue(db);
+        };
+        const handleOffline = () => {
+          setIsOnline(false);
+          showToast("أنت تعمل الآن بدون إنترنت. الحفظ محلي بجهازك 📡");
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('offline', handleOffline);
+        };
+      }, []);
 
       useEffect(() => {
         if (settings.theme === 'dark') document.documentElement.classList.add('dark');
@@ -288,7 +331,7 @@
       };
 
       const logActivity = (actionText) => {
-        if (!db || !user) return;
+        if (!user) return;
         const entry = {
           name: user.displayName || user.email,
           email: user.email,
@@ -296,15 +339,20 @@
           date: new Date().toLocaleString('ar-EG'),
           timestamp: Date.now()
         };
-        db.ref('survey_data/login_logs').push(entry);
+        if (navigator.onLine && db) {
+          db.ref('survey_data/login_logs').push(entry);
+        }
       };
 
+      // التحقق من الحساب مع استعادة بيانات الدخول أوفلاين
       useEffect(() => {
         if (!auth) { setAuthLoading(false); return; }
         return auth.onAuthStateChanged((curr) => {
           if (curr) {
             setUser(curr);
-            if (db && !sessionStorage.getItem('survey_log_done')) {
+            localStorage.setItem('last_user_email', curr.email);
+            localStorage.setItem('last_user_name', curr.displayName || curr.email);
+            if (navigator.onLine && db && !sessionStorage.getItem('survey_log_done')) {
               db.ref('survey_data/login_logs').push({
                 name: curr.displayName || curr.email,
                 email: curr.email,
@@ -315,45 +363,82 @@
               sessionStorage.setItem('survey_log_done', 'true');
             }
           } else {
-            setUser(null);
+            // إذا كان المستخدم بدون نت ولكن لديه جلسة سابقة
+            const savedEmail = localStorage.getItem('last_user_email');
+            if (savedEmail && !navigator.onLine) {
+              setUser({ email: savedEmail, displayName: localStorage.getItem('last_user_name') || savedEmail });
+            } else {
+              setUser(null);
+            }
           }
           setAuthLoading(false);
         });
       }, []);
 
+      // استقبال التحديثات من Firebase وحفظها فوراً محلياً
       useEffect(() => {
         if (!db) return;
         const ref = db.ref('survey_data');
         ref.on('value', (snap) => {
           const d = snap.val() || {};
           const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
-          setOperations(toArr(d.operations).reverse());
-          setTransactions(toArr(d.transactions).reverse());
-          setPayments(toArr(d.payments).reverse());
-          setLoginLogs(toArr(d.login_logs).reverse());
           
+          if (d.operations) {
+            const arr = toArr(d.operations).reverse();
+            setOperations(arr);
+            offlineStorage.set('operations', arr);
+          }
+          if (d.transactions) {
+            const arr = toArr(d.transactions).reverse();
+            setTransactions(arr);
+            offlineStorage.set('transactions', arr);
+          }
+          if (d.payments) {
+            const arr = toArr(d.payments).reverse();
+            setPayments(arr);
+            offlineStorage.set('payments', arr);
+          }
+          if (d.login_logs) {
+            const arr = toArr(d.login_logs).reverse();
+            setLoginLogs(arr);
+            offlineStorage.set('login_logs', arr);
+          }
           if (d.settings) {
-            setSettings(prev => ({
-              ...prev,
-              engineers: d.settings.engineers || prev.engineers,
-              opTypes: d.settings.opTypes || prev.opTypes,
-              logo: d.settings.logo || prev.logo
-            }));
+            setSettings(prev => {
+              const updated = {
+                ...prev,
+                engineers: d.settings.engineers || prev.engineers,
+                opTypes: d.settings.opTypes || prev.opTypes,
+                logo: d.settings.logo || prev.logo
+              };
+              offlineStorage.set('settings', updated);
+              return updated;
+            });
           }
         });
       }, []);
+
+      // حفظ أي قائمة سواء أونلاين أو أوفلاين
+      const saveListSafely = (path, storageKey, data) => {
+        offlineStorage.set(storageKey, data);
+        if (navigator.onLine && db) {
+          db.ref(`survey_data/${path}`).set(data);
+        } else {
+          offlineStorage.addToQueue(`survey_data/${path}`, data);
+        }
+      };
 
       const updateSettingArray = (key, title) => {
         const val = prompt(`إضافة ${title} جديد:`);
         if (val && val.trim()) {
           const updated = [...settings[key], val.trim()];
-          setSettings(p => ({ ...p, [key]: updated }));
-          if(db) db.ref(`survey_data/settings/${key}`).set(updated);
+          const newSettings = { ...settings, [key]: updated };
+          setSettings(newSettings);
+          saveListSafely(`settings/${key}`, 'settings', newSettings);
           logActivity(`إضافة ${title} جديد: ${val.trim()}`);
         }
       };
 
-      // حساب التوزيعات مع دعم (مهندس يوم + جهاز نصف يوم)
       const calculateOperationShares = (op) => {
         const total = parseNum(op?.agreedAmount);
         const labor = parseNum(op?.laborCost);
@@ -364,23 +449,20 @@
 
         let engFee = 0, deviceFee = 0, officeFee = 0;
 
-        // حالة خاصة: مهندس يوم كامل + جهاز نصف يوم
         const isEngDayDevHalf = method === 'engDay_devHalf' || type.includes('مهندس يوم + جهاز نصف يوم');
         const isHalfRtk = !isEngDayDevHalf && (type.includes('1/2') || type.includes('نص') || type.includes('نصف'));
         const isFullRtk = !isEngDayDevHalf && (type.includes('يوم RTK') || (type.includes('RTK') && !isHalfRtk));
 
-        // 1. تحديد حصة الجهاز
         if (isEngDayDevHalf || isHalfRtk) {
-          deviceFee = 1750; // نصف يوم RTK
+          deviceFee = 1750;
         } else if (isFullRtk) {
-          deviceFee = 3500; // يوم كامل RTK
+          deviceFee = 3500;
         } else {
-          deviceFee = 0;    // أي عمل بدون RTK لا يأخذ الجهاز شيئاً
+          deviceFee = 0;
         }
 
-        // 2. تحديد حصة المهندس
         if (isEngDayDevHalf) {
-          engFee = 2000; // يوم كامل للمهندس
+          engFee = 2000;
         } else if (method === 'percent80') {
           engFee = total * 0.80;
         } else if (method === 'percent70') {
@@ -391,18 +473,11 @@
         } else if (method === 'customFixed') {
           engFee = parseNum(op?.engCustomFixedAmount) || 0;
         } else {
-          // الحساب الآلي الافتراضي
-          if (isHalfRtk) {
-            engFee = 1500;
-          } else if (isFullRtk) {
-            engFee = 2000;
-          } else {
-            // أي عمل بدون RTK يحسب 80% للمهندس تلقائياً
-            engFee = total * 0.80;
-          }
+          if (isHalfRtk) engFee = 1500;
+          else if (isFullRtk) engFee = 2000;
+          else engFee = total * 0.80;
         }
 
-        // 3. صافي أرباح المكتب
         officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
 
         return { 
@@ -418,7 +493,7 @@
         let defaultMethod = "auto";
 
         if (selectedType === 'مهندس يوم + جهاز نصف يوم') {
-          defaultAmount = 3750; // 2000 مهندس + 1750 جهاز
+          defaultAmount = 3750;
           defaultMethod = "engDay_devHalf";
         } else if (selectedType === 'يوم RTK') {
           defaultAmount = 5500;
@@ -452,9 +527,9 @@
         if (editingOp) {
           const updatedOps = operations.map(o => o.id === editingOp.id ? { ...o, ...finalOp, ...shares } : o);
           setOperations(updatedOps);
-          if (db) db.ref('survey_data/operations').set(updatedOps);
+          saveListSafely('operations', 'operations', updatedOps);
           logActivity(`تعديل طلعة للعميل: ${finalOp.clientName}`);
-          showToast("تم تحديث الطلعة بنجاح! ✏️");
+          showToast(navigator.onLine ? "تم تحديث الطلعة بنجاح! ✏️" : "تم حفظ التعديل محلياً بجهازك 💾");
           setEditingOp(null);
         } else {
           const opToSave = {
@@ -462,20 +537,21 @@
           };
           const updatedOps = [opToSave, ...operations];
           setOperations(updatedOps);
-          if (db) db.ref('survey_data/operations').set(updatedOps);
+          saveListSafely('operations', 'operations', updatedOps);
 
           if (parseNum(newOp.paidNow) > 0) {
             const autoPay = { id: Date.now() + 1, date: newOp.date, clientName: finalOp.clientName, siteLocation: finalOp.siteLocation, amount: parseNum(newOp.paidNow), notes: `دفعة مقدمة موقع (${finalOp.opType})` };
             const autoTx = { id: Date.now() + 2, date: newOp.date, type: "income", category: "تحصيل مساحة مقدم", clientOrEntity: `${finalOp.clientName}`, amount: parseNum(newOp.paidNow) };
-            setPayments([autoPay, ...payments]);
-            setTransactions([autoTx, ...transactions]);
-            if(db){
-              db.ref('survey_data/payments').set([autoPay, ...payments]);
-              db.ref('survey_data/transactions').set([autoTx, ...transactions]);
-            }
+            const upPayments = [autoPay, ...payments];
+            const upTx = [autoTx, ...transactions];
+            setPayments(upPayments);
+            setTransactions(upTx);
+            saveListSafely('payments', 'payments', upPayments);
+            saveListSafely('transactions', 'transactions', upTx);
           }
+
           logActivity(`تسجيل طلعة جديدة: ${finalOp.clientName} بقيمة ${finalAgreed} ج.م`);
-          showToast("تم حفظ الطلعة بنجاح! 📐");
+          showToast(navigator.onLine ? "تم حفظ الطلعة بنجاح! 📐" : "تم حفظ الطلعة بنجاح بدون إنترنت 💾");
         }
         setOpModalOpen(false);
       };
@@ -483,29 +559,24 @@
       const handleAddTransaction = (e) => {
         e.preventDefault();
         const amt = parseNum(newTx.amount);
-        if (amt <= 0) {
-          alert("يرجى كتابة مبلغ صالح!");
-          return;
-        }
+        if (amt <= 0) return alert("يرجى كتابة مبلغ صالح!");
         const item = { id: Date.now(), ...newTx, amount: amt };
         const updated = [item, ...transactions];
         setTransactions(updated);
-        if (db) db.ref('survey_data/transactions').set(updated);
-        logActivity(`قيد حركة بالخزينة: ${item.type === 'income' ? 'وارد' : 'صادر'} بمبلغ ${amt} ج.م (${item.category})`);
+        saveListSafely('transactions', 'transactions', updated);
         setNewTx({ date: todayDate, type: "income", category: "إيراد عام", clientOrEntity: "", amount: "", notes: "" });
-        showToast("تم تسجيل الحركة في الخزينة بنجاح! 💵");
+        showToast("تم قيد الحركة بنجاح! 💵");
       };
 
       const handleAddPayment = (e) => {
         e.preventDefault();
         const item = { id: Date.now(), ...newPayment, clientName: (newPayment.clientName||'').trim(), amount: parseNum(newPayment.amount) };
         const tx = { id: Date.now()+1, date: item.date, type: 'income', category: 'سداد دفعة مستخلص', clientOrEntity: item.clientName, amount: item.amount };
-        
         const upPay = [item, ...payments];
         const upTx = [tx, ...transactions];
         setPayments(upPay); setTransactions(upTx);
-        if (db) { db.ref('survey_data/payments').set(upPay); db.ref('survey_data/transactions').set(upTx); }
-        logActivity(`قيد دفعة مستلمة من العميل: ${item.clientName} بقيمة ${item.amount} ج.م`);
+        saveListSafely('payments', 'payments', upPay);
+        saveListSafely('transactions', 'transactions', upTx);
         setPayModalOpen(false);
         setNewPayment({ date: todayDate, clientName: "", siteLocation: "", amount: "", notes: "سداد دفعة من المستخلص" });
         showToast("تم قيد الدفعة بنجاح! 💰");
@@ -516,7 +587,7 @@
         if (window.confirm("تأكيد الحذف النهائي؟")) {
           const updated = list.filter(item => item.id !== id);
           setter(updated);
-          if (db) db.ref(`survey_data/${path}`).set(updated);
+          saveListSafely(path, path, updated);
           logActivity(`حذف ${title || 'عنصر'} من النظام`);
           showToast("تم الحذف بنجاح!");
         }
@@ -525,10 +596,7 @@
       const loadClientOpsIntoExtract = (targetClient, targetSite) => {
         const cName = (targetClient || '').trim();
         const sName = (targetSite || '').trim();
-        if (!cName) {
-          setExtractItems([]);
-          return;
-        }
+        if (!cName) return setExtractItems([]);
 
         const filtered = operations.filter(o => {
           const matchClient = (o?.clientName || '').trim() === cName;
@@ -562,19 +630,13 @@
         });
 
         setExtractItems(loaded);
-        if (loaded.length > 0) {
-          showToast(`تم تحميل ${loaded.length} أعمال بنجاح في المستخلص!`);
-        } else {
-          showToast(`لا توجد أعمال مسجلة مطابقة للعميل.`);
-        }
+        if (loaded.length > 0) showToast(`تم تحميل ${loaded.length} أعمال بنجاح!`);
+        else showToast(`لا توجد أعمال مطابقة.`);
       };
 
       useEffect(() => {
-        if (extractClient) {
-          loadClientOpsIntoExtract(extractClient, extractSite);
-        } else {
-          setExtractItems([]);
-        }
+        if (extractClient) loadClientOpsIntoExtract(extractClient, extractSite);
+        else setExtractItems([]);
       }, [extractClient, extractSite, operations]);
 
       const handleAddEmptyExtractRow = () => {
@@ -588,10 +650,7 @@
         setExtractItems(extractItems.filter(item => item.id !== id));
       };
 
-      const extractTotalWork = extractItems.reduce((sum, item) => {
-        return sum + (parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100));
-      }, 0);
-
+      const extractTotalWork = extractItems.reduce((sum, item) => sum + (parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100)), 0);
       const clientOpsForPayment = operations.filter(o => (o?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (o?.siteLocation||'').trim() === extractSite.trim()));
       const clientPaysForPayment = payments.filter(p => (p?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (p?.siteLocation||'').trim() === extractSite.trim()));
       const clientTotalPaid = clientOpsForPayment.reduce((s,o)=>s+parseNum(o?.paidNow),0) + clientPaysForPayment.reduce((s,p)=>s+parseNum(p?.amount),0);
@@ -646,14 +705,14 @@
         return calculateOperationShares(newOp);
       }, [newOp?.opType, newOp?.agreedAmount, newOp?.laborCost, newOp?.carCost, newOp?.isSketch, newOp?.engCalcMethod, newOp?.engCustomPercent, newOp?.engCustomFixedAmount]);
 
-      if (authLoading) return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">جاري التهيئة...</div>;
+      if (authLoading) return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">جاري فتح النظام...</div>;
 
       if (!user) {
         return (
           <div class="min-h-screen flex items-center justify-center bg-slate-900 p-4">
-            <div class="bg-white p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl">
+            <div class="bg-white dark:bg-slate-800 p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl">
               <div class="text-5xl mb-4">📐</div>
-              <h2 class="text-2xl font-black text-slate-800">نظام المساحة ERP</h2>
+              <h2 class="text-2xl font-black text-slate-800 dark:text-white">نظام المساحة ERP</h2>
               <button onClick={() => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())} class="mt-6 w-full bg-slate-900 text-white py-3.5 rounded-2xl font-bold shadow-md">الدخول بحساب Google</button>
             </div>
           </div>
@@ -663,6 +722,14 @@
       return (
         <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
           
+          {/* شريط حالة الاتصال بالإنترنت */}
+          {!isOnline && (
+            <div class="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
+              <span>📡</span>
+              <span>أنت تعمل الآن في وضع عدم الاتصال (بدون إنترنت). يتم حفظ جميع العمليات محلياً على جهازك وسوف ترفع تلقائياً عند توفر الشبكة.</span>
+            </div>
+          )}
+
           {/* Header */}
           <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div class="flex items-center gap-2">
@@ -704,7 +771,6 @@
           </header>
 
           <div class="flex-1 flex overflow-hidden">
-            {/* Desktop Sidebar */}
             <aside class="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col justify-between shrink-0 border-l border-slate-800 print-hidden">
               <div class="p-3 overflow-y-auto space-y-1 text-xs font-bold">
                 {navTabs.map(t => (
@@ -719,7 +785,6 @@
               </div>
             </aside>
 
-            {/* Mobile Drawer */}
             {drawerOpen && (
               <div class="fixed inset-0 z-50 flex md:hidden print-hidden">
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setDrawerOpen(false)}></div>
@@ -747,7 +812,6 @@
               </div>
             )}
 
-            {/* Main Workspace */}
             <main class="flex-1 overflow-y-auto p-3.5 sm:p-5 text-xs max-w-7xl mx-auto w-full">
               
               {/* 1. لوحة التحكم */}
@@ -1103,7 +1167,6 @@
                           </div>
                         </div>
 
-                        {/* جدول البنود */}
                         <div class="overflow-x-auto">
                           <table class="w-full text-right border-collapse text-xs">
                             <thead>
@@ -1172,7 +1235,6 @@
                           </button>
                         </div>
 
-                        {/* الكروت المالية */}
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200">
                           <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
                             <span class="text-[11px] text-slate-500 font-bold block mb-0.5">إجمالي الأعمال المنجزة</span>
@@ -1200,10 +1262,9 @@
                         </div>
                       </div>
 
-                      {/* أزرار الإجراءات */}
                       <div class="flex flex-col sm:flex-row justify-end gap-2.5 pt-4 print-hidden">
                         <button onClick={()=>window.print()} class="bg-slate-800 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-1.5 transition">
-                          🖨️️ طباعة المستخلص
+                          🖨️ طباعة المستخلص
                         </button>
                         <button onClick={()=>{
                           const summaryMessage = `🏢 *مكتب الاستشارات والأعمال المساحية*\n📄 *مستخلص تصفية أعمال للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️ *التاريخ:* ${todayDate}`;
@@ -1221,7 +1282,7 @@
                 </div>
               )}
 
-              {/* 10. كشف الحساب التفصيلي المخصص للشركاء */}
+              {/* 10. كشف الحساب */}
               {activeTab === 'statement' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-3 items-center print-hidden">
@@ -1264,7 +1325,6 @@
                           {settings.logo && <img src={settings.logo} class="h-14 object-contain rounded-lg border p-1" />}
                         </div>
 
-                        {/* كروت التلخيص للشركاء */}
                         <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-xs">
                           <div class="p-2.5 bg-slate-50 rounded-xl border">إجمالي العمل: <strong class="block text-indigo-700 font-black text-sm">{tBilled.toLocaleString()}</strong></div>
                           <div class="p-2.5 bg-amber-50 rounded-xl border">عمالة: <strong class="block text-amber-700 font-black text-sm">{tLabor.toLocaleString()}</strong></div>
@@ -1344,13 +1404,14 @@
               {/* 13. الإعدادات */}
               {activeTab === 'settings' && (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs max-w-sm font-bold space-y-3">
-                  <h3>🖼️ شعار الترويسة المعتمد:</h3>
+                  <h3>🖼️️ شعار الترويسة المعتمد:</h3>
                   <input type="file" accept="image/*" onChange={(e)=>{
                     if(!isAdmin) return;
                     const f = e.target.files[0]; if(!f) return;
                     const r = new FileReader(); r.onload = (evt) => {
-                      setSettings(p=>({...p, logo: evt.target.result}));
-                      if(db) db.ref(`survey_data/settings/logo`).set(evt.target.result);
+                      const newSettings = { ...settings, logo: evt.target.result };
+                      setSettings(newSettings);
+                      saveListSafely('settings/logo', 'settings', newSettings);
                       logActivity('تحديث شعار المكتب');
                       showToast("تم تحديث الشعار!");
                     }; r.readAsDataURL(f);
@@ -1405,7 +1466,6 @@
                   </div>
                   <div>بيان الأعمال (الوصف الذي سيوضع في المستخلص) <input type="text" value={newOp.workDescription} onChange={e=>setNewOp({...newOp, workDescription: e.target.value})} placeholder="تخطيط 80 فدان موقع المحمية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
                   
-                  {/* استعادة خيارات الفدان والكروكيات */}
                   <div class="flex gap-4 py-1">
                     <label class="flex items-center gap-1.5 cursor-pointer">
                       <input 
@@ -1493,7 +1553,6 @@
                     </div>
                   )}
 
-                  {/* حقل المبلغ النهائي المتفق عليه */}
                   <div class="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1">
                     <label class="block text-amber-900 dark:text-amber-300 font-black">💰 المبلغ النهائي المتفق عليه مع العميل (آلي مع إمكانية التعديل الحر):</label>
                     <input 
@@ -1508,7 +1567,6 @@
                     <span class="text-[10px] text-amber-800 dark:text-amber-400 block">يُحسب تلقائياً من الفدان أو نوع العمل، ويمكنك تغييره يدوياً في أي وقت.</span>
                   </div>
 
-                  {/* قسم تحديد طريقة احتساب أتعاب المهندس المرنة */}
                   <div class="p-3 bg-indigo-50 dark:bg-slate-700/60 rounded-2xl border border-indigo-200 dark:border-slate-600 space-y-2">
                     <label class="block text-indigo-900 dark:text-indigo-300 font-black text-[11px]">⚙️ طريقة احتساب أتعاب المهندس في هذه العملية:</label>
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
@@ -1563,7 +1621,6 @@
                     )}
                   </div>
 
-                  {/* حساب المصاريف */}
                   <div class="grid grid-cols-2 gap-2 pt-1">
                     <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
                     <div>مصاريف سيارة <input type="number" value={newOp.carCost} onChange={e=>setNewOp({...newOp, carCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
@@ -1571,7 +1628,6 @@
 
                   <div>المحصل فوراً في الموقع (إن وجد) <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
 
-                  {/* شريط المعاينة المحمي بالكامل */}
                   <div class="p-2.5 bg-emerald-50 dark:bg-slate-700 border border-emerald-200 dark:border-slate-600 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
                     <div class="flex justify-between">
                       <span>👷 أتعاب المهندس: <strong>{(livePreview.engFee || 0).toLocaleString()} ج.م</strong></span>
@@ -1618,7 +1674,7 @@
             </div>
           )}
 
-          {/* Bottom Bar للهاتف */}
+          {/* Bottom Bar */}
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg print-hidden">
             <button onClick={()=>setActiveTab('dashboard')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
               <span class="text-base">📊</span>
