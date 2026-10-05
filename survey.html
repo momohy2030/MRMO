@@ -67,7 +67,6 @@
       measurementId: "G-N9DW5R28H0"
     };
 
-    // تعيين الأدمن الأساسي الجديد
     const SUPER_ADMIN_EMAIL = "mohamedmohy676676@gmail.com";
     const ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, "ahmnab23@gmail.com", "+201095545982"];
 
@@ -237,17 +236,16 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
-      // فحص حساب الأدمن الجديد بدقة
       const userEmail = (user?.email || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
       const isAdmin = isSuperAdmin || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
 
-      // نموذج الإدخال (المبلغ غير إجباري تلقائياً ويكتبه المستخدم يدوياً)
+      // نموذج الإدخال
       const [newOp, setNewOp] = useState({
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
         isFaddan: false, faddanQty: 1, faddanPrice: "",
         isSketch: false, sketchesCount: 1,
-        agreedAmount: "", paidNow: 0, laborCost: 0, carCost: 0
+        agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0
       });
 
       const [newTx, setNewTx] = useState({
@@ -341,12 +339,12 @@
         }
       };
 
-      // حساب التوزيعات والمصاريف بناءً على المبلغ الذي حدده المستخدم يدوياً
+      // حساب التوزيعات التلقائية (مع قبول التعديل اليدوي على المبلغ المتفق عليه)
       const calculateOperationShares = (op) => {
         const total = parseNum(op.agreedAmount);
         const labor = parseNum(op.laborCost);
         const car = parseNum(op.carCost);
-        const totalExpenses = labor + car; // حساب المصاريف فقط
+        const totalExpenses = labor + car;
         const type = String(op.opType || '');
         let engFee = 0, deviceFee = 0, officeFee = 0;
 
@@ -371,9 +369,21 @@
         return { engFee, deviceFee, officeFee, totalExpenses };
       };
 
+      // تحديث المبلغ التلقائي عند تغيير نوع العمل (مع تركه قابلاً للتعديل)
+      const handleOpTypeChange = (selectedType) => {
+        let defaultAmount = newOp.agreedAmount;
+        if (selectedType === 'يوم RTK') defaultAmount = 5500;
+        else if (selectedType.includes('1/2') || selectedType.includes('نص')) defaultAmount = 3250;
+        
+        setNewOp(prev => ({
+          ...prev,
+          opType: selectedType,
+          agreedAmount: defaultAmount
+        }));
+      };
+
       const handleSaveOperation = (e) => {
         e.preventDefault();
-        // المبلغ المكتوب يدوياً هو الأساس التام
         const finalAgreed = parseNum(newOp.agreedAmount);
         const finalOp = { 
           ...newOp, 
@@ -551,15 +561,9 @@
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ], [isSuperAdmin]);
 
-      // معاينة المصاريف وصافي العملية مباشرة
-      const liveExpenses = useMemo(() => {
-        const labor = parseNum(newOp.laborCost);
-        const car = parseNum(newOp.carCost);
-        const totalExp = labor + car;
-        const agreed = parseNum(newOp.agreedAmount);
-        const netAfterExp = agreed > 0 ? (agreed - totalExp) : 0;
-        return { labor, car, totalExp, netAfterExp };
-      }, [newOp.laborCost, newOp.carCost, newOp.agreedAmount]);
+      const livePreview = useMemo(() => {
+        return calculateOperationShares(newOp);
+      }, [newOp.opType, newOp.agreedAmount, newOp.laborCost, newOp.carCost]);
 
       if (authLoading) return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">جاري التهيئة...</div>;
 
@@ -578,7 +582,7 @@
       return (
         <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
           
-          {/* Header العلوي */}
+          {/* Header */}
           <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div class="flex items-center gap-2">
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
@@ -725,7 +729,7 @@
                     <button 
                       onClick={()=>{ 
                         setEditingOp(null); 
-                        setNewOp({ date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل", isFaddan: false, faddanQty: 1, faddanPrice: "", isSketch: false, sketchesCount: 1, agreedAmount: "", paidNow: 0, laborCost: 0, carCost: 0 }); 
+                        setNewOp({ date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل", isFaddan: false, faddanQty: 1, faddanPrice: "", isSketch: false, sketchesCount: 1, agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0 }); 
                         setOpModalOpen(true); 
                       }}
                       class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 shadow-sm text-xs"
@@ -754,9 +758,10 @@
                             </div>
                             {o.workDescription && <p class="text-[11px] text-slate-500 dark:text-slate-400 font-bold">📝 {o.workDescription}</p>}
                             <div class="grid grid-cols-2 gap-1 text-[10px] pt-1 border-t dark:border-slate-600">
-                              <span>🚗 سيارة: <strong>{parseNum(o.carCost)} ج.م</strong></span>
-                              <span>👷 عمالة: <strong>{parseNum(o.laborCost)} ج.م</strong></span>
-                              <span class="col-span-2 text-rose-600 font-bold">إجمالي المصاريف: {parseNum(o.laborCost) + parseNum(o.carCost)} ج.م</span>
+                              <span>🚗 سيارة: <strong>{parseNum(o.carCost)}</strong></span>
+                              <span>👷 عمالة: <strong>{parseNum(o.laborCost)}</strong></span>
+                              <span>👷 أتعاب المهندس: <strong class="text-emerald-600">{parseNum(o.engFee)} ج.م</strong></span>
+                              <span>🛰 حصة الجهاز: <strong class="text-purple-600">{parseNum(o.deviceFee)} ج.م</strong></span>
                             </div>
                           </div>
 
@@ -1282,7 +1287,7 @@
                     <div>الموقع بالمزرعة <input type="text" value={newOp.siteLocation} onChange={e=>setNewOp({...newOp, siteLocation: e.target.value})} placeholder="المحمية، خط 2400..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1 bg-amber-50 dark:bg-amber-950/40" required/></div>
                     <div>نوع العمل 
                       <div class="flex gap-1 mt-1">
-                        <select value={newOp.opType} onChange={e=>setNewOp({...newOp, opType: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
+                        <select value={newOp.opType} onChange={e=>handleOpTypeChange(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
                           {settings.opTypes.map(o=><option key={o}>{o}</option>)}
                         </select>
                         <button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button>
@@ -1299,9 +1304,9 @@
                   </div>
                   <div>بيان الأعمال (الوصف الذي سيوضع في المستخلص) <input type="text" value={newOp.workDescription} onChange={e=>setNewOp({...newOp, workDescription: e.target.value})} placeholder="تخطيط 80 فدان موقع المحمية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
                   
-                  {/* حقل المبلغ النهائي المتفق عليه - يكتب يدوياً بحرية تامة */}
+                  {/* حقل المبلغ النهائي المتفق عليه - يملأ تلقائياً وقابل للتعديل الحر */}
                   <div class="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1">
-                    <label class="block text-amber-900 dark:text-amber-300 font-black">💰 المبلغ النهائي المتفق عليه مع العميل (أدخل القيمة يدوياً):</label>
+                    <label class="block text-amber-900 dark:text-amber-300 font-black">💰 المبلغ النهائي المتفق عليه مع العميل (آلي مع إمكانية التعديل الحر):</label>
                     <input 
                       type="number" 
                       step="any"
@@ -1311,7 +1316,7 @@
                       class="w-full border p-2.5 rounded-xl dark:bg-slate-700 bg-white text-indigo-700 dark:text-indigo-300 font-black text-sm" 
                       required
                     />
-                    <span class="text-[10px] text-amber-800 dark:text-amber-400 block">يتم تحديد المبلغ بناءً على اتفاقك المباشر مع هذا العميل دون حساب آلي إجباري.</span>
+                    <span class="text-[10px] text-amber-800 dark:text-amber-400 block">يتم احتساب القيمة تلقائياً حسب نوع العمل ويمكنك تغييرها بيدك متى أردت.</span>
                   </div>
 
                   {/* حساب المصاريف فقط */}
@@ -1322,18 +1327,16 @@
 
                   <div>المحصل فوراً في الموقع (إن وجد) <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
 
-                  {/* شريط ملخص التكاليف الصافية */}
-                  <div class="p-2.5 bg-slate-100 dark:bg-slate-700/60 border border-slate-300 dark:border-slate-600 rounded-xl text-[11px] font-bold space-y-1">
-                    <div class="flex justify-between text-rose-600 dark:text-rose-400">
-                      <span>🚗 إجمالي مصاريف الطلعة (عمالة + سيارة):</span>
-                      <strong>{liveExpenses.totalExp.toLocaleString()} ج.م</strong>
+                  {/* شريط المعاينة التلقائية لنسب المهندس والجهاز والتكاليف */}
+                  <div class="p-2.5 bg-emerald-50 dark:bg-slate-700 border border-emerald-200 dark:border-slate-600 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
+                    <div class="flex justify-between">
+                      <span>👷 أتعاب المهندس: <strong>{livePreview.engFee.toLocaleString()} ج.م</strong></span>
+                      <span>🛰 حصة الجهاز: <strong>{livePreview.deviceFee.toLocaleString()} ج.م</strong></span>
                     </div>
-                    {parseNum(newOp.agreedAmount) > 0 && (
-                      <div class="flex justify-between text-emerald-700 dark:text-emerald-400 border-t pt-1">
-                        <span>📊 الصافي بعد المصاريف:</span>
-                        <strong>{liveExpenses.netAfterExp.toLocaleString()} ج.م</strong>
-                      </div>
-                    )}
+                    <div class="flex justify-between text-rose-600 dark:text-rose-400 pt-1 border-t dark:border-slate-600">
+                      <span>🚗 مصاريف الطلعة (عمالة + سيارة): <strong>{livePreview.totalExpenses.toLocaleString()} ج.م</strong></span>
+                      <span>🏢 صافي المكتب: <strong>{livePreview.officeFee.toLocaleString()} ج.م</strong></span>
+                    </div>
                   </div>
 
                   <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">
