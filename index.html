@@ -33,8 +33,13 @@
       font-family: 'Cairo', sans-serif; 
       -webkit-tap-highlight-color: transparent;
     }
-    .scrollbar-hide::-webkit-scrollbar { display: none; }
-    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .scrollbar-hide::-webkit-scrollbar { 
+      display: none; 
+    }
+    .scrollbar-hide { 
+      -ms-overflow-style: none; 
+      scrollbar-width: none; 
+    }
     @media print {
       body { background-color: white !important; font-size: 11px; }
       .print-hidden { display: none !important; }
@@ -68,7 +73,10 @@
     const ADMIN_WHATSAPP_NUMBER = "201095545982";
     const SUPER_ADMIN_EMAIL = "mohamedmohy676676@gmail.com";
     const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL, "+201000000000", "+201095545982"];
-    const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com", "ahmnab23@gmail.com"];
+    const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
+    
+    // قائمة الحسابات المحظورة صراحة من قطاع الإنشاءات والمسموح لها فقط بقطاع المساحة
+    const BLOCKED_CONSTRUCTION_EMAILS = ["ahmnab23@gmail.com"];
 
     let db = null;
     let auth = null;
@@ -203,6 +211,7 @@
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
       const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+      const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
 
       const [loginMethod, setLoginMethod] = useState("choose");
       const [phoneNumber, setPhoneNumber] = useState("");
@@ -238,7 +247,6 @@
 
       const todayDate = new Date().toISOString().split('T')[0];
 
-      // تطبيق الوضع الليلي
       useEffect(() => {
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
@@ -271,6 +279,7 @@
         db.ref('login_logs').push(logEntry);
       };
 
+      // التحقق من الحساب وحظر البريد المحدد من قطاع الإنشاءات
       useEffect(() => {
         if (!auth) { 
           setAuthLoading(false); 
@@ -278,7 +287,18 @@
         }
         return auth.onAuthStateChanged((currentUser) => {
           if (currentUser) {
-            const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase();
+            const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase().trim();
+            
+            // شرط حظر الحساب صراحة من قطاع الإنشاءات
+            if (BLOCKED_CONSTRUCTION_EMAILS.some(b => identifier.includes(b.toLowerCase()))) {
+              setAccessDeniedMessage("عفواً، حسابك مصرح له بالدخول لقطاع المساحة فقط وغير مصرح له بدخول قطاع الإنشاءات.");
+              auth.signOut();
+              setUser(null);
+              setAuthLoading(false);
+              return;
+            }
+
+            setAccessDeniedMessage("");
             setUser({ 
               uid: currentUser.uid, 
               name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", 
@@ -338,7 +358,6 @@
         return () => { rootRef.off('value', handleValue); };
       }, [user]);
 
-      // تحديد الصلاحيات وحماية الشاشة من الفراغ
       const currentUserEmail = (user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
@@ -361,7 +380,6 @@
         return "مهندس الموقع (Site Engineer)";
       }, [isAdmin, isAccountant]);
 
-      // توجيه ذكي: إذا لم يكن المستخدم مديراً، يتم تحويله لتبويب متاح تلقائياً بدلاً من الشاشة البيضاء
       useEffect(() => {
         if (!isAdmin && activeTab === 'dashboard') {
           setActiveTab('projects');
@@ -401,8 +419,8 @@
       }, [myEmpName]);
 
       const handleAddNewSettingItem = (settingKey, currentArray, title) => {
-        if (!canEditOrDelete) {
-          showToast("خاصية الإضافة وتعديل الإعدادات للإدارة والمهندس فقط 🔒", "error");
+        if (!isAdmin) {
+          showToast("خاصية الإضافة وتعديل الإعدادات لمدير النظام فقط 🔒", "error");
           return;
         }
         const newVal = window.prompt(`أدخل [${title}] جديد لإضافته فوراً للقائمة:`, "");
@@ -546,7 +564,6 @@
         showToast("تم حفظ التعديلات بنجاح! ✏️");
       };
 
-      // تصدير Excel
       const exportToExcel = () => {
         const wb = XLSX.utils.book_new();
         const wsProjects = XLSX.utils.json_to_sheet(projects); 
@@ -582,7 +599,6 @@
         showToast("تم تحميل الإكسل بنجاح! 📥");
       };
 
-      // تصدير نسخة احتياطية JSON
       const exportJsonBackup = () => {
         const fullBackup = {
           projects,
@@ -605,7 +621,6 @@
         showToast("تم تحميل ملف النسخة الاحتياطية الكامل (JSON) بنجاح! 💾");
       };
 
-      // استيراد بيانات
       const handleImportData = (e) => {
         if (!isAdmin) {
           showToast("استيراد البيانات مقتصر على مدير النظام فقط 🔒", "error");
@@ -673,7 +688,6 @@
         }
       };
 
-      // حفظ دور المستخدم
       const [newRoleInput, setNewRoleInput] = useState({ email: "", role: "engineer" });
       const handleSaveRole = (e) => {
         e.preventDefault();
@@ -742,7 +756,6 @@
       });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + parseNum(e?.amount), 0);
 
-      // حماية تحويل الموردين لمنع s.trim() crash
       const allSupplierNames = Array.from(new Set([
         ...(settings?.suppliers || []),
         ...expenses.map(e => e?.supplier).filter(Boolean),
@@ -787,7 +800,7 @@
 
       const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
-      // التبويبات المتاحة بحسب صلاحية الحساب
+      // التبويبات المتاحة (تم حجب الإعدادات عن غير الأدمن)
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "لوحة التحكم", icon: "📊" }] : [{ id: "my_custody", label: "لوحة عهدتي", icon: "💼" }]),
         { id: "projects", label: "المشاريع", icon: "📁" },
@@ -799,7 +812,7 @@
         ...(isAdmin ? [{ id: "statement", label: "كشف الحساب", icon: "📑" }] : []),
         ...(isAdmin || isAccountant ? [{ id: "extracts", label: "المستخلصات", icon: "📄" }] : []),
         ...(isAdmin ? [{ id: "audit_log", label: "الدخول", icon: "🛡️" }] : []),
-        { id: "settings", label: "الإعدادات", icon: "⚙️" }
+        ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
       ];
 
       if (authLoading) {
@@ -818,38 +831,52 @@
               <h2 class="text-2xl font-black text-slate-800 dark:text-white mb-1">MOMOHY ERP</h2>
               <p class="text-slate-500 dark:text-slate-400 text-xs mb-6 font-semibold">بوابة الدخول السحابية</p>
               
-              {loginError && <div class="bg-rose-100 text-rose-700 p-2.5 rounded-xl text-xs font-bold mb-4">{loginError}</div>}
-              
-              {loginMethod === "choose" && (
-                <div class="space-y-3">
-                  <button onClick={handleGoogleLogin} class="w-full flex items-center justify-center gap-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-2xl transition shadow-sm text-xs">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg> الدخول عبر Google 
-                  </button>
-                  <button onClick={() => setLoginMethod("phone")} class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-2xl transition shadow text-xs">
-                    📱 الدخول عبر الهاتف
-                  </button>
+              {/* إشعار الحظر لحساب المساحة */}
+              {accessDeniedMessage ? (
+                <div class="space-y-4">
+                  <div class="bg-rose-100 border border-rose-300 text-rose-800 p-3 rounded-2xl text-xs font-bold leading-relaxed">
+                    ⚠️ {accessDeniedMessage}
+                  </div>
+                  <a href="/survey.html" class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl transition shadow text-xs">
+                    📐 الانتقال إلى قطاع المساحة
+                  </a>
                 </div>
-              )}
-              
-              {loginMethod === "phone" && !verificationId && (
-                <form onSubmit={handleSendOtp} class="space-y-3">
-                  <input type="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)} placeholder="01xxxxxxxxx" class="w-full border p-3 rounded-xl text-center font-bold text-xs outline-none dark:bg-slate-700" dir="ltr" required />
-                  <div id="recaptcha-container"></div>
-                  <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl text-xs shadow-md">إرسال كود التحقق</button>
-                  <button type="button" onClick={() => setLoginMethod("choose")} class="w-full text-slate-500 text-xs">الرجوع</button>
-                </form>
-              )}
-              
-              {loginMethod === "phone" && verificationId && (
-                <form onSubmit={handleVerifyOtp} class="space-y-3">
-                  <input type="text" value={otpCode} onChange={e=>setOtpCode(e.target.value)} placeholder="کود التحقق (OTP)" class="w-full border p-3 rounded-xl text-center font-black tracking-widest text-sm outline-none dark:bg-slate-700" dir="ltr" required />
-                  <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-2xl text-xs shadow-md">تأكيد ودخول</button>
-                </form>
+              ) : (
+                <>
+                  {loginError && <div class="bg-rose-100 text-rose-700 p-2.5 rounded-xl text-xs font-bold mb-4">{loginError}</div>}
+                  
+                  {loginMethod === "choose" && (
+                    <div class="space-y-3">
+                      <button onClick={handleGoogleLogin} class="w-full flex items-center justify-center gap-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-2xl transition shadow-sm text-xs">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg> الدخول عبر Google 
+                      </button>
+                      <button onClick={() => setLoginMethod("phone")} class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-2xl transition shadow text-xs">
+                        📱 الدخول عبر الهاتف
+                      </button>
+                    </div>
+                  )}
+                  
+                  {loginMethod === "phone" && !verificationId && (
+                    <form onSubmit={handleSendOtp} class="space-y-3">
+                      <input type="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)} placeholder="01xxxxxxxxx" class="w-full border p-3 rounded-xl text-center font-bold text-xs outline-none dark:bg-slate-700" dir="ltr" required />
+                      <div id="recaptcha-container"></div>
+                      <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl text-xs shadow-md">إرسال كود التحقق</button>
+                      <button type="button" onClick={() => setLoginMethod("choose")} class="w-full text-slate-500 text-xs">الرجوع</button>
+                    </form>
+                  )}
+                  
+                  {loginMethod === "phone" && verificationId && (
+                    <form onSubmit={handleVerifyOtp} class="space-y-3">
+                      <input type="text" value={otpCode} onChange={e=>setOtpCode(e.target.value)} placeholder="کود التحقق (OTP)" class="w-full border p-3 rounded-xl text-center font-black tracking-widest text-sm outline-none dark:bg-slate-700" dir="ltr" required />
+                      <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-2xl text-xs shadow-md">تأكيد ودخول</button>
+                    </form>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -961,7 +988,7 @@
           )}
 
           <main class="max-w-7xl mx-auto px-4 mt-3.5">
-            {/* 1. لوحة التحكم (خاصة بالإدارة) */}
+            {/* 1. لوحة التحكم */}
             {activeTab === "dashboard" && isAdmin && (
               <div class="space-y-4">
                 {projBudget > 0 && (
@@ -1179,7 +1206,7 @@
                           <option value="">اختر الموظف...</option>
                           {settings.employees.map(c => <option key={c}>{c}</option>)}
                         </select>
-                        {canEditOrDelete && (
+                        {isAdmin && (
                           <button type="button" onClick={()=>handleAddNewSettingItem('employees', settings.employees, 'موظف')} class="bg-emerald-200 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 px-3 rounded-xl font-black text-lg hover:bg-emerald-300 transition">+</button>
                         )}
                       </div>
@@ -1227,8 +1254,8 @@
                                 {canEditOrDelete && (
                                   <td class="p-2.5 text-center whitespace-nowrap bg-emerald-50/90 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                                     <div class="flex items-center justify-center gap-1.5">
-                                      <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1 rounded-lg font-bold text-[10px] shadow-xs">✏️ تعديل</button>
-                                      <button onClick={() => deleteItem('advances', a.id, advances)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
+                                      <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1 rounded-lg font-bold text-[10px] shadow-xs">✏️️ تعديل</button>
+                                      {isAdmin && <button onClick={() => deleteItem('advances', a.id, advances)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>}
                                     </div>
                                   </td>
                                 )}
@@ -1282,7 +1309,7 @@
                         <option value="">اختر...</option>
                         {settings.mainCategories.map(c => <option key={c}>{c}</option>)}
                       </select>
-                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                      {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
                     </div>
                   </div>
                   <div>
@@ -1292,7 +1319,7 @@
                         <option value="">اختر...</option>
                         {settings.subCategories.map(c => <option key={c}>{c}</option>)}
                       </select>
-                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                      {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
                     </div>
                   </div>
                   <div>
@@ -1302,7 +1329,7 @@
                         <option value="">اختر...</option>
                         {settings.costTypes.map(c => <option key={c}>{c}</option>)}
                       </select>
-                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                      {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
                     </div>
                   </div>
                   <div>
@@ -1312,7 +1339,7 @@
                         <option value="">اختر...</option>
                         {settings.suppliers.map(c => <option key={c}>{c}</option>)}
                       </select>
-                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                      {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
                     </div>
                   </div>
                   <div>
@@ -1658,9 +1685,9 @@
               </div>
             )}
 
-            {/* 8. كشف الحساب (خاص بالإدارة) */}
+            {/* 8. كشف الحساب */}
             {activeTab === "statement" && isAdmin && (() => {
-              const statementMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📑 *الموقف المالي الشامل لمشروع:* ${currentProj.name} (${currentProj.id})\n📍 *الموقع:* ${currentProj.location || '-'}\n📊 *الميزانية المعتمدة:* ${parseNum(currentProj.budget).toLocaleString()} ج.م\n----------------------------------\n📄 *إجمالي صافي المستخلصات:* ${totalWorkNet.toLocaleString()} ج.م\n📥 *إجمالي التحصيلات المستلمة:* ${totalReceived.toLocaleString()} ج.م\n📤 *إجمالي المصروفات المنفذة:* ${totalCost.toLocaleString()} ج.م\n🏦 *خزينة المشروع الحرة:* ${centralCashRemaining.toLocaleString()} ج.م\n📈 *صافي أرباح المشروع:* ${netProfit.toLocaleString()} ج.م\n----------------------------------\n🗓️️ *تاريخ التقرير:* ${todayDate}`;
+              const statementMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📑 *الموقف المالي الشامل لمشروع:* ${currentProj.name} (${currentProj.id})\n📍 *الموقع:* ${currentProj.location || '-'}\n📊 *الميزانية المعتمدة:* ${parseNum(currentProj.budget).toLocaleString()} ج.م\n----------------------------------\n📄 *إجمالي صافي المستخلصات:* ${totalWorkNet.toLocaleString()} ج.م\n📥 *إجمالي التحصيلات المستلمة:* ${totalReceived.toLocaleString()} ج.م\n📤 *إجمالي المصروفات المنفذة:* ${totalCost.toLocaleString()} ج.م\n🏦 *خزينة المشروع الحرة:* ${centralCashRemaining.toLocaleString()} ج.م\n📈 *صافي أرباح المشروع:* ${netProfit.toLocaleString()} ج.م\n----------------------------------\n🗓 *تاريخ التقرير:* ${todayDate}`;
               return (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm print-area text-xs">
                   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b dark:border-slate-700 pb-3 print-hidden">
@@ -1857,7 +1884,7 @@
                       <tbody>
                         {projExtracts.length === 0 ? <tr><td colSpan={isAdmin ? 10 : 9} class="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
                         projExtracts.map((ex) => {
-                          const extractMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📄 *إشعار اعتماد مستخلص أعمال رسمـي*\n🏗️ *المشروع:* ${currentProj.name} (${currentProj.id})\n🔢 *رقم المستخلص:* ${ex.extractNo}\n📝 *بيان الأعمال:* ${ex.workDescription}\n📐 *الكمية المنفذة:* ${ex.quantity} | *الفئة التعاقدية:* ${parseNum(ex.unitPrice).toLocaleString()} ج.م\n💵 *إجمالي قيمة الأعمال:* ${parseNum(ex.totalWork).toLocaleString()} ج.م\n📉 *الاستقطاعات وتأمين الأعمال:* ${parseNum(ex.deductions).toLocaleString()} ج.م\n✅ *الصافي المعتمد للصرف:* ${parseNum(ex.net).toLocaleString()} ج.م\n🗓️ *التاريخ:* ${ex.date}`;
+                          const extractMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📄 *إشعار اعتماد مستخلص أعمال رسمـي*\n🏗️ *المشروع:* ${currentProj.name} (${currentProj.id})\n🔢 *رقم المستخلص:* ${ex.extractNo}\n📝 *بيان الأعمال:* ${ex.workDescription}\n📐 *الكمية المنفذة:* ${ex.quantity} | *الفئة التعاقدية:* ${parseNum(ex.unitPrice).toLocaleString()} ج.م\n💵 *إجمالي قيمة الأعمال:* ${parseNum(ex.totalWork).toLocaleString()} ج.م\n📉 *الاستقطاعات وتأمين الأعمال:* ${parseNum(ex.deductions).toLocaleString()} ج.م\n✅ *الصافي المعتمد للصرف:* ${parseNum(ex.net).toLocaleString()} ج.م\n🗓️️ *التاريخ:* ${ex.date}`;
                           return (
                             <tr key={ex.id} class="hover:bg-slate-50">
                               <td class="p-2 border border-slate-300">{ex.date}</td>
@@ -1918,7 +1945,7 @@
             {/* 10. الدخول */}
             {activeTab === "audit_log" && isAdmin && (
               <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm text-xs">
-                <h3 class="font-bold text-slate-800 dark:text-white mb-2.5 border-b dark:border-slate-700 pb-2">🛡️ سجل دخول المستخدمين</h3>
+                <h3 class="font-bold text-slate-800 dark:text-white mb-2.5 border-b dark:border-slate-700 pb-2">🛡️️ سجل دخول المستخدمين</h3>
                 <div class="overflow-x-auto">
                   <table class="w-full text-right">
                     <thead><tr class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-b"><th class="p-2.5">المستخدم</th><th class="p-2.5">المعرف</th><th class="p-2.5">الرتبة</th><th class="p-2.5">الجهاز</th><th class="p-2.5">الوقت</th></tr></thead>
@@ -1936,8 +1963,8 @@
               </div>
             )}
 
-            {/* 11. الإعدادات المدمجة الاحترافية */}
-            {activeTab === "settings" && (
+            {/* 11. الإعدادات (خاصة بمدير النظام فقط) */}
+            {activeTab === "settings" && isAdmin && (
               <div class="space-y-4 text-xs font-bold">
                 
                 {/* قسم النسخ الاحتياطي واستيراد وتصدير البيانات */}
@@ -1967,96 +1994,88 @@
                       <span class="text-xl">📊</span>
                     </button>
 
-                    {isAdmin && (
-                      <div class="p-3 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-dashed border-blue-400 flex items-center justify-between">
-                        <label class="cursor-pointer w-full flex items-center justify-between">
-                          <div class="text-right">
-                            <span class="block text-xs font-black text-blue-700 dark:text-blue-300">استيراد بيانات (JSON / Excel)</span>
-                            <span class="text-[10px] text-slate-400 font-normal">رفع شيت أو مقايسة سابقة</span>
-                          </div>
-                          <span class="text-xl">📥</span>
-                          <input type="file" accept=".json,.xlsx,.xls,.csv" onChange={handleImportData} class="hidden"/>
-                        </label>
-                      </div>
-                    )}
+                    <div class="p-3 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-dashed border-blue-400 flex items-center justify-between">
+                      <label class="cursor-pointer w-full flex items-center justify-between">
+                        <div class="text-right">
+                          <span class="block text-xs font-black text-blue-700 dark:text-blue-300">استيراد بيانات (JSON / Excel)</span>
+                          <span class="text-[10px] text-slate-400 font-normal">رفع شيت أو مقايسة سابقة</span>
+                        </div>
+                        <span class="text-xl">📥</span>
+                        <input type="file" accept=".json,.xlsx,.xls,.csv" onChange={handleImportData} class="hidden"/>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
-                {/* قسم إدارة الصلاحيات والأدوار (خاص بمدير النظام) */}
-                {isAdmin && (
-                  <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm space-y-3">
-                    <div class="flex items-center gap-2 border-b dark:border-slate-700 pb-2">
-                      <span class="text-lg">🛡️</span>
-                      <div>
-                        <h3 class="text-sm font-black text-slate-900 dark:text-white">إدارة الصلاحيات والمستخدمين (Roles & Access Control)</h3>
-                        <p class="text-[11px] text-slate-400 font-normal">تخصيص الصلاحيات بين مدير النظام، المحاسب، ومهندس الموقع</p>
-                      </div>
-                    </div>
-
-                    <form onSubmit={handleSaveRole} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                      <input 
-                        type="email" 
-                        placeholder="البريد الإلكتروني لحساب Google..." 
-                        value={newRoleInput.email} 
-                        onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} 
-                        class="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 text-xs" 
-                        required
-                      />
-                      <select 
-                        value={newRoleInput.role} 
-                        onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} 
-                        class="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 text-xs font-bold"
-                      >
-                        <option value="engineer">👷 مهندس موقع (يوميات، حصر، بدون أسعار وأرباح)</option>
-                        <option value="accountant">💼 محاسب (مستخلصات، أذون صرف، دفعات الموردين)</option>
-                        <option value="admin">👑 مدير نظام (صلاحية كاملة، خزينة، أرباح، تعديل وحذف)</option>
-                      </select>
-                      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black py-2.5">
-                        حفظ الصلاحية للمستخدم
-                      </button>
-                    </form>
-
-                    <div class="border dark:border-slate-700 rounded-xl overflow-hidden mt-2">
-                      <table class="w-full text-right text-xs">
-                        <thead class="bg-slate-100 dark:bg-slate-700">
-                          <tr>
-                            <th class="p-2">المستخدم</th>
-                            <th class="p-2 text-center">الدور المعين</th>
-                          </tr>
-                        </thead>
-                        <tbody class="divide-y dark:divide-slate-700">
-                          <tr class="bg-amber-50/50 dark:bg-amber-950/20">
-                            <td class="p-2 font-mono text-amber-900 dark:text-amber-300 font-bold">{SUPER_ADMIN_EMAIL}</td>
-                            <td class="p-2 text-center font-bold text-amber-700">👑 مدير النظام الرئيسي</td>
-                          </tr>
-                          {Object.entries(userRolesMap).map(([k, r]) => (
-                            <tr key={k}>
-                              <td class="p-2 font-mono text-slate-600 dark:text-slate-400">{k.replace(/_/g, '.')}</td>
-                              <td class="p-2 text-center">
-                                <span class={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
-                                  r === 'admin' ? 'bg-amber-100 text-amber-800' :
-                                  r === 'accountant' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
-                                }`}>
-                                  {r === 'admin' ? 'مدير نظام' : r === 'accountant' ? 'محاسب' : 'مهندس موقع'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                {/* قسم إدارة الصلاحيات والأدوار */}
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm space-y-3">
+                  <div class="flex items-center gap-2 border-b dark:border-slate-700 pb-2">
+                    <span class="text-lg">🛡️</span>
+                    <div>
+                      <h3 class="text-sm font-black text-slate-900 dark:text-white">إدارة الصلاحيات والمستخدمين (Roles & Access Control)</h3>
+                      <p class="text-[11px] text-slate-400 font-normal">تخصيص الصلاحيات بين مدير النظام، المحاسب، ومهندس الموقع</p>
                     </div>
                   </div>
-                )}
+
+                  <form onSubmit={handleSaveRole} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                    <input 
+                      type="email" 
+                      placeholder="البريد الإلكتروني لحساب Google..." 
+                      value={newRoleInput.email} 
+                      onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} 
+                      class="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 text-xs" 
+                      required
+                    />
+                    <select 
+                      value={newRoleInput.role} 
+                      onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} 
+                      class="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 text-xs font-bold"
+                    >
+                      <option value="engineer">👷 مهندس موقع (يوميات، حصر، بدون أسعار وأرباح)</option>
+                      <option value="accountant">💼 محاسب (مستخلصات، أذون صرف، دفعات الموردين)</option>
+                      <option value="admin">👑 مدير نظام (صلاحية كاملة، خزينة، أرباح، تعديل وحذف)</option>
+                    </select>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black py-2.5">
+                      حفظ الصلاحية للمستخدم
+                    </button>
+                  </form>
+
+                  <div class="border dark:border-slate-700 rounded-xl overflow-hidden mt-2">
+                    <table class="w-full text-right text-xs">
+                      <thead class="bg-slate-100 dark:bg-slate-700">
+                        <tr>
+                          <th class="p-2">المستخدم</th>
+                          <th class="p-2 text-center">الدور المعين</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y dark:divide-slate-700">
+                        <tr class="bg-amber-50/50 dark:bg-amber-950/20">
+                          <td class="p-2 font-mono text-amber-900 dark:text-amber-300 font-bold">{SUPER_ADMIN_EMAIL}</td>
+                          <td class="p-2 text-center font-bold text-amber-700">👑 مدير النظام الرئيسي</td>
+                        </tr>
+                        {Object.entries(userRolesMap).map(([k, r]) => (
+                          <tr key={k}>
+                            <td class="p-2 font-mono text-slate-600 dark:text-slate-400">{k.replace(/_/g, '.')}</td>
+                            <td class="p-2 text-center">
+                              <span class={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                                r === 'admin' ? 'bg-amber-100 text-amber-800' :
+                                r === 'accountant' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {r === 'admin' ? 'مدير نظام' : r === 'accountant' ? 'محاسب' : 'مهندس موقع'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
                 {/* شعار الشركة والمظهر */}
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm">
                     <h3 class="font-bold mb-2 text-xs">🖼️ شعار الشركة المعتمد للترويسة</h3>
                     <input type="file" accept="image/*" onChange={(e)=>{
-                      if (!canEditOrDelete) {
-                        showToast("تعديل الشعار مصرح لمدير النظام والمهندس فقط 🔒", "error");
-                        return;
-                      }
                       const file = e.target.files && e.target.files[0];
                       if(!file) return;
                       const reader = new FileReader();
@@ -2168,8 +2187,8 @@
                               {canEditOrDelete && (
                                 <td class="p-2 border text-center whitespace-nowrap bg-slate-50 print-hidden">
                                   <div class="flex items-center justify-center gap-1.5">
-                                    <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
-                                    <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
+                                    <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
+                                    <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded font-bold text-[10px]">🗑️ حذف</button>
                                   </div>
                                 </td>
                               )}
@@ -2430,7 +2449,7 @@
             </button>
           </nav>
 
-          {/* نافذة التنبيهات التفاعلية */}
+          {/* نافذة التنبيهات */}
           {toast.show && (
             <div class="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
               <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
