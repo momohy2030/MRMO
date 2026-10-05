@@ -480,14 +480,24 @@
             setLoginLogs(arr);
             offlineStorage.set('login_logs', arr);
           }
-         if (d.settings) {
+       if (d.settings) {
+            const defaultOpTypes = [
+              "يوم RTK",
+              "1/2RTK (نصف يوم)",
+              "مهندس يوم + جهاز نصف يوم",
+              "قياس وكروكي",
+              "تخطيط شبكة",
+              "تخطيط جور"
+            ];
+
             setSettings(prev => {
-              const defaultOpTypes = ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"];
               const loadedOps = toArr(d.settings.opTypes);
-              // التأكد من أن القائمة المحملة لا تحتوي بالخطأ على أسماء المهندسين
-              const cleanOps = (loadedOps.length && !loadedOps.some(x => String(x).includes('م أحمد') || String(x).includes('م أيمن'))) 
-                ? loadedOps 
-                : defaultOpTypes;
+              const hasWrongNames = loadedOps.some(item => {
+                const s = String(item);
+                return s.includes("م أحمد") || s.includes("م أيمن") || s.includes("م علاء") || s.includes("م أسامة");
+              });
+
+              const cleanOps = (loadedOps.length > 0 && !hasWrongNames) ? loadedOps : defaultOpTypes;
 
               const updated = {
                 ...prev,
@@ -495,6 +505,7 @@
                 opTypes: cleanOps,
                 logo: d.settings.logo || prev.logo
               };
+
               offlineStorage.set('settings', updated);
               return updated;
             });
