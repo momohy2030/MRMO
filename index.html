@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة المعاملات الإنشائية - MOMOHY ERP</title>
   
-  <!-- وسوم الـ PWA والتثبيت -->
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#0f172a">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,10 +16,7 @@
       darkMode: 'class',
       theme: {
         extend: { 
-          fontFamily: { sans: ['Cairo', 'sans-serif'] },
-          colors: {
-            brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#1e1b4b' }
-          }
+          fontFamily: { sans: ['Cairo', 'sans-serif'] }
         }
       }
     }
@@ -56,6 +52,11 @@
       .print-area { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
       .print-break-inside { page-break-inside: avoid; }
     }
+    @keyframes slideUp { 
+      from { transform: translateY(100%); opacity: 0; } 
+      to { transform: translateY(0); opacity: 1; } 
+    }
+    .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   </style>
 
   <script>
@@ -66,7 +67,7 @@
     }
   </script>
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200">
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased transition-colors duration-200">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -96,7 +97,7 @@
       db = firebase.database();
       auth = firebase.auth();
       auth.languageCode = 'ar';
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Firebase init error:", e); }
 
     const initialProjects = [
       {
@@ -285,7 +286,7 @@
         };
         const handleOffline = () => {
           setIsOnline(false);
-          showToast("تم التحويل للعمل بدون إنترنت (حفظ محلي) 📡");
+          showToast("العمل بدون إنترنت (حفظ محلي) 📡");
         };
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
@@ -463,6 +464,20 @@
         }
       }, [myEmpName]);
 
+      const handleAddNewSettingItem = (settingKey, currentArray, title) => {
+        if (!isAdmin) { showToast("خاصية مقتصرة على مدير النظام 🔒", "error"); return; }
+        const newVal = window.prompt(`أدخل [${title}] جديد لإضافته للقائمة:`, "");
+        if (newVal && newVal.trim() !== "") {
+          const cleanVal = newVal.trim();
+          if (currentArray.includes(cleanVal)) { showToast("هذا البند موجود مسبقاً!", "error"); return; }
+          const updatedArray = [...currentArray, cleanVal];
+          const newSettings = { ...settings, [settingKey]: updatedArray };
+          setSettings(newSettings);
+          saveSafeConstructionData(`settings/${settingKey}`, 'settings', newSettings);
+          showToast(`تمت إضافة "${cleanVal}" بنجاح!`);
+        }
+      };
+
       const handleGoogleLogin = () => { 
         setLoginError(""); 
         const provider = new firebase.auth.GoogleAuthProvider(); 
@@ -489,7 +504,7 @@
 
       const deleteItem = (path, id, list) => {
         if (!isAdmin && !isAccountant) {
-          showToast("الحذف مصرح لمدير النظام والمحاسب فقط 🔒", "error");
+          showToast("الحذف مصرح للإدارة والمحاسب فقط 🔒", "error");
           return;
         }
         if (window.confirm("تأكيد الحذف نهائياً؟")) {
@@ -574,6 +589,32 @@
         showToast("تم تصدير ملف الإكسيل! 📥");
       };
 
+      const exportJsonBackup = () => {
+        const fullBackup = { projects, expenses, extracts, payments, advances, supplier_payments: supplierPayments, settings, roles: userRolesMap, exportDate: new Date().toISOString() };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `Construction_FullBackup_${todayDate}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        showToast("تم تحميل النسخة الاحتياطية (JSON)! 💾");
+      };
+
+      const [newRoleInput, setNewRoleInput] = useState({ email: "", role: "engineer" });
+      const handleSaveRole = (e) => {
+        e.preventDefault();
+        if (!isAdmin) return;
+        const cleanEmail = newRoleInput.email.trim().toLowerCase();
+        if (!cleanEmail) return;
+        const key = cleanEmail.replace(/\./g, '_');
+        const updated = { ...userRolesMap, [key]: newRoleInput.role };
+        setUserRolesMap(updated);
+        saveSafeConstructionData('roles', 'roles', updated);
+        setNewRoleInput({ email: "", role: "engineer" });
+        showToast(`تم تعيين صلاحية (${newRoleInput.role}) بنجاح! 🛡️`);
+      };
+
       if (loading) {
         return (
           <div class="min-h-screen flex items-center justify-center bg-slate-950 text-white font-bold text-sm">
@@ -654,6 +695,8 @@
         const empExp = projExpenses.filter(e => e?.paymentMethod === 'خصم من العهدة' && e?.custodyEmployee === empName).reduce((sum, e) => sum + parseNum(e?.amount), 0);
         return { received: empAdv, spent: empExp, balance: empAdv - empExp };
       };
+
+      const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "الرئيسية", icon: "📊" }] : [{ id: "my_custody", label: "عهدتي", icon: "💼" }]),
@@ -812,6 +855,7 @@
           </div>
 
           <main class="max-w-7xl mx-auto px-4 mt-3.5">
+            {/* 1. الرئيسية / لوحة التحكم */}
             {activeTab === "dashboard" && isAdmin && (
               <div class="space-y-4">
                 {projBudget > 0 && (
@@ -854,10 +898,139 @@
                     <div class={`text-sm font-black mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div>
                   </div>
                 </div>
+
+                {activeEmployeesCustody.length > 0 && (
+                  <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
+                    <h3 class="font-bold text-slate-800 dark:text-white mb-3">💼 رصيد العهد الحالية للموظفين:</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {activeEmployeesCustody.map(emp => (
+                        <div key={emp.name} class="border dark:border-slate-800 rounded-2xl p-3 bg-slate-50 dark:bg-slate-850">
+                          <span class="font-black text-indigo-700 dark:text-indigo-300 block mb-1">{emp.name}</span>
+                          <div class="flex justify-between text-[11px] text-slate-500 mb-2">
+                            <span>استلم: <strong class="text-emerald-600">{emp.received.toLocaleString()}</strong></span>
+                            <span>صرف: <strong class="text-rose-600">{emp.spent.toLocaleString()}</strong></span>
+                          </div>
+                          <div class="bg-white dark:bg-slate-800 rounded-xl p-2 text-center font-bold">
+                            الرصيد المتبقي: <span class="text-indigo-600 font-black">{emp.balance.toLocaleString()} ج.م</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* صفحة تسجيل المصاريف */}
+            {/* 2. لوحة عهدتي (للمهندسين والموظفين) */}
+            {activeTab === "my_custody" && !isAdmin && (
+              <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 text-xs">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+                  <div>
+                    <h2 class="text-base font-black text-slate-900 dark:text-white">💼 متابعة عهدتي الشخصية</h2>
+                    <p class="text-slate-500 text-[11px] mt-0.5">متابعة المبالغ المستلمة والمنصرفة والرصيد المتبقي معك.</p>
+                  </div>
+                  <div class="w-full sm:w-60">
+                    <select 
+                      value={myEmpName} 
+                      onChange={(e) => { setMyEmpName(e.target.value); localStorage.setItem('myEmpName', e.target.value); }} 
+                      class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 font-bold p-2.5 rounded-xl outline-none"
+                    >
+                      <option value="">اختر اسمك...</option>
+                      {settings.employees.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {myEmpName ? (() => {
+                  const myStats = getCustodyStats(myEmpName);
+                  return (
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div class="bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 p-4 rounded-2xl text-center">
+                        <span class="text-[11px] text-emerald-800 font-bold block mb-1">إجمالي المستلم</span>
+                        <span class="text-xl font-black text-emerald-600">{myStats.received.toLocaleString()} ج.م</span>
+                      </div>
+                      <div class="bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 p-4 rounded-2xl text-center">
+                        <span class="text-[11px] text-rose-800 font-bold block mb-1">إجمالي المنصرف</span>
+                        <span class="text-xl font-black text-rose-600">{myStats.spent.toLocaleString()} ج.م</span>
+                      </div>
+                      <div class="bg-indigo-600 text-white p-4 rounded-2xl text-center shadow-xs">
+                        <span class="text-[11px] text-indigo-100 font-bold block mb-1">الرصيد المتبقي معك</span>
+                        <span class="text-2xl font-black">{myStats.balance.toLocaleString()} ج.م</span>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div class="text-center p-6 text-slate-400 font-bold">يرجى اختيار اسمك لعرض الرصيد التفاعلي.</div>
+                )}
+              </div>
+            )}
+
+            {/* 3. المشاريع */}
+            {activeTab === "projects" && (
+              <div class="space-y-3.5">
+                {(isAdmin || isAccountant) && (
+                  <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
+                    <h3 class="font-black text-sm text-slate-900 dark:text-white mb-3">📁 إضافة مشروع جديد</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newProj.id || !newProj.name) return;
+                      const clean = cleanId(newProj.id);
+                      const projectToAdd = { ...newProj, id: clean, budget: parseNum(newProj.budget), createdBy: user?.name || 'مستخدم' };
+                      const updatedProjects = [...projects, projectToAdd];
+                      setProjects(updatedProjects);
+                      saveSafeConstructionData('projects', 'projects', updatedProjects);
+                      setSelectedProjId(clean);
+                      setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
+                      showToast(`تمت إضافة المشروع بنجاح!`);
+                    }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
+                      <div><label class="block font-bold mb-1">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2 font-mono dark:bg-slate-800 font-bold" required /></div>
+                      <div><label class="block font-bold mb-1">اسم المالك</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" required /></div>
+                      <div><label class="block font-bold mb-1">المكتب الاستشاري</label><input type="text" value={newProj.consultant} onChange={e=>setNewProj({...newProj, consultant: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" /></div>
+                      <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" /></div>
+                      <div><label class="block font-bold mb-1">الميزانية التقديرية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" /></div>
+                      <div><button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ المشروع</button></div>
+                    </form>
+                  </div>
+                )}
+                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-x-auto custom-scroll text-xs">
+                  <table class="w-full text-right border-collapse whitespace-nowrap">
+                    <thead>
+                      <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200/80 dark:border-slate-800 font-black">
+                        <th class="p-3">الكود</th>
+                        <th class="p-3">المالك</th>
+                        <th class="p-3">الاستشاري</th>
+                        <th class="p-3">الموقع</th>
+                        <th class="p-3">الميزانية</th>
+                        <th class="p-3">الحالة</th>
+                        {isAdmin && <th class="p-3 text-center">إجراءات</th>}
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
+                      {projects.map(p => (
+                        <tr key={p.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <td class="p-3 font-bold text-indigo-600 font-mono">{p.id}</td>
+                          <td class="p-3 font-bold text-slate-900 dark:text-white">{p.name}</td>
+                          <td class="p-3 text-slate-500">{p.consultant || '-'}</td>
+                          <td class="p-3 text-slate-500">{p.location || '-'}</td>
+                          <td class="p-3 font-mono font-bold">{isAdmin || isAccountant ? `${parseNum(p.budget).toLocaleString()} ج.م` : '🔒 محجوب'}</td>
+                          <td class="p-3"><span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold">{p.status || 'جاري'}</span></td>
+                          {isAdmin && (
+                            <td class="p-3 text-center">
+                              <div class="inline-flex items-center gap-1.5">
+                                <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} class="bg-indigo-50 dark:bg-slate-800 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
+                                <button onClick={()=>deleteItem('projects', p.id, projects)} class="bg-rose-50 dark:bg-slate-800 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 4. إدخال فاتورة ومصروف جديد */}
             {activeTab === "add_data" && (
               <div class="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
                 <h3 class="font-black text-sm text-slate-900 dark:text-white mb-4 pb-2 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-2">
@@ -892,31 +1065,43 @@
                   </div>
                   <div>
                     <label class="block font-bold mb-1 text-slate-600 dark:text-slate-300">البند الرئيسي</label>
-                    <select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 font-bold" required>
-                      <option value="">اختر...</option>
-                      {settings.mainCategories.map(c => <option key={c}>{c}</option>)}
-                    </select>
+                    <div class="flex gap-1">
+                      <select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 font-bold" required>
+                        <option value="">اختر...</option>
+                        {settings.mainCategories.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} class="px-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold">+</button>}
+                    </div>
                   </div>
                   <div>
                     <label class="block font-bold mb-1 text-slate-600 dark:text-slate-300">البند الفرعي</label>
-                    <select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 font-bold" required>
-                      <option value="">اختر...</option>
-                      {settings.subCategories.map(c => <option key={c}>{c}</option>)}
-                    </select>
+                    <div class="flex gap-1">
+                      <select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 font-bold" required>
+                        <option value="">اختر...</option>
+                        {settings.subCategories.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} class="px-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold">+</button>}
+                    </div>
                   </div>
                   <div>
                     <label class="block font-bold mb-1 text-slate-600 dark:text-slate-300">نوع التكلفة</label>
-                    <select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 font-bold">
-                      <option value="">اختر...</option>
-                      {settings.costTypes.map(c => <option key={c}>{c}</option>)}
-                    </select>
+                    <div class="flex gap-1">
+                      <select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 font-bold">
+                        <option value="">اختر...</option>
+                        {settings.costTypes.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} class="px-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold">+</button>}
+                    </div>
                   </div>
                   <div>
                     <label class="block font-bold mb-1 text-slate-600 dark:text-slate-300">المورد / الجهة</label>
-                    <select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 font-bold">
-                      <option value="">اختر...</option>
-                      {settings.suppliers.map(c => <option key={c}>{c}</option>)}
-                    </select>
+                    <div class="flex gap-1">
+                      <select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 font-bold">
+                        <option value="">اختر...</option>
+                        {settings.suppliers.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} class="px-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold">+</button>}
+                    </div>
                   </div>
                   <div>
                     <label class="block font-bold mb-1 text-slate-600 dark:text-slate-300">طريقة السداد</label>
@@ -953,7 +1138,7 @@
                   </div>
                   <div class="sm:col-span-2">
                     <label class="block font-bold mb-1 text-slate-600 dark:text-slate-300">البيان / الوصف</label>
-                    <input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="تفاصيل الصرف ورقم الفاتورة..." class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 outline-none"/>
+                    <input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="تفاصيل الفاتورة وإذن الاستلام..." class="w-full border dark:border-slate-700 rounded-xl p-2.5 dark:bg-slate-800 outline-none"/>
                   </div>
                   <div class="sm:col-span-2">
                     <label class="block font-bold mb-1 text-slate-600 dark:text-slate-300">📸 إرفاق صورة الفاتورة</label>
@@ -972,7 +1157,7 @@
               </div>
             )}
 
-            {/* صفحة عرض المصاريف - تم إلغاء خانة الإجراءات المتحركة لتكون عادية تماماً ومريحة للهاتف */}
+            {/* 5. سجل المصاريف */}
             {activeTab === "expenses" && (
               <div class="space-y-3">
                 <div class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row gap-2.5 text-xs">
@@ -1009,7 +1194,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
                       {filteredSearchExpenses.length === 0 ? (
-                        <tr><td colSpan={canEditOrDelete ? 11 : 10} class="text-center p-6 text-slate-400">لا توجد سجلات مسجلة</td></tr>
+                        <tr><td colSpan={canEditOrDelete ? 11 : 10} class="text-center p-6 text-slate-400">لا توجد مصاريف مسجلة مطابقة للبحث</td></tr>
                       ) : (
                         filteredSearchExpenses.map((e) => (
                           <tr key={e.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
@@ -1032,7 +1217,7 @@
                             </td>
                             <td class="p-3 text-center">
                               <button onClick={() => {
-                                const msg = `🏢 *إشعار فاتورة توريد*\n🏗️ *المشروع:* ${currentProj.name}\n📌 *البند:* ${e.mainCategory} - ${e.subCategory}\n💰 *المبلغ:* ${parseNum(e.amount).toLocaleString()} ج.م\n🗓️️ *التاريخ:* ${e.date}`;
+                                const msg = `🏢 *إشعار فاتورة توريد*\n🏗️ *المشروع:* ${currentProj.name}\n📌 *البند:* ${e.mainCategory} - ${e.subCategory}\n💰 *المبلغ:* ${parseNum(e.amount).toLocaleString()} ج.م\n🗓 *التاريخ:* ${e.date}`;
                                 window.open(`https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
                               }} class="text-emerald-600 hover:text-emerald-700 text-xs">📲</button>
                             </td>
@@ -1055,52 +1240,11 @@
               </div>
             )}
 
-            {/* صفحة المشاريع */}
-            {activeTab === "projects" && (
-              <div class="space-y-3">
-                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-x-auto custom-scroll text-xs">
-                  <table class="w-full text-right border-collapse whitespace-nowrap">
-                    <thead>
-                      <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200/80 dark:border-slate-800 font-black">
-                        <th class="p-3">الكود</th>
-                        <th class="p-3">اسم المالك</th>
-                        <th class="p-3">الاستشاري</th>
-                        <th class="p-3">الموقع</th>
-                        <th class="p-3">الميزانية</th>
-                        <th class="p-3">الحالة</th>
-                        {isAdmin && <th class="p-3 text-center">إجراءات</th>}
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
-                      {projects.map(p => (
-                        <tr key={p.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                          <td class="p-3 font-bold text-indigo-600 font-mono">{p.id}</td>
-                          <td class="p-3 font-bold text-slate-900 dark:text-white">{p.name}</td>
-                          <td class="p-3 text-slate-500">{p.consultant || '-'}</td>
-                          <td class="p-3 text-slate-500">{p.location || '-'}</td>
-                          <td class="p-3 font-mono font-bold">{parseNum(p.budget).toLocaleString()} ج.م</td>
-                          <td class="p-3"><span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px]">{p.status || 'جاري'}</span></td>
-                          {isAdmin && (
-                            <td class="p-3 text-center">
-                              <div class="inline-flex items-center gap-1.5">
-                                <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} class="bg-indigo-50 dark:bg-slate-800 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
-                                <button onClick={()=>deleteItem('projects', p.id, projects)} class="bg-rose-50 dark:bg-slate-800 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* صفحة العهدة */}
+            {/* 6. سجل العهد */}
             {activeTab === "advances" && (
               <div class="space-y-4">
                 <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
-                  <h3 class="font-black text-sm text-slate-900 dark:text-white mb-3">تسليم عهدة وسلفة جديدة</h3>
+                  <h3 class="font-black text-sm text-slate-900 dark:text-white mb-3">💵 تسليم عهدة وسلفة جديدة</h3>
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
@@ -1155,9 +1299,334 @@
                 </div>
               </div>
             )}
+
+            {/* 7. الدفعات والتحصيلات */}
+            {activeTab === "payments" && (isAdmin || isAccountant) && (
+              <div class="space-y-4">
+                <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
+                  <h3 class="font-black text-sm text-slate-900 dark:text-white mb-3">💰 تسجيل تحصيل ودفعة من العميل</h3>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const targetProj = cleanId(selectedProjId);
+                    const newItem = { id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user?.name || 'مستخدم' };
+                    const updated = [newItem, ...payments];
+                    setPayments(updated);
+                    saveSafeConstructionData('payments', 'payments', updated);
+                    setNewPay({ date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: "" });
+                    showToast("تم تسجيل الدفعة بنجاح! 💵");
+                  }} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/>
+                    <input type="number" step="any" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} placeholder="المبلغ..." class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-black text-emerald-600" required/>
+                    <input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} placeholder="بيان الدفعة..." class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800"/>
+                    <button type="submit" class="sm:col-span-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ التحصيل</button>
+                  </form>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-x-auto custom-scroll text-xs">
+                  <table class="w-full text-right border-collapse whitespace-nowrap">
+                    <thead>
+                      <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200/80 dark:border-slate-800 font-black">
+                        <th class="p-3">التاريخ</th>
+                        <th class="p-3">المشروع</th>
+                        <th class="p-3 text-center">المبلغ</th>
+                        <th class="p-3">البيان</th>
+                        {isAdmin && <th class="p-3 text-center">إجراءات</th>}
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
+                      {projPayments.map(p => (
+                        <tr key={p.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <td class="p-3 text-slate-500 font-mono text-[11px]">{p.date}</td>
+                          <td class="p-3 font-bold text-indigo-600">{p.projectId}</td>
+                          <td class="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
+                          <td class="p-3 text-slate-500">{p.notes || '-'}</td>
+                          {isAdmin && (
+                            <td class="p-3 text-center">
+                              <div class="inline-flex items-center gap-1.5">
+                                <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} class="bg-indigo-50 dark:bg-slate-800 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
+                                <button onClick={()=>deleteItem('payments', p.id, payments)} class="bg-rose-50 dark:bg-slate-800 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 8. حساب الموردين */}
+            {activeTab === "suppliers" && (isAdmin || isAccountant) && (
+              <div class="space-y-4">
+                <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
+                  <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-black text-sm text-slate-900 dark:text-white">🚚 سداد دفعة نقدية لمورد</h3>
+                    <div class="flex gap-1.5">
+                      <button onClick={()=>setSuppScope("project")} class={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "project" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800"}`}>المشروع الحالي</button>
+                      <button onClick={()=>setSuppScope("company")} class={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "company" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800"}`}>كل المشاريع</button>
+                    </div>
+                  </div>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
+                    const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newSuppPay, amount: parseNum(newSuppPay.amount), createdBy: user?.name || 'مستخدم' };
+                    const updated = [newItem, ...supplierPayments];
+                    setSupplierPayments(updated);
+                    saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
+                    setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" });
+                    showToast("تم تسجيل الدفعة للمورد بنجاح! 🚚");
+                  }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                    <input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/>
+                    <select value={newSuppPay.supplier} onChange={e=>setNewSuppPay({...newSuppPay, supplier: e.target.value})} class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required>
+                      <option value="">اختر المورد...</option>
+                      {settings.suppliers.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                    <input type="number" step="any" value={newSuppPay.amount} onChange={e=>setNewSuppPay({...newSuppPay, amount: e.target.value})} placeholder="المبلغ..." class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-black text-emerald-600" required/>
+                    <input type="text" value={newSuppPay.notes} onChange={e=>setNewSuppPay({...newSuppPay, notes: e.target.value})} placeholder="البيان أو رقم الشيك..." class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800"/>
+                    <button type="submit" class="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">قيد الدفعة للمورد</button>
+                  </form>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-x-auto custom-scroll text-xs">
+                  <table class="w-full text-right border-collapse whitespace-nowrap">
+                    <thead>
+                      <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200/80 dark:border-slate-800 font-black">
+                        <th class="p-3">المورد</th>
+                        <th class="p-3 text-center">إجمالي المسحوبات</th>
+                        <th class="p-3 text-center text-amber-600">فواتير آجلة</th>
+                        <th class="p-3 text-center text-emerald-600">المسدد له</th>
+                        <th class="p-3 text-center">الرصيد النهائي</th>
+                        <th class="p-3 text-center">كشف الحساب</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
+                      {suppliersLedger.map((s, i) => (
+                        <tr key={i} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <td class="p-3 font-bold text-slate-900 dark:text-white">{s.name}</td>
+                          <td class="p-3 text-center font-mono">{s.totalPurchases.toLocaleString()}</td>
+                          <td class="p-3 text-center font-mono text-amber-600 font-bold">{s.creditPurchases.toLocaleString()}</td>
+                          <td class="p-3 text-center font-mono text-emerald-600 font-bold">{s.totalPaid.toLocaleString()}</td>
+                          <td class={`p-3 text-center font-mono font-black ${s.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {Math.abs(s.balance).toLocaleString()} ج.م
+                          </td>
+                          <td class="p-3 text-center">
+                            <button onClick={()=>setSelectedSupplierDetail(s.name)} class="bg-indigo-50 dark:bg-slate-800 text-indigo-600 hover:bg-indigo-100 px-3 py-1 rounded-lg font-bold text-[11px]">
+                              📑 عرض كشف
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 9. كشف الحساب المتكامل */}
+            {activeTab === "statement" && isAdmin && (
+              <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs space-y-4">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 print-hidden">
+                  <h3 class="font-black text-sm text-slate-900 dark:text-white">📑 كشف حساب وموقف مالي متكامل للمشروع</h3>
+                  <button onClick={() => window.print()} class="bg-slate-900 text-white px-4 py-2 rounded-xl font-bold">🖨️ طباعة عادية</button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">المستخلصات: <strong class="block text-indigo-600 text-sm mt-1">{totalWorkNet.toLocaleString()} ج.م</strong></div>
+                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">التحصيلات: <strong class="block text-emerald-600 text-sm mt-1">{totalReceived.toLocaleString()} ج.م</strong></div>
+                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">المصروفات: <strong class="block text-rose-600 text-sm mt-1">{totalCost.toLocaleString()} ج.م</strong></div>
+                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">السيولة الحرة: <strong class="block text-indigo-700 text-sm mt-1">{centralCashRemaining.toLocaleString()} ج.م</strong></div>
+                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">الأرباح: <strong class="block text-emerald-700 text-sm mt-1">{netProfit.toLocaleString()} ج.م</strong></div>
+                </div>
+              </div>
+            )}
+
+            {/* 10. المستخلصات المعتمدة */}
+            {activeTab === "extracts" && (isAdmin || isAccountant) && (
+              <div class="space-y-4">
+                <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs print-hidden">
+                  <h3 class="font-black text-sm text-slate-900 dark:text-white mb-3">📄 اعتماد مستخلص أعمال جديد</h3>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const totalWork = parseNum(newExt.quantity) * parseNum(newExt.unitPrice);
+                    const net = totalWork - parseNum(newExt.deductions);
+                    const targetProj = cleanId(selectedProjId);
+                    const newItem = { 
+                      id: Date.now(), 
+                      projectId: targetProj, 
+                      ...newExt, 
+                      quantity: parseNum(newExt.quantity),
+                      unitPrice: parseNum(newExt.unitPrice),
+                      totalWork, 
+                      deductions: parseNum(newExt.deductions), 
+                      net, 
+                      createdBy: user?.name || 'مستخدم' 
+                    };
+                    const updated = [newItem, ...extracts];
+                    setExtracts(updated);
+                    saveSafeConstructionData('extracts', 'extracts', updated);
+                    setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""});
+                    showToast("تم اعتماد المستخلص وحفظه!");
+                  }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/>
+                    <input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} placeholder="رقم المستخلص..." class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/>
+                    <div class="sm:col-span-2"><input type="text" value={newExt.workDescription} onChange={e=>setNewExt({...newExt, workDescription: e.target.value})} placeholder="توصيف الأعمال..." class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/></div>
+                    <input type="number" step="any" value={newExt.quantity} onChange={e=>setNewExt({...newExt, quantity: e.target.value})} placeholder="الكمية..." class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/>
+                    <input type="number" step="any" value={newExt.unitPrice} onChange={e=>setNewExt({...newExt, unitPrice: e.target.value})} placeholder="الفئة..." class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/>
+                    <input type="number" step="any" value={newExt.deductions} onChange={e=>setNewExt({...newExt, deductions: e.target.value})} placeholder="الاستقطاعات..." class="sm:col-span-2 border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold text-rose-600"/>
+                    <button type="submit" class="sm:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ المستخلص</button>
+                  </form>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-x-auto custom-scroll text-xs">
+                  <table class="w-full text-right border-collapse whitespace-nowrap">
+                    <thead>
+                      <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200/80 dark:border-slate-800 font-black">
+                        <th class="p-3">التاريخ</th>
+                        <th class="p-3">المستخلص</th>
+                        <th class="p-3">البيان</th>
+                        <th class="p-3 text-center">الكمية</th>
+                        <th class="p-3 text-center">الفئة</th>
+                        <th class="p-3 text-center">الصافي</th>
+                        {isAdmin && <th class="p-3 text-center">إجراءات</th>}
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
+                      {projExtracts.map(ex => (
+                        <tr key={ex.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <td class="p-3 text-slate-500 font-mono text-[11px]">{ex.date}</td>
+                          <td class="p-3 font-bold text-slate-900 dark:text-white">{ex.extractNo}</td>
+                          <td class="p-3 text-slate-500">{ex.workDescription}</td>
+                          <td class="p-3 text-center">{parseNum(ex.quantity)}</td>
+                          <td class="p-3 text-center font-mono">{parseNum(ex.unitPrice).toLocaleString()}</td>
+                          <td class="p-3 text-center font-black text-indigo-600 font-mono">{parseNum(ex.net).toLocaleString()} ج.م</td>
+                          {isAdmin && (
+                            <td class="p-3 text-center">
+                              <div class="inline-flex items-center gap-1.5">
+                                <button onClick={()=>setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-indigo-50 dark:bg-slate-800 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
+                                <button onClick={()=>deleteItem('extracts', ex.id, extracts)} class="bg-rose-50 dark:bg-slate-800 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 11. سجل الدخول للمراقبة */}
+            {activeTab === "audit_log" && isAdmin && (
+              <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs space-y-3">
+                <h3 class="font-black text-sm text-slate-900 dark:text-white">🛡 سجل الدخول والنشاط</h3>
+                <div class="overflow-x-auto custom-scroll">
+                  <table class="w-full text-right whitespace-nowrap">
+                    <thead><tr class="bg-slate-50 dark:bg-slate-800 text-slate-500 border-b dark:border-slate-700 font-black"><th class="p-2.5">المستخدم</th><th class="p-2.5">الرتبة</th><th class="p-2.5">الجهاز</th><th class="p-2.5">التاريخ والوقت</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-bold">{loginLogs.map((log, i) => (
+                      <tr key={i} class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                        <td class="p-2.5 font-bold text-slate-900 dark:text-white">{log.name}</td>
+                        <td class="p-2.5"><span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg text-[10px]">{log.role}</span></td>
+                        <td class="p-2.5 text-slate-500">{log.device}</td>
+                        <td class="p-2.5 text-slate-400 font-mono text-[11px]">{log.formattedDate}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 12. الإعدادات والنسخ الاحتياطي */}
+            {activeTab === "settings" && isAdmin && (
+              <div class="space-y-4 text-xs font-bold">
+                <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+                  <h3 class="text-sm font-black text-slate-900 dark:text-white">💾 النسخ الاحتياطي والترحيل</h3>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <button onClick={exportJsonBackup} class="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-between hover:bg-slate-100 transition">
+                      <span>تحميل نسخة شاملة (JSON)</span><span class="text-lg">💾</span>
+                    </button>
+                    <button onClick={exportToExcel} class="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-between hover:bg-slate-100 transition">
+                      <span>تصدير شيت إكسيل (Excel)</span><span class="text-lg">📊</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+                  <h3 class="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات</h3>
+                  <form onSubmit={handleSaveRole} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800" required/>
+                    <select value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold">
+                      <option value="engineer">👷 مهندس موقع</option>
+                      <option value="accountant">💼 محاسب</option>
+                      <option value="admin">👑 مدير نظام</option>
+                    </select>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-2.5 font-black">حفظ الصلاحية</button>
+                  </form>
+                </div>
+              </div>
+            )}
           </main>
 
-          {/* شريط التنقل السفلي للهواتف الذكية - نظيف ومريح */}
+          {/* نافذة كشف حساب المورد */}
+          {selectedSupplierDetail && (
+            <div class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+              <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 w-full max-w-2xl shadow-2xl border dark:border-slate-800 text-xs max-h-[85vh] flex flex-col justify-between">
+                <div class="flex justify-between items-center border-b dark:border-slate-800 pb-3 mb-3">
+                  <h3 class="font-black text-sm text-slate-900 dark:text-white">كشف حساب: {selectedSupplierDetail}</h3>
+                  <button onClick={()=>setSelectedSupplierDetail(null)} class="text-slate-400 text-lg">✕</button>
+                </div>
+                <div class="overflow-y-auto max-h-[55vh] space-y-3 custom-scroll">
+                  <table class="w-full text-right border-collapse whitespace-nowrap">
+                    <thead><tr class="bg-slate-50 dark:bg-slate-800 border-b font-black"><th class="p-2">التاريخ</th><th class="p-2">البند</th><th class="p-2 text-center">المبلغ</th><th class="p-2">الحالة</th></tr></thead>
+                    <tbody class="divide-y dark:divide-slate-800 font-bold">
+                      {expenses.filter(e => (e.supplier || '').trim() === selectedSupplierDetail).map(e => (
+                        <tr key={e.id}><td class="p-2 text-slate-400 font-mono">{e.date}</td><td class="p-2">{e.mainCategory} - {e.subCategory}</td><td class="p-2 text-center text-rose-600 font-mono font-black">{parseNum(e.amount).toLocaleString()}</td><td class="p-2">{e.billStatus || 'مدفوعة'}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div class="pt-3 border-t dark:border-slate-800 flex justify-end">
+                  <button onClick={()=>setSelectedSupplierDetail(null)} class="bg-slate-800 text-white px-5 py-2 rounded-xl font-bold">إغلاق</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* نافذة التعديل المنبثقة الموحدة */}
+          {editItemData && canEditOrDelete && (
+            <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+              <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 text-xs">
+                <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 mb-3">
+                  <h3 class="font-black text-sm text-slate-900 dark:text-white">تعديل السجل</h3>
+                  <button onClick={() => setEditItemData(null)} class="text-slate-400 text-lg">✕</button>
+                </div>
+                <form onSubmit={handleSaveEditedItem} class="space-y-3">
+                  {editItemData.type === 'expense' && (
+                    <>
+                      <div><label class="block font-bold mb-1">البيان</label><input type="text" value={editItemData.data.description || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, description: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800"/></div>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block font-bold mb-1">الكمية</label><input type="number" step="any" value={editItemData.data.quantity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, quantity: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/></div>
+                        <div><label class="block font-bold mb-1">السعر</label><input type="number" step="any" value={editItemData.data.unitPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, unitPrice: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/></div>
+                      </div>
+                    </>
+                  )}
+                  {editItemData.type === 'advance' && (
+                    <div><label class="block font-bold mb-1">المبلغ</label><input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold text-emerald-600" required/></div>
+                  )}
+                  {editItemData.type === 'payment' && (
+                    <div><label class="block font-bold mb-1">المبلغ</label><input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold text-emerald-600" required/></div>
+                  )}
+                  {editItemData.type === 'supp_payment' && (
+                    <div><label class="block font-bold mb-1">المبلغ المسدد</label><input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold text-emerald-600" required/></div>
+                  )}
+                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-2xl shadow-xs transition mt-3">
+                    تأكيد وحفظ
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* شريط التنقل السفلي للهواتف الذكية */}
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-lg z-40 px-2 py-1 flex justify-around items-center">
             {navTabs.slice(0, 4).map(tab => (
               <button 
@@ -1180,51 +1649,22 @@
             </button>
           </nav>
 
-          {/* نافذة التعديل المنبثقة */}
-          {editItemData && canEditOrDelete && (
-            <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-              <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 text-xs">
-                <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 mb-3">
-                  <h3 class="font-black text-sm text-slate-900 dark:text-white">تعديل السجل</h3>
-                  <button onClick={() => setEditItemData(null)} class="text-slate-400 text-lg">✕</button>
-                </div>
-                <form onSubmit={handleSaveEditedItem} class="space-y-3">
-                  {editItemData.type === 'expense' && (
-                    <>
-                      <div>
-                        <label class="block font-bold mb-1">البيان</label>
-                        <input type="text" value={editItemData.data.description || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, description: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800"/>
-                      </div>
-                      <div class="grid grid-cols-2 gap-2">
-                        <div>
-                          <label class="block font-bold mb-1">الكمية</label>
-                          <input type="number" step="any" value={editItemData.data.quantity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, quantity: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800" required/>
-                        </div>
-                        <div>
-                          <label class="block font-bold mb-1">السعر</label>
-                          <input type="number" step="any" value={editItemData.data.unitPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, unitPrice: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800" required/>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  {editItemData.type === 'advance' && (
-                    <div>
-                      <label class="block font-bold mb-1">المبلغ</label>
-                      <input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold text-emerald-600" required/>
-                    </div>
-                  )}
-                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-2xl shadow-xs transition mt-3">
-                    تأكيد وحفظ
-                  </button>
-                </form>
+          {/* التنبيهات المنبثقة */}
+          {toast.show && (
+            <div class="fixed bottom-16 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
+              <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
+                <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
+                <span>{toast.message}</span>
               </div>
             </div>
           )}
 
-          {toast.show && (
-            <div class="fixed bottom-16 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-              <div class="px-4 py-2 rounded-2xl shadow-lg border border-slate-800 bg-slate-900 text-white text-xs font-bold">
-                {toast.message}
+          {/* معاينة صورة الفاتورة */}
+          {activeInvoiceModal && (
+            <div class="fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
+              <div class="bg-white dark:bg-slate-900 p-4 rounded-3xl max-w-md w-full flex flex-col items-center shadow-2xl">
+                <img src={activeInvoiceModal} class="max-h-[65vh] object-contain rounded-2xl mb-3 w-full" />
+                <button onClick={()=>setActiveInvoiceModal(null)} class="w-full bg-slate-900 dark:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs">إغلاق</button>
               </div>
             </div>
           )}
