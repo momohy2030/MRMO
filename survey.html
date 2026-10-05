@@ -142,6 +142,8 @@
       return isNaN(n) ? 0 : n;
     };
 
+    const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
+
     const offlineStorage = {
       get(key, fallback = []) {
         try {
@@ -325,23 +327,21 @@
       const [payModalOpen, setPayModalOpen] = useState(false);
       const [editingOp, setEditingOp] = useState(null);
 
-      // حارس الأمان لمنع الشاشة البيضاء
-      const ensureArr = (data) => Array.isArray(data) ? data : (data ? Object.values(data) : []);
-
-      const [operations, setOperations] = useState(() => ensureArr(offlineStorage.get('operations', [])));
-      const [transactions, setTransactions] = useState(() => ensureArr(offlineStorage.get('transactions', [])));
-      const [payments, setPayments] = useState(() => ensureArr(offlineStorage.get('payments', [])));
-      const [loginLogs, setLoginLogs] = useState(() => ensureArr(offlineStorage.get('login_logs', [])));
+      const [operations, setOperations] = useState(() => toArr(offlineStorage.get('operations', [])));
+      const [transactions, setTransactions] = useState(() => toArr(offlineStorage.get('transactions', [])));
+      const [payments, setPayments] = useState(() => toArr(offlineStorage.get('payments', [])));
+      const [loginLogs, setLoginLogs] = useState(() => toArr(offlineStorage.get('login_logs', [])));
       
       const [settings, setSettings] = useState(() => {
         const saved = offlineStorage.get('settings', {});
         return {
-          engineers: ensureArr(saved.engineers || ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"]),
-          opTypes: ensureArr(saved.opTypes || ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"]),
+          engineers: toArr(saved.engineers).length ? toArr(saved.engineers) : ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"],
+          opTypes: toArr(saved.opTypes).length ? toArr(saved.opTypes) : ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"],
           logo: saved.logo || "",
-          theme: localStorage.getItem('theme') || 'light'
+          theme: 'light'
         };
       });
+
       const todayDate = new Date().toISOString().split('T')[0];
       const currentMonthStr = todayDate.substring(0, 7);
 
@@ -401,10 +401,10 @@
       }, []);
 
       useEffect(() => {
-        if (settings.theme === 'dark') document.documentElement.classList.add('dark');
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        if (savedTheme === 'dark') document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', settings.theme);
-      }, [settings.theme]);
+      }, []);
 
       const showToast = (message) => {
         setToast({ show: true, message });
@@ -459,8 +459,6 @@
         const ref = db.ref('survey_data');
         ref.on('value', (snap) => {
           const d = snap.val() || {};
-          // فلتر الحماية الضروري لمنع الشاشة البيضاء عن طريق إجبار البيانات أن تكون مصفوفة (Array)
-          const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
           
           if (d.operations) {
             const arr = toArr(d.operations).reverse();
@@ -486,7 +484,6 @@
             setSettings(prev => {
               const updated = {
                 ...prev,
-                // استخدام فلتر الحماية لمنع تحويل الـ Settings إلى Object
                 engineers: toArr(d.settings.engineers).length ? toArr(d.settings.engineers) : prev.engineers,
                 opTypes: toArr(d.settings.opTypes).length ? toArr(d.settings.opTypes) : prev.opTypes,
                 logo: d.settings.logo || prev.logo
@@ -598,7 +595,7 @@
           setOperations(updatedOps);
           saveListSafely('operations', 'operations', updatedOps);
           logActivity(`تعديل طلعة للعميل: ${finalOp.clientName}`);
-          showToast(navigator.onLine ? "تم تحديث الطلعة بنجاح! ✏️" : "تم حفظ التعديل محلياً بجهازك 💾");
+          showToast("تم تحديث الطلعة بنجاح! ✏️");
           setEditingOp(null);
         } else {
           const opToSave = { id: Date.now(), ...finalOp, ...shares, createdBy: user?.email || 'Admin' };
@@ -618,7 +615,7 @@
           }
 
           logActivity(`تسجيل طلعة جديدة: ${finalOp.clientName} بقيمة ${finalAgreed} ج.م`);
-          showToast(navigator.onLine ? "تم حفظ الطلعة بنجاح! 📐" : "تم حفظ الطلعة بنجاح بدون إنترنت 💾");
+          showToast("تم حفظ الطلعة بنجاح! 📐");
         }
         setOpModalOpen(false);
       };
@@ -817,8 +814,14 @@
             </div>
 
             <div class="flex items-center gap-2">
-              <button onClick={() => setSettings(p=>({...p, theme: p.theme==='dark'?'light':'dark'}))} class="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">
-                {settings.theme === 'dark' ? '☀️' : '🌙'}
+              <button onClick={() => {
+                const current = localStorage.getItem('theme') || 'light';
+                const next = current === 'dark' ? 'light' : 'dark';
+                localStorage.setItem('theme', next);
+                if (next === 'dark') document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+              }} class="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">
+                ☀️/🌙
               </button>
               <a href="index.html" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition">
                 <span>🏗️</span> <span class="hidden sm:inline">الإنشاءات</span>
@@ -1171,7 +1174,6 @@
                 </div>
               )}
 
-              {/* تبويب المستخلصات - تم عزل تداخل الأرقام وترتيب الترويسة */}
               {activeTab === 'extracts' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs print-hidden flex flex-col sm:flex-row gap-3 items-center">
@@ -1201,7 +1203,6 @@
                     <div>
                       <div id="printable-area" dir="rtl" class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm print-area text-slate-800 space-y-5">
                         
-                        {/* الترويسة المحدثة بدقة */}
                         <div class="border-b-2 border-slate-900 pb-4">
                           <div class="flex justify-between items-start">
                             <div>
@@ -1229,7 +1230,6 @@
                           </div>
                         </div>
 
-                        {/* جدول بنود المستخلص ذو القياسات الثابتة */}
                         <div class="overflow-x-auto">
                           <table class="w-full text-right border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
                             <thead>
@@ -1298,7 +1298,6 @@
                           </button>
                         </div>
 
-                        {/* بطاقات الإجماليات المعزولة عن تداخل الأرقام */}
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200">
                           <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
                             <span class="text-[11px] text-slate-500 font-bold block mb-1">إجمالي الأعمال المنجزة</span>
@@ -1314,7 +1313,6 @@
                           </div>
                         </div>
 
-                        {/* التوقيعات */}
                         <div class="pt-6 flex justify-between items-end border-t border-slate-200 text-xs font-bold text-slate-600">
                           <div>
                             <span>المهندس المشرف:</span>
@@ -1332,7 +1330,7 @@
                           🖨️ طباعة المستخلص
                         </button>
                         <button onClick={()=>{
-                          const summaryMessage = `🏢 *مكتب مساحة*\n📄 *مستخلص أعمال مساحية للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️ *التاريخ:* ${todayDate}`;
+                          const summaryMessage = `🏢 *مكتب مساحة*\n📄 *مستخلص أعمال مساحية للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓️️ *التاريخ:* ${todayDate}`;
                           exportCleanPdfAndWhatsApp('printable-area', `مستخلص_${extractClient}.pdf`, summaryMessage);
                         }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-sm transition">
                           <span>📲</span> إرسال المستخلص عبر واتساب (PDF مفرود وأرقام واضحة)
@@ -1359,7 +1357,7 @@
                     </div>
                     {statementClient && (
                       <div class="w-full sm:w-1/2 flex justify-end gap-2 items-end">
-                        <button onClick={()=>window.print()} class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs">🖨️️ طباعة كشف الشركاء</button>
+                        <button onClick={()=>window.print()} class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs">🖨 طباعة كشف الشركاء</button>
                       </div>
                     )}
                   </div>
@@ -1450,11 +1448,10 @@
                 </div>
               )}
 
-              {/* 12. سجل الدخول للمراقبة */}
               {activeTab === 'logs' && isSuperAdmin && (
                 <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto p-4 space-y-3 font-bold custom-scroll">
                   <h3 class="text-sm font-black text-indigo-700 dark:text-indigo-400">🛡 سجل نشاطات وحركات المستخدمين (خاص بمدير النظام):</h3>
-                  <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">الوقت</th><th class="p-2">المستخدم</th><th class="p-2">البريد</th><th class="p-2">النشاط والإجراء المنفذ</th></tr></thead>
+                  <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">الوقت</th><th class="p-2">المستخدم</th><th class="p-2">البريد</th><th class="p-2.5">النشاط والإجراء المنفذ</th></tr></thead>
                   <tbody>{loginLogs.map((l,i)=><tr key={i} class="border-b dark:border-slate-700">
                     <td class="p-2 whitespace-nowrap text-slate-500 font-mono text-[11px]">{l.date}</td>
                     <td class="p-2">{l.name}</td>
@@ -1464,9 +1461,8 @@
                 </div>
               )}
 
-              {/* 13. الإعدادات والنسخ الاحتياطي */}
               {activeTab === 'settings' && isAdmin && (
-                <div class="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs max-w-sm font-bold space-y-3">
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs max-w-sm font-bold space-y-3">
                   <h3>🖼 شعار الترويسة المعتمد:</h3>
                   <input type="file" accept="image/*" onChange={(e)=>{
                     if(!isAdmin) return;
@@ -1494,7 +1490,6 @@
             </main>
           </div>
 
-          {/* نوافذ الإدخال المنبثقة */}
           {opModalOpen && (
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
