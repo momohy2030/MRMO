@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة الأعمال المساحية - SURVEY ERP</title>
 
-  <!-- وسوم التثبيت والـ PWA -->
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#0f172a">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -63,7 +62,6 @@
       .print-hidden { display: none !important; }
     }
 
-    /* قواعد عزل التنسيق وضمان سلامة النصوص والأرقام عند تصدير الـ PDF */
     .pdf-render-mode {
       background: #ffffff !important;
       color: #0f172a !important;
@@ -346,7 +344,6 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
-      // تعريف الصلاحيات المحدثة
       const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
       const isProjectManager = userEmail === PROJECT_MANAGER_EMAIL.toLowerCase() || userEmail.includes("alaayousef1698");
@@ -457,6 +454,7 @@
         const ref = db.ref('survey_data');
         ref.on('value', (snap) => {
           const d = snap.val() || {};
+          // فلتر الحماية الضروري لمنع الشاشة البيضاء عن طريق إجبار البيانات أن تكون مصفوفة (Array)
           const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
           
           if (d.operations) {
@@ -483,8 +481,9 @@
             setSettings(prev => {
               const updated = {
                 ...prev,
-                engineers: d.settings.engineers || prev.engineers,
-                opTypes: d.settings.opTypes || prev.opTypes,
+                // استخدام فلتر الحماية لمنع تحويل الـ Settings إلى Object
+                engineers: toArr(d.settings.engineers).length ? toArr(d.settings.engineers) : prev.engineers,
+                opTypes: toArr(d.settings.opTypes).length ? toArr(d.settings.opTypes) : prev.opTypes,
                 logo: d.settings.logo || prev.logo
               };
               offlineStorage.set('settings', updated);
@@ -751,7 +750,7 @@
         { id: "extracts", label: "المستخلصات", icon: "📄" },
         { id: "statement", label: "كشف الحساب", icon: "📑" },
         { id: "office", label: "أرباح المكتب", icon: "🏢" },
-        ...(isSuperAdmin ? [{ id: "logs", label: "سجل الدخول والمراقبة", icon: "🛡️️" }] : []),
+        ...(isSuperAdmin ? [{ id: "logs", label: "سجل الدخول والمراقبة", icon: "🛡️" }] : []),
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ], [isSuperAdmin]);
 
@@ -1294,7 +1293,7 @@
                           </button>
                         </div>
 
-                        {/* إجماليات الحساب - عزل الأرقام */}
+                        {/* بطاقات الإجماليات المعزولة عن تداخل الأرقام */}
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200">
                           <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
                             <span class="text-[11px] text-slate-500 font-bold block mb-1">إجمالي الأعمال المنجزة</span>
@@ -1355,7 +1354,7 @@
                     </div>
                     {statementClient && (
                       <div class="w-full sm:w-1/2 flex justify-end gap-2 items-end">
-                        <button onClick={()=>window.print()} class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs">🖨️ طباعة كشف الشركاء</button>
+                        <button onClick={()=>window.print()} class="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs">🖨️️ طباعة كشف الشركاء</button>
                       </div>
                     )}
                   </div>
@@ -1462,9 +1461,10 @@
 
               {/* 13. الإعدادات والنسخ الاحتياطي */}
               {activeTab === 'settings' && isAdmin && (
-                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs max-w-sm font-bold space-y-3">
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs max-w-sm font-bold space-y-3">
                   <h3>🖼 شعار الترويسة المعتمد:</h3>
                   <input type="file" accept="image/*" onChange={(e)=>{
+                    if(!isAdmin) return;
                     const f = e.target.files[0]; if(!f) return;
                     const r = new FileReader(); r.onload = (evt) => {
                       const newSettings = { ...settings, logo: evt.target.result };
