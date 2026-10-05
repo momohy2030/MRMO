@@ -10,7 +10,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         const swCode = `
-          const CACHE_NAME = 'survey-erp-offline-v2';
+          const CACHE_NAME = 'survey-erp-offline-v3';
           self.addEventListener('install', (e) => {
             self.skipWaiting();
           });
@@ -282,7 +282,7 @@
       const [payModalOpen, setPayModalOpen] = useState(false);
       const [editingOp, setEditingOp] = useState(null);
 
-      // استرجاع فوري للبيانات من الذاكرة المحلية حتى يفتح التطبيق بدون إنترنت
+      // استرجاع فوري للبيانات من الذاكرة المحلية لتعمل بدون إنترنت
       const [operations, setOperations] = useState(() => offlineStorage.get('operations', []));
       const [transactions, setTransactions] = useState(() => offlineStorage.get('transactions', []));
       const [payments, setPayments] = useState(() => offlineStorage.get('payments', []));
@@ -302,7 +302,7 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
-      // فحص الصلاحيات مع دعم الحساب المحفوظ محلياً
+      // فحص الصلاحيات مع دعم الحساب المخزّن محلياً
       const userEmail = (user?.email || localStorage.getItem('last_survey_user_email') || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
@@ -333,7 +333,7 @@
       const [extractItems, setExtractItems] = useState([]);
       const [statementClient, setStatementClient] = useState("");
 
-      // مراقبة حالة الاتصال بالإنترنت والمزامنة التلقائية
+      // مراقبة حالة الاتصال بالإنترنت والمزامنة
       useEffect(() => {
         const handleOnline = () => {
           setIsOnline(true);
@@ -383,7 +383,6 @@
       useEffect(() => {
         const savedEmail = localStorage.getItem('last_survey_user_email');
         
-        // إذا كان الجهاز بدون نت وتوجد جلسة سابقة مسجلة، ادخل فوراً
         if (!navigator.onLine && savedEmail) {
           setUser({
             email: savedEmail,
@@ -426,7 +425,7 @@
         return () => unsubscribe();
       }, []);
 
-      // استقبال التحديثات من Firebase وحفظها فوراً محلياً
+      // استقبال التحديثات وتخزينها محلياً فوراً
       useEffect(() => {
         if (!db) return;
         const ref = db.ref('survey_data');
@@ -469,7 +468,6 @@
         });
       }, []);
 
-      // حفظ أي قائمة سواء أونلاين أو أوفلاين
       const saveListSafely = (path, storageKey, data) => {
         offlineStorage.set(storageKey, data);
         if (navigator.onLine && db) {
@@ -1633,7 +1631,7 @@
                         onClick={()=>setNewOp({...newOp, engCalcMethod: 'engDay_devHalf'})}
                         class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'engDay_devHalf' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
                       >
-                        🛰️ مهندس يوم + جهاز 1/2
+                        🛰️️ مهندس يوم + جهاز 1/2
                       </button>
                       <button 
                         type="button" 
