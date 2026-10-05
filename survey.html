@@ -4,7 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة الأعمال المساحية - SURVEY ERP</title>
-  
+
+  <!-- وسوم دعم تثبيت التطبيق وربط الـ Manifest -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -247,7 +253,6 @@
       const [payModalOpen, setPayModalOpen] = useState(false);
       const [editingOp, setEditingOp] = useState(null);
 
-      // استرجاع البيانات المخزنة محلياً عند بدء التشغيل فوراً لتعمل بدون إنترنت
       const [operations, setOperations] = useState(() => offlineStorage.get('operations', []));
       const [transactions, setTransactions] = useState(() => offlineStorage.get('transactions', []));
       const [payments, setPayments] = useState(() => offlineStorage.get('payments', []));
@@ -267,7 +272,6 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
-      // فحص الصلاحيات مع دعم الحساب المحفوظ محلياً
       const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
@@ -298,7 +302,6 @@
       const [extractItems, setExtractItems] = useState([]);
       const [statementClient, setStatementClient] = useState("");
 
-      // مراقبة الاتصال بالإنترنت والمزامنة الذكية
       useEffect(() => {
         const handleOnline = () => {
           setIsOnline(true);
@@ -344,7 +347,6 @@
         }
       };
 
-      // التحقق من الحساب مع استعادة بيانات الدخول أوفلاين
       useEffect(() => {
         if (!auth) { setAuthLoading(false); return; }
         return auth.onAuthStateChanged((curr) => {
@@ -363,7 +365,6 @@
               sessionStorage.setItem('survey_log_done', 'true');
             }
           } else {
-            // إذا كان المستخدم بدون نت ولكن لديه جلسة سابقة
             const savedEmail = localStorage.getItem('last_user_email');
             if (savedEmail && !navigator.onLine) {
               setUser({ email: savedEmail, displayName: localStorage.getItem('last_user_name') || savedEmail });
@@ -375,7 +376,6 @@
         });
       }, []);
 
-      // استقبال التحديثات من Firebase وحفظها فوراً محلياً
       useEffect(() => {
         if (!db) return;
         const ref = db.ref('survey_data');
@@ -418,7 +418,6 @@
         });
       }, []);
 
-      // حفظ أي قائمة سواء أونلاين أو أوفلاين
       const saveListSafely = (path, storageKey, data) => {
         offlineStorage.set(storageKey, data);
         if (navigator.onLine && db) {
@@ -682,7 +681,7 @@
         { id: "operations", label: "الأعمال والطلعات", icon: "📐" },
         { id: "vault", label: "الخزينة", icon: "💵" },
         { id: "payments", label: "الدفعات", icon: "💰" },
-        { id: "rtk", label: "جهاز RTK", icon: "🛰️️" },
+        { id: "rtk", label: "جهاز RTK", icon: "🛰" },
         { id: "expenses", label: "مصاريف التشغيل", icon: "🚗" },
         { id: "engineers", label: "حساب المهندسين", icon: "👷" },
         { id: "extracts", label: "المستخلصات", icon: "📄" },
@@ -722,7 +721,6 @@
       return (
         <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
           
-          {/* شريط حالة الاتصال بالإنترنت */}
           {!isOnline && (
             <div class="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
               <span>📡</span>
@@ -730,7 +728,6 @@
             </div>
           )}
 
-          {/* Header */}
           <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div class="flex items-center gap-2">
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
@@ -814,7 +811,6 @@
 
             <main class="flex-1 overflow-y-auto p-3.5 sm:p-5 text-xs max-w-7xl mx-auto w-full">
               
-              {/* 1. لوحة التحكم */}
               {activeTab === 'dashboard' && (
                 <div class="space-y-4">
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
@@ -827,7 +823,6 @@
                 </div>
               )}
 
-              {/* 2. تبويب العملاء */}
               {activeTab === 'clients_list' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700">
@@ -862,7 +857,6 @@
                 </div>
               )}
 
-              {/* 3. تبويب الأعمال والطلعات */}
               {activeTab === 'operations' && (
                 <div class="space-y-4">
                   <div class="flex flex-col sm:flex-row gap-2 justify-between items-stretch sm:items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border dark:border-slate-700 shadow-xs">
@@ -952,7 +946,6 @@
                 </div>
               )}
 
-              {/* 4. تبويب الخزينة */}
               {activeTab === 'vault' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-3">
@@ -1029,7 +1022,6 @@
                 </div>
               )}
 
-              {/* 5. الدفعات */}
               {activeTab === 'payments' && (
                 <div class="space-y-4 font-bold">
                   <div class="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border dark:border-slate-700">
@@ -1055,7 +1047,6 @@
                 </div>
               )}
 
-              {/* 6. جهاز RTK */}
               {activeTab === 'rtk' && (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs text-center font-bold space-y-4">
                   <h3 class="text-base text-indigo-700 dark:text-indigo-400">إيرادات جهاز RTK المجمعة</h3>
@@ -1069,7 +1060,6 @@
                 </div>
               )}
 
-              {/* 7. مصاريف التشغيل */}
               {activeTab === 'expenses' && (
                 <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 overflow-x-auto font-bold space-y-3">
                   <h3 class="text-sm font-black">🚗 تفصيل مصاريف العمالة والسيارات لكل عملية:</h3>
@@ -1094,7 +1084,6 @@
                 </div>
               )}
 
-              {/* 8. حساب المهندسين */}
               {activeTab === 'engineers' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs">
@@ -1119,7 +1108,6 @@
                 </div>
               )}
 
-              {/* 9. المستخلصات */}
               {activeTab === 'extracts' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs print-hidden flex flex-col sm:flex-row gap-3 items-center">
@@ -1282,7 +1270,6 @@
                 </div>
               )}
 
-              {/* 10. كشف الحساب */}
               {activeTab === 'statement' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-3 items-center print-hidden">
@@ -1372,7 +1359,6 @@
                 </div>
               )}
 
-              {/* 11. أرباح المكتب */}
               {activeTab === 'office' && (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs text-center font-bold space-y-4">
                   <h3 class="text-base">أرباح المكتب المجمعة</h3>
@@ -1387,7 +1373,6 @@
                 </div>
               )}
 
-              {/* 12. سجل الدخول والمراقبة */}
               {activeTab === 'logs' && isSuperAdmin && (
                 <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto p-4 space-y-3 font-bold">
                   <h3 class="text-sm font-black text-indigo-700 dark:text-indigo-400">🛡 سجل نشاطات وحركات المستخدمين (خاص بمدير النظام):</h3>
@@ -1401,10 +1386,9 @@
                 </div>
               )}
 
-              {/* 13. الإعدادات */}
               {activeTab === 'settings' && (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs max-w-sm font-bold space-y-3">
-                  <h3>🖼️️ شعار الترويسة المعتمد:</h3>
+                  <h3>🖼 شعار الترويسة المعتمد:</h3>
                   <input type="file" accept="image/*" onChange={(e)=>{
                     if(!isAdmin) return;
                     const f = e.target.files[0]; if(!f) return;
@@ -1431,7 +1415,6 @@
             </main>
           </div>
 
-          {/* نافذة تسجيل وتعديل الطلعة */}
           {opModalOpen && (
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
@@ -1647,7 +1630,6 @@
             </div>
           )}
 
-          {/* نافذة تسجيل الدفعة */}
           {payModalOpen && (
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setPayModalOpen(false)}></div>
@@ -1674,7 +1656,6 @@
             </div>
           )}
 
-          {/* Bottom Bar */}
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg print-hidden">
             <button onClick={()=>setActiveTab('dashboard')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
               <span class="text-base">📊</span>
@@ -1698,7 +1679,6 @@
             </button>
           </nav>
 
-          {/* Toast */}
           {toast.show && <div class="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs z-50 shadow-2xl font-bold print-hidden">{toast.message}</div>}
         </div>
       );
