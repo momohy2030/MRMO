@@ -237,16 +237,22 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
+      // فحص الصلاحيات
       const userEmail = (user?.email || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
       const isAdmin = isSuperAdmin || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
 
+      // نموذج الإدخال مع خيارات احتساب أتعاب المهندس المرنة
       const initialOpState = {
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
         isFaddan: false, faddanQty: 1, faddanPrice: 250,
         isSketch: false, sketchesCount: 1,
-        agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0
+        agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0,
+        // خيارات احتساب المهندس المرنة:
+        engCalcMethod: "auto", // auto, percent80, percent70, customPercent, customFixed
+        engCustomPercent: 80,
+        engCustomFixedAmount: 1500
       };
 
       const [newOp, setNewOp] = useState(initialOpState);
@@ -342,31 +348,50 @@
         }
       };
 
+      // الدالة الشاملة لحساب التوزيعات ونسب الشركاء والمهندس المرنة
       const calculateOperationShares = (op) => {
         const total = parseNum(op?.agreedAmount);
         const labor = parseNum(op?.laborCost);
         const car = parseNum(op?.carCost);
         const totalExpenses = labor + car;
         const type = String(op?.opType || '');
+        const method = op?.engCalcMethod || 'auto';
+
         let engFee = 0, deviceFee = 0, officeFee = 0;
 
+        // 1. تحديد حصة الجهاز (RTK)
         if (type.includes('1/2') || type.includes('نص') || type.includes('نصف')) {
-          engFee = 1500;
           deviceFee = 1750;
-          officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
         } else if (type.includes('RTK') || type.includes('يوم RTK')) {
-          engFee = 2000;
           deviceFee = 3500;
-          officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
-        } else if (type.includes('كروكي') || type.includes('قياس') || op?.isSketch) {
-          engFee = total * 0.80;
-          officeFee = total * 0.20;
-          deviceFee = 0;
         } else {
-          engFee = 2000;
           deviceFee = 0;
-          officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
         }
+
+        // 2. تحديد حصة وأتعاب المهندس حسب الطريقة المختارة
+        if (method === 'percent80') {
+          engFee = total * 0.80;
+        } else if (method === 'percent70') {
+          engFee = total * 0.70;
+        } else if (method === 'customPercent') {
+          const pct = parseNum(op?.engCustomPercent) || 80;
+          engFee = total * (pct / 100);
+        } else if (method === 'customFixed') {
+          engFee = parseNum(op?.engCustomFixedAmount) || 0;
+        } else {
+          // الطريقة التلقائية (Auto)
+          if (type.includes('1/2') || type.includes('نص') || type.includes('نصف')) {
+            engFee = 1500;
+          } else if (type.includes('RTK') || type.includes('يوم RTK')) {
+            engFee = 2000;
+          } else {
+            // أي عمل آخر (تخطيط، رفع، كروكي... إلخ) يطبق الافتراضي 80% للمهندس
+            engFee = total * 0.80;
+          }
+        }
+
+        // 3. احتساب صافي أرباح المكتب المتبقية
+        officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
 
         return { 
           engFee: Number(engFee) || 0, 
@@ -378,12 +403,23 @@
 
       const handleOpTypeChange = (selectedType) => {
         let defaultAmount = newOp.agreedAmount;
-        if (selectedType === 'يوم RTK') defaultAmount = 5500;
-        else if (selectedType.includes('1/2') || selectedType.includes('نص')) defaultAmount = 3250;
+        let defaultMethod = "auto";
+
+        if (selectedType === 'يوم RTK') {
+          defaultAmount = 5500;
+          defaultMethod = "auto";
+        } else if (selectedType.includes('1/2') || selectedType.includes('نص')) {
+          defaultAmount = 3250;
+          defaultMethod = "auto";
+        } else {
+          // لأي عمل آخر: تفعيل نسبة 80% مهندس - 20% مكتب افتراضياً
+          defaultMethod = "percent80";
+        }
         
         setNewOp(prev => ({
           ...prev,
           opType: selectedType,
+          engCalcMethod: defaultMethod,
           agreedAmount: prev.isFaddan ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : defaultAmount
         }));
       };
@@ -583,7 +619,6 @@
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ], [isSuperAdmin]);
 
-      // معاينة آمنة تماماً تمنع الشاشة البيضاء نهائياً
       const liveExpenses = useMemo(() => {
         const labor = parseNum(newOp?.laborCost);
         const car = parseNum(newOp?.carCost);
@@ -595,7 +630,7 @@
 
       const livePreview = useMemo(() => {
         return calculateOperationShares(newOp);
-      }, [newOp?.opType, newOp?.agreedAmount, newOp?.laborCost, newOp?.carCost, newOp?.isSketch]);
+      }, [newOp?.opType, newOp?.agreedAmount, newOp?.laborCost, newOp?.carCost, newOp?.isSketch, newOp?.engCalcMethod, newOp?.engCustomPercent, newOp?.engCustomFixedAmount]);
 
       if (authLoading) return <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">جاري التهيئة...</div>;
 
@@ -817,7 +852,10 @@
                                   agreedAmount: o.agreedAmount || "",
                                   faddanQty: o.faddanQty || 1,
                                   faddanPrice: o.faddanPrice || 250,
-                                  sketchesCount: o.sketchesCount || 1
+                                  sketchesCount: o.sketchesCount || 1,
+                                  engCalcMethod: o.engCalcMethod || "auto",
+                                  engCustomPercent: o.engCustomPercent || 80,
+                                  engCustomFixedAmount: o.engCustomFixedAmount || 1500
                                 }); 
                                 setOpModalOpen(true); 
                               }} class="bg-indigo-50 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 p-2 rounded-xl hover:bg-indigo-100" title="تعديل">
@@ -1318,7 +1356,7 @@
             </main>
           </div>
 
-          {/* نافذة تسجيل وتعديل الطلعة المأمنة */}
+          {/* نافذة تسجيل وتعديل الطلعة مع خيارات احتساب المهندس الذكية */}
           {opModalOpen && (
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
               <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
@@ -1456,6 +1494,54 @@
                     <span class="text-[10px] text-amber-800 dark:text-amber-400 block">يُحسب تلقائياً من الفدان أو نوع العمل، ويمكنك تغييره يدوياً في أي وقت.</span>
                   </div>
 
+                  {/* قسم تحديد طريقة احتساب أتعاب المهندس المرنة */}
+                  <div class="p-3 bg-indigo-50 dark:bg-slate-700/60 rounded-2xl border border-indigo-200 dark:border-slate-600 space-y-2">
+                    <label class="block text-indigo-900 dark:text-indigo-300 font-black text-[11px]">⚙️ طريقة احتساب أتعاب المهندس في هذه العملية:</label>
+                    <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'auto'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'auto' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        ⚡ حسب نوع العمل
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent80'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent80' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        🎯 نسبة 80% مهندس
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent70'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent70' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        🎯 نسبة 70% مهندس
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'customFixed'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'customFixed' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        💵 مبلغ مقطوع ثابت
+                      </button>
+                    </div>
+
+                    {newOp.engCalcMethod === 'customFixed' && (
+                      <div class="pt-1">
+                        <label class="block text-[10px] text-slate-600 dark:text-slate-300 mb-1">أدخل مبلغ أتعاب المهندس المقطوع (ج.م):</label>
+                        <input 
+                          type="number" 
+                          step="any"
+                          value={newOp.engCustomFixedAmount} 
+                          onChange={e=>setNewOp({...newOp, engCustomFixedAmount: e.target.value})} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-800 bg-white font-bold text-emerald-600"
+                        />
+                      </div>
+                    )}
+                  </div>
+
                   {/* حساب المصاريف */}
                   <div class="grid grid-cols-2 gap-2 pt-1">
                     <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
@@ -1464,7 +1550,7 @@
 
                   <div>المحصل فوراً في الموقع (إن وجد) <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
 
-                  {/* شريط المعاينة المحمي بالكامل ضد الانهيار */}
+                  {/* شريط المعاينة المحمي بالكامل */}
                   <div class="p-2.5 bg-emerald-50 dark:bg-slate-700 border border-emerald-200 dark:border-slate-600 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
                     <div class="flex justify-between">
                       <span>👷 أتعاب المهندس: <strong>{(livePreview.engFee || 0).toLocaleString()} ج.م</strong></span>
