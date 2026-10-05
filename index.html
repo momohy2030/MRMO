@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة المعاملات الإنشائية - MOMOHY ERP</title>
   
+  <!-- ربط الـ Manifest ووسوم تثبيت التطبيق -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -25,7 +31,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 
-  <meta name="theme-color" content="#0f172a">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   
   <style>
@@ -2262,7 +2267,7 @@
                                 <td class="p-2 border text-center whitespace-nowrap bg-slate-50 print-hidden">
                                   <div class="flex items-center justify-center gap-1.5">
                                     <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏ تعديل</button>
-                                    <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-0.5 rounded font-bold text-[10px]">🗑️ حذف</button>
+                                    <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded font-bold text-[10px]">🗑️ حذف</button>
                                   </div>
                                 </td>
                               )}
