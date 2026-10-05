@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>نظام إدارة المعاملات الإنشائية </title>
+  <title>نظام إدارة المعاملات الإنشائية - MOMOHY ERP</title>
   
+  <!-- وسوم التثبيت الرسمية -->
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#0f172a">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,7 +17,10 @@
       darkMode: 'class',
       theme: {
         extend: { 
-          fontFamily: { sans: ['Cairo', 'sans-serif'] }
+          fontFamily: { sans: ['Cairo', 'sans-serif'] },
+          colors: {
+            brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#1e1b4b' }
+          }
         }
       }
     }
@@ -46,28 +50,67 @@
     .dark .custom-scroll::-webkit-scrollbar-thumb { background: #475569; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    
     @media print {
-      body { background-color: white !important; font-size: 11px; }
+      body * { visibility: hidden !important; }
+      #printable-area, #printable-area * { visibility: visible !important; }
+      #printable-area {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 10mm !important;
+        box-shadow: none !important;
+        border: none !important;
+        background: white !important;
+        color: black !important;
+      }
       .print-hidden { display: none !important; }
-      .print-area { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
       .print-break-inside { page-break-inside: avoid; }
     }
+
+    /* قواعد عزل التنسيق وضمان سلامة النصوص والأرقام عند تصدير الـ PDF */
+    .pdf-render-mode {
+      background: #ffffff !important;
+      color: #0f172a !important;
+      direction: rtl !important;
+      font-family: 'Cairo', Arial, sans-serif !important;
+    }
+    .pdf-render-mode * {
+      letter-spacing: 0 !important;
+      word-spacing: normal !important;
+    }
+    .pdf-render-mode input,
+    .pdf-render-mode select {
+      border: none !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      appearance: none !important;
+      -webkit-appearance: none !important;
+      font-weight: 800 !important;
+      padding: 0 !important;
+    }
+    .pdf-render-mode table {
+      table-layout: fixed !important;
+      width: 100% !important;
+    }
+    .pdf-num {
+      direction: ltr !important;
+      unicode-bidi: isolate !important;
+      display: inline-block !important;
+      font-family: Arial, sans-serif !important;
+      white-space: nowrap !important;
+    }
+
     @keyframes slideUp { 
       from { transform: translateY(100%); opacity: 0; } 
       to { transform: translateY(0); opacity: 1; } 
     }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   </style>
-
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
-      });
-    }
-  </script>
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased transition-colors duration-200">
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -86,9 +129,11 @@
 
     const ADMIN_WHATSAPP_NUMBER = "201095545982";
     const SUPER_ADMIN_EMAIL = "mohamedmohy676676@gmail.com";
-    const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL,ENGINEER_EMAILS , ENGINEER_EMAILS 2 , "+201095545982"];
+    const PROJECT_MANAGER_EMAIL = "alaayousef1698@gmail.com";
+    const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL, PROJECT_MANAGER_EMAIL, "+201000000000", "+201095545982"];
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
-    const ENGINEER_EMAILS 2 = ["alaayousef1698@gmail.com"];
+    
+    // الحساب المحظور صراحة من قطاع الإنشاءات
     const BLOCKED_CONSTRUCTION_EMAILS = ["ahmnab23@gmail.com"];
 
     let db = null;
@@ -158,18 +203,38 @@
 
     const generatePdfAndOpenWhatsApp = (elementId, filename, textMessage, targetPhone = ADMIN_WHATSAPP_NUMBER) => {
       const element = document.getElementById(elementId);
-      if (!element) return;
+      if (!element) { alert("تعذر العثور على العنصر لإنشاء الـ PDF"); return; }
+      
+      const prevWidth = element.style.width;
+      const prevMaxWidth = element.style.maxWidth;
+      const prevPadding = element.style.padding;
+
+      element.style.width = '800px';
+      element.style.maxWidth = '800px';
+      element.style.padding = '24px';
+      element.classList.add('pdf-render-mode');
+
       const opt = {
         margin: [8, 8, 8, 8],
         filename: filename || 'document.pdf',
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, windowWidth: 1200, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
+      
       html2pdf().set(opt).from(element).save().then(() => {
+        element.style.width = prevWidth;
+        element.style.maxWidth = prevMaxWidth;
+        element.style.padding = prevPadding;
+        element.classList.remove('pdf-render-mode');
+        
         const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
         window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMessage + "\n\n📎 (تم استخراج ملف الـ PDF)")}`, '_blank');
-      }).catch(() => {
+      }).catch(err => {
+        element.style.width = prevWidth;
+        element.style.maxWidth = prevMaxWidth;
+        element.style.padding = prevPadding;
+        element.classList.remove('pdf-render-mode');
         window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}`, '_blank');
       });
     };
@@ -287,7 +352,7 @@
         };
         const handleOffline = () => {
           setIsOnline(false);
-          showToast("العمل بدون إنترنت (حفظ محلي) 📡");
+          showToast("تم التحويل للعمل بدون إنترنت (حفظ محلي) 📡");
         };
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
@@ -410,6 +475,10 @@
       const currentUserEmail = (user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
+      // تعريف الصلاحيات المحدثة
+      const isSuperAdmin = currentUserEmail === SUPER_ADMIN_EMAIL.toLowerCase() || currentUserEmail.includes("mohamedmohy676676");
+      const isProjectManager = currentUserEmail === PROJECT_MANAGER_EMAIL.toLowerCase() || currentUserEmail.includes("alaayousef1698");
+
       const userRoleKey = useMemo(() => {
         if (!currentUserEmail) return 'guest';
         if (DIRECTOR_EMAILS.some(id => currentUserEmail.includes(id.toLowerCase()))) return 'admin';
@@ -424,10 +493,12 @@
       const canEditOrDelete = isAdmin || isAccountant || isEngineer;
 
       const userRoleTitle = useMemo(() => {
-        if (isAdmin) return "مدير النظام (Admin)";
+        if (isSuperAdmin) return "مدير النظام (Admin)";
+        if (isProjectManager) return "مدير مشاريع (PM)";
+        if (isAdmin) return "مدير (Admin)";
         if (isAccountant) return "المحاسب (Accountant)";
         return "مهندس الموقع (Site Engineer)";
-      }, [isAdmin, isAccountant]);
+      }, [isSuperAdmin, isProjectManager, isAdmin, isAccountant]);
 
       useEffect(() => {
         if (!isAdmin && activeTab === 'dashboard') setActiveTab('projects');
@@ -466,7 +537,7 @@
       }, [myEmpName]);
 
       const handleAddNewSettingItem = (settingKey, currentArray, title) => {
-        if (!isAdmin) { showToast("خاصية مقتصرة على مدير النظام 🔒", "error"); return; }
+        if (!isAdmin) { showToast("خاصية مقتصرة على الإدارة 🔒", "error"); return; }
         const newVal = window.prompt(`أدخل [${title}] جديد لإضافته للقائمة:`, "");
         if (newVal && newVal.trim() !== "") {
           const cleanVal = newVal.trim();
@@ -697,8 +768,7 @@
         return { received: empAdv, spent: empExp, balance: empAdv - empExp };
       };
 
-      const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
-
+      // التبويبات المتاحة (سجل الدخول محجوب عن مدير المشاريع، ومتاح فقط للمدير العام)
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "الرئيسية", icon: "📊" }] : [{ id: "my_custody", label: "عهدتي", icon: "💼" }]),
         { id: "projects", label: "المشاريع", icon: "📁" },
@@ -709,7 +779,7 @@
         ...(isAdmin || isAccountant ? [{ id: "suppliers", label: "الموردين", icon: "🚚" }] : []),
         ...(isAdmin ? [{ id: "statement", label: "كشف حساب", icon: "📑" }] : []),
         ...(isAdmin || isAccountant ? [{ id: "extracts", label: "المستخلصات", icon: "📄" }] : []),
-        ...(isAdmin ? [{ id: "audit_log", label: "الدخول", icon: "🛡️" }] : []),
+        ...(isAdmin && isSuperAdmin ? [{ id: "audit_log", label: "الدخول", icon: "🛡️" }] : []),
         ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
       ];
 
@@ -767,7 +837,17 @@
                   <h1 class="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight">MOMOHY ERP</h1>
                   <div class="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
                     <span class="truncate max-w-[110px] sm:max-w-none font-semibold">{user.name}</span>
-                    <span class="text-indigo-600 dark:text-indigo-400 font-extrabold">• {userRoleTitle}</span>
+                    {isSuperAdmin ? (
+                      <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">👑 مدير النظام</span>
+                    ) : isProjectManager ? (
+                      <span class="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">💼 مدير مشاريع</span>
+                    ) : isAccountant ? (
+                      <span class="bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">💼 محاسب</span>
+                    ) : isAdmin ? (
+                      <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">👑 إدارة</span>
+                    ) : (
+                      <span class="bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">👷 مهندس معتمد</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -876,27 +956,27 @@
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 text-xs">
                   <div class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
                     <span class="text-[10px] text-slate-500 font-bold block">المستخلصات</span>
-                    <div class="text-sm font-black text-slate-900 dark:text-white mt-1">{totalWorkNet.toLocaleString()} ج.م</div>
+                    <div class="text-sm font-black text-slate-900 dark:text-white mt-1"><span class="pdf-num">{totalWorkNet.toLocaleString('en-US')}</span> ج.م</div>
                   </div>
                   <div class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
                     <span class="text-[10px] text-slate-500 font-bold block">التحصيلات</span>
-                    <div class="text-sm font-black text-emerald-600 mt-1">{totalReceived.toLocaleString()} ج.م</div>
+                    <div class="text-sm font-black text-emerald-600 mt-1"><span class="pdf-num">{totalReceived.toLocaleString('en-US')}</span> ج.م</div>
                   </div>
                   <div class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
                     <span class="text-[10px] text-slate-500 font-bold block">المصروفات</span>
-                    <div class="text-sm font-black text-rose-600 mt-1">{totalCost.toLocaleString()} ج.م</div>
+                    <div class="text-sm font-black text-rose-600 mt-1"><span class="pdf-num">{totalCost.toLocaleString('en-US')}</span> ج.م</div>
                   </div>
                   <div class="bg-indigo-50/60 dark:bg-indigo-950/30 p-3.5 rounded-2xl border border-indigo-200/80 dark:border-indigo-900 shadow-xs">
                     <span class="text-[10px] text-indigo-900 dark:text-indigo-300 font-black block">خزينة الشركة</span>
-                    <div class={`text-sm font-black mt-1 ${centralCashRemaining >= 0 ? 'text-indigo-700 dark:text-indigo-300' : 'text-rose-600'}`}>{centralCashRemaining.toLocaleString()} ج.م</div>
+                    <div class={`text-sm font-black mt-1 ${centralCashRemaining >= 0 ? 'text-indigo-700 dark:text-indigo-300' : 'text-rose-600'}`}><span class="pdf-num">{centralCashRemaining.toLocaleString('en-US')}</span> ج.م</div>
                   </div>
                   <div class="bg-amber-50/60 dark:bg-amber-950/30 p-3.5 rounded-2xl border border-amber-200/80 dark:border-amber-900 shadow-xs">
                     <span class="text-[10px] text-amber-900 dark:text-amber-300 font-black block">عهد بالموقع</span>
-                    <div class="text-sm font-black text-amber-700 dark:text-amber-400 mt-1">{allEmpCustodyBalance.toLocaleString()} ج.م</div>
+                    <div class="text-sm font-black text-amber-700 dark:text-amber-400 mt-1"><span class="pdf-num">{allEmpCustodyBalance.toLocaleString('en-US')}</span> ج.م</div>
                   </div>
                   <div class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
                     <span class="text-[10px] text-slate-500 font-bold block">صافي الأرباح</span>
-                    <div class={`text-sm font-black mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{netProfit.toLocaleString()} ج.م</div>
+                    <div class={`text-sm font-black mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}><span class="pdf-num">{netProfit.toLocaleString('en-US')}</span> ج.م</div>
                   </div>
                 </div>
 
@@ -1172,7 +1252,7 @@
                   </select>
                   <div class="sm:mr-auto flex items-center justify-between font-bold bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 rounded-xl text-indigo-900 dark:text-indigo-300">
                     <span>الإجمالي:</span>
-                    <span class="font-black mr-2">{filteredSearchTotal.toLocaleString()} ج.م</span>
+                    <span class="font-black mr-2"><span class="pdf-num">{filteredSearchTotal.toLocaleString('en-US')}</span> ج.م</span>
                   </div>
                 </div>
 
@@ -1195,7 +1275,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
                       {filteredSearchExpenses.length === 0 ? (
-                        <tr><td colSpan={canEditOrDelete ? 11 : 10} class="text-center p-6 text-slate-400">لا توجد مصاريف مسجلة مطابقة للبحث</td></tr>
+                        <tr><td colSpan={canEditOrDelete ? 11 : 10} class="text-center p-6 text-slate-400">لا توجد سجلات مسجلة</td></tr>
                       ) : (
                         filteredSearchExpenses.map((e) => (
                           <tr key={e.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
@@ -1431,12 +1511,60 @@
                   <h3 class="font-black text-sm text-slate-900 dark:text-white">📑 كشف حساب وموقف مالي متكامل للمشروع</h3>
                   <button onClick={() => window.print()} class="bg-slate-900 text-white px-4 py-2 rounded-xl font-bold">🖨️ طباعة عادية</button>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
-                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">المستخلصات: <strong class="block text-indigo-600 text-sm mt-1">{totalWorkNet.toLocaleString()} ج.م</strong></div>
-                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">التحصيلات: <strong class="block text-emerald-600 text-sm mt-1">{totalReceived.toLocaleString()} ج.م</strong></div>
-                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">المصروفات: <strong class="block text-rose-600 text-sm mt-1">{totalCost.toLocaleString()} ج.م</strong></div>
-                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">السيولة الحرة: <strong class="block text-indigo-700 text-sm mt-1">{centralCashRemaining.toLocaleString()} ج.م</strong></div>
-                  <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">الأرباح: <strong class="block text-emerald-700 text-sm mt-1">{netProfit.toLocaleString()} ج.م</strong></div>
+                
+                <div id="statement-pdf-target" class="p-2 bg-white text-slate-800 print-area space-y-5">
+                  <div class="border-b-2 border-slate-900 pb-4">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <h1 class="text-2xl font-black text-slate-950 tracking-tight">مكتب مساحة</h1>
+                        <h2 class="text-base font-extrabold text-indigo-700 mt-0.5">الموقف المالي لمشروع: {currentProj.name}</h2>
+                        <div class="flex items-center gap-2 text-xs text-slate-500 font-bold mt-2">
+                          <span>كود المشروع: <strong class="text-slate-900 font-mono">#{currentProj.id}</strong></span>
+                          <span>•</span>
+                          <span>التاريخ: <span class="font-mono text-slate-700">{todayDate}</span></span>
+                        </div>
+                      </div>
+                      {settings.logo && <img src={settings.logo} class="h-14 object-contain rounded-lg border p-1" />}
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">المستخلصات: <strong class="block text-indigo-600 text-sm mt-1"><span class="pdf-num">{totalWorkNet.toLocaleString('en-US')}</span> ج.م</strong></div>
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">التحصيلات: <strong class="block text-emerald-600 text-sm mt-1"><span class="pdf-num">{totalReceived.toLocaleString('en-US')}</span> ج.م</strong></div>
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">المصروفات: <strong class="block text-rose-600 text-sm mt-1"><span class="pdf-num">{totalCost.toLocaleString('en-US')}</span> ج.م</strong></div>
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">السيولة الحرة: <strong class="block text-indigo-700 text-sm mt-1"><span class="pdf-num">{centralCashRemaining.toLocaleString('en-US')}</span> ج.م</strong></div>
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">الأرباح: <strong class="block text-emerald-700 text-sm mt-1"><span class="pdf-num">{netProfit.toLocaleString('en-US')}</span> ج.م</strong></div>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">1. المستخلصات المعتمدة</h4>
+                      <table class="w-full text-right border" style={{ tableLayout: 'fixed' }}>
+                        <thead><tr class="bg-slate-100"><th class="p-1.5 border w-24">التاريخ</th><th class="p-1.5 border">المستخلص</th><th class="p-1.5 border text-center w-24">الصافي</th></tr></thead>
+                        <tbody>
+                          {projExtracts.map(ex => <tr key={ex.id}><td class="p-1.5 border whitespace-nowrap"><span class="pdf-num text-[11px]">{ex.date}</span></td><td class="p-1.5 border font-bold">{ex.extractNo}</td><td class="p-1.5 border text-center font-bold text-indigo-700"><span class="pdf-num">{parseNum(ex.net).toLocaleString('en-US')}</span></td></tr>)}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div>
+                      <h4 class="font-bold text-slate-700 mb-1.5 border-b pb-1">2. التحصيلات المستلمة</h4>
+                      <table class="w-full text-right border" style={{ tableLayout: 'fixed' }}>
+                        <thead><tr class="bg-slate-100"><th class="p-1.5 border w-24">التاريخ</th><th class="p-1.5 border">البيان</th><th class="p-1.5 border text-center w-24">المبلغ</th></tr></thead>
+                        <tbody>
+                          {projPayments.map(p => <tr key={p.id}><td class="p-1.5 border whitespace-nowrap"><span class="pdf-num text-[11px]">{p.date}</span></td><td class="p-1.5 border">{p.notes || 'تحصيل'}</td><td class="p-1.5 border text-center font-bold text-emerald-600"><span class="pdf-num">{parseNum(p.amount).toLocaleString('en-US')}</span></td></tr>)}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div class="flex justify-end pt-4 print-hidden">
+                    <button onClick={() => {
+                      const statementMsg = `🏢 *مكتب مساحة*\n📑 *الموقف المالي لمشروع:* ${currentProj.name}\n----------------------------------\n📄 *المستخلصات:* ${totalWorkNet.toLocaleString()} ج.م\n📥 *التحصيلات:* ${totalReceived.toLocaleString()} ج.م\n📤 *المصروفات:* ${totalCost.toLocaleString()} ج.م\n🏦 *السيولة الحرة:* ${centralCashRemaining.toLocaleString()} ج.م\n📈 *الأرباح:* ${netProfit.toLocaleString()} ج.م\n----------------------------------\n🗓 *تاريخ التقرير:* ${todayDate}`;
+                      generatePdfAndOpenWhatsApp('statement-pdf-target', `كشف_حساب_${currentProj.id}.pdf`, statementMsg);
+                    }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-1.5 transition">
+                      📲 إرسال PDF للأدمن
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1478,46 +1606,91 @@
                   </form>
                 </div>
 
-                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-x-auto custom-scroll text-xs">
-                  <table class="w-full text-right border-collapse whitespace-nowrap">
-                    <thead>
-                      <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200/80 dark:border-slate-800 font-black">
-                        <th class="p-3">التاريخ</th>
-                        <th class="p-3">المستخلص</th>
-                        <th class="p-3">البيان</th>
-                        <th class="p-3 text-center">الكمية</th>
-                        <th class="p-3 text-center">الفئة</th>
-                        <th class="p-3 text-center">الصافي</th>
-                        {isAdmin && <th class="p-3 text-center">إجراءات</th>}
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
-                      {projExtracts.map(ex => (
-                        <tr key={ex.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                          <td class="p-3 text-slate-500 font-mono text-[11px]">{ex.date}</td>
-                          <td class="p-3 font-bold text-slate-900 dark:text-white">{ex.extractNo}</td>
-                          <td class="p-3 text-slate-500">{ex.workDescription}</td>
-                          <td class="p-3 text-center">{parseNum(ex.quantity)}</td>
-                          <td class="p-3 text-center font-mono">{parseNum(ex.unitPrice).toLocaleString()}</td>
-                          <td class="p-3 text-center font-black text-indigo-600 font-mono">{parseNum(ex.net).toLocaleString()} ج.م</td>
-                          {isAdmin && (
-                            <td class="p-3 text-center">
-                              <div class="inline-flex items-center gap-1.5">
-                                <button onClick={()=>setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-indigo-50 dark:bg-slate-800 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
-                                <button onClick={()=>deleteItem('extracts', ex.id, extracts)} class="bg-rose-50 dark:bg-slate-800 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm print-area text-slate-800 space-y-5">
+                  <div class="flex justify-between items-start border-b pb-3 print-hidden">
+                    <h3 class="font-black text-sm text-slate-900">📄 معاينة وطباعة المستخلصات</h3>
+                    <button onClick={() => window.print()} class="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold">🖨️ طباعة</button>
+                  </div>
+                  
+                  <div id="extract-pdf-target" class="p-2 bg-white">
+                    <div class="border-b-2 border-slate-900 pb-4 mb-4">
+                      <div class="flex justify-between items-start">
+                        <div>
+                          <h1 class="text-2xl font-black text-slate-950 tracking-tight">مكتب مساحة</h1>
+                          <h2 class="text-base font-extrabold text-indigo-700 mt-0.5">مستخلص أعمال جارية - إنشاءات</h2>
+                          <div class="flex items-center gap-2 text-xs text-slate-500 font-bold mt-2">
+                            <span>كود المشروع: <strong class="text-slate-900 font-mono">#{currentProj.id}</strong></span>
+                            <span>•</span>
+                            <span>التاريخ: <span class="font-mono text-slate-700">{todayDate}</span></span>
+                          </div>
+                        </div>
+                        {settings.logo ? <img src={settings.logo} class="h-16 object-contain rounded-xl border p-1" /> : <div class="text-3xl">🏗️</div>}
+                      </div>
+
+                      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-xl mt-3 text-[11px] border border-slate-200">
+                        <div><strong>العميل المالك:</strong> {currentProj.name}</div>
+                        <div><strong>الموقع:</strong> {currentProj.location || '-'}</div>
+                        <div class="sm:col-span-2"><strong>الاستشاري:</strong> {currentProj.consultant || '-'}</div>
+                      </div>
+                    </div>
+
+                    <div class="overflow-x-auto custom-scroll">
+                      <table class="w-full text-right border-collapse text-xs border border-slate-300" style={{ tableLayout: 'fixed' }}>
+                        <thead>
+                          <tr class="bg-slate-100 text-slate-700 font-black">
+                            <th class="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>التاريخ</th>
+                            <th class="p-2 border border-slate-300" style={{ width: '15%' }}>رقم المستخلص</th>
+                            <th class="p-2 border border-slate-300" style={{ width: '28%' }}>بيان الأعمال</th>
+                            <th class="p-2 border border-slate-300 text-center" style={{ width: '10%' }}>الكمية</th>
+                            <th class="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>الفئة</th>
+                            <th class="p-2 border border-slate-300 text-center" style={{ width: '11%' }}>الاستقطاعات</th>
+                            <th class="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>الصافي</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 font-bold">
+                          {projExtracts.length === 0 ? <tr><td colSpan="7" class="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
+                          projExtracts.map((ex) => (
+                            <tr key={ex.id}>
+                              <td class="p-2 border border-slate-300 text-center whitespace-nowrap"><span class="pdf-num text-[11px] text-slate-500">{ex.date}</span></td>
+                              <td class="p-2 border border-slate-300 font-bold text-slate-900">{ex.extractNo}</td>
+                              <td class="p-2 border border-slate-300 text-slate-700">{ex.workDescription}</td>
+                              <td class="p-2 border border-slate-300 text-center"><span class="pdf-num">{parseNum(ex.quantity).toLocaleString('en-US')}</span></td>
+                              <td class="p-2 border border-slate-300 text-center"><span class="pdf-num">{parseNum(ex.unitPrice).toLocaleString('en-US')}</span></td>
+                              <td class="p-2 border border-slate-300 text-center text-rose-600"><span class="pdf-num">{parseNum(ex.deductions).toLocaleString('en-US')}</span></td>
+                              <td class="p-2 border border-slate-300 text-center font-black text-indigo-700"><span class="pdf-num">{parseNum(ex.net).toLocaleString('en-US')}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr class="bg-slate-800 text-white font-bold">
+                            <td class="p-2.5 text-left border border-slate-800" colSpan="6">إجمالي الصافي المعتمد:</td>
+                            <td class="p-2.5 text-center text-sm border border-slate-800"><span class="pdf-num text-white">{totalWorkNet.toLocaleString('en-US')}</span></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-6 text-center mt-12 pt-6 border-t border-slate-300 print-break-inside font-bold text-xs">
+                      <div><p class="text-slate-500 mb-8">مهندس التنفيذ</p><p class="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع: ....................</p></div>
+                      <div><p class="text-slate-500 mb-8">استشاري المشروع</p><p class="border-t border-dotted border-slate-400 pt-1 text-slate-800">الختم: ....................</p></div>
+                      <div><p class="text-slate-500 mb-8">الإدارة العامة</p><p class="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع: ....................</p></div>
+                    </div>
+                  </div>
+
+                  <div class="flex justify-end pt-4 print-hidden">
+                    <button onClick={() => {
+                      const extSummaryMsg = `🏢 *مكتب مساحة*\n📄 *مستخلص أعمال للعميل:* ${currentProj.name}\n💰 *الصافي الإجمالي:* ${totalWorkNet.toLocaleString()} ج.م\n🗓️ *التاريخ:* ${todayDate}`;
+                      generatePdfAndOpenWhatsApp('extract-pdf-target', `مستخلص_مجمع_${currentProj.id}.pdf`, extSummaryMsg);
+                    }} class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-1.5 transition">
+                      📲 إرسال PDF (معزول الأرقام)
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* 11. سجل الدخول للمراقبة */}
-            {activeTab === "audit_log" && isAdmin && (
+            {activeTab === "audit_log" && isAdmin && isSuperAdmin && (
               <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs space-y-3">
                 <h3 class="font-black text-sm text-slate-900 dark:text-white">🛡 سجل الدخول والنشاط</h3>
                 <div class="overflow-x-auto custom-scroll">
