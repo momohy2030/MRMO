@@ -1,17 +1,24 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" class="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>نظام إدارة المعاملات الإنشائية - MOMOHY ERP</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: { fontFamily: { sans: ['Cairo', 'sans-serif'] } }
+      }
+    }
+  </script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- مكتبة تحويل HTML إلى PDF فورياً -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
@@ -24,7 +31,7 @@
   <style>
     body { 
       font-family: 'Cairo', sans-serif; 
-      background-color: #f8fafc; 
+      -webkit-tap-highlight-color: transparent;
     }
     .scrollbar-hide::-webkit-scrollbar { 
       display: none; 
@@ -61,7 +68,7 @@
     }
   </style>
 </head>
-<body class="text-slate-800 antialiased select-none sm:select-auto">
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 antialiased select-none sm:select-auto transition-colors duration-300">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -79,8 +86,9 @@
     };
 
     const ADMIN_WHATSAPP_NUMBER = "201095545982";
-    const DIRECTOR_EMAILS = ["mohamedmohy676676@gmail.com", "+201000000000", "+201095545982"];
-    const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
+    const SUPER_ADMIN_EMAIL = "mohamedmohy676676@gmail.com";
+    const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL, "+201000000000", "+201095545982"];
+    const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com", "ahmnab23@gmail.com"];
 
     let db = null;
     let auth = null;
@@ -127,7 +135,6 @@
       return isNaN(n) ? 0 : n;
     };
 
-    // دالة إنشاء وتحميل PDF فورياً ثم فتح شات الواتساب مع الأدمن
     const generatePdfAndOpenWhatsApp = (elementId, filename, textMessage, targetPhone = ADMIN_WHATSAPP_NUMBER) => {
       const element = document.getElementById(elementId);
       if (!element) {
@@ -143,15 +150,12 @@
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      // توليد الـ PDF وتحميله
       html2pdf().set(opt).from(element).save().then(() => {
-        // فتح شات واتساب الأدمن المباشر بعد التحميل
         const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
         const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMessage + "\n\n📎 (تم استخراج ملف الـ PDF وتحميله بجهازك، برجاء إرفاقه هنا)")}`;
         window.open(url, '_blank');
       }).catch(err => {
         console.error("PDF generation failed:", err);
-        // في حال فشل المكتبة لأي سبب يفتح الواتساب مباشرة
         const url = `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}`;
         window.open(url, '_blank');
       });
@@ -218,12 +222,12 @@
 
       return (
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm h-72 flex flex-col overflow-hidden">
-            <h4 class="font-bold text-slate-700 mb-2 text-center text-xs">📈 الموقف المالي العام للشركة</h4>
+          <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm h-72 flex flex-col overflow-hidden">
+            <h4 class="font-bold text-slate-700 dark:text-slate-300 mb-2 text-center text-xs">📈 الموقف المالي العام للشركة</h4>
             <div class="relative w-full flex-1 min-h-0"><canvas ref={chart1Ref}></canvas></div>
           </div>
-          <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm h-72 flex flex-col overflow-hidden">
-            <h4 class="font-bold text-slate-700 mb-2 text-center text-xs truncate px-2">📊 توزيع تكلفة ({projName})</h4>
+          <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm h-72 flex flex-col overflow-hidden">
+            <h4 class="font-bold text-slate-700 dark:text-slate-300 mb-2 text-center text-xs truncate px-2">📊 توزيع تكلفة ({projName})</h4>
             <div class="relative w-full flex-1 min-h-0"><canvas ref={chart2Ref}></canvas></div>
           </div>
         </div>
@@ -232,12 +236,8 @@
 
     function App() {
       const [user, setUser] = useState(null);
-      const [userRole, setUserRole] = useState("Staff");
-      const [canEditOrDelete, setCanEditOrDelete] = useState(false);
-      const [isAdmin, setIsAdmin] = useState(false);
-      const [isDirector, setIsDirector] = useState(false);
-      const [isProjectEng, setIsProjectEng] = useState(false);
       const [authLoading, setAuthLoading] = useState(true);
+      const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
 
       const [loginMethod, setLoginMethod] = useState("choose");
       const [phoneNumber, setPhoneNumber] = useState("");
@@ -255,6 +255,9 @@
       const [loginLogs, setLoginLogs] = useState([]);
       const [settings, setSettings] = useState(initialSettings);
       
+      // مصفوفة الصلاحيات المحفوظة سحابياً
+      const [userRolesMap, setUserRolesMap] = useState({});
+
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
       const [activeTab, setActiveTab] = useState("dashboard");
       const [myEmpName, setMyEmpName] = useState(localStorage.getItem('myEmpName') || "");
@@ -264,7 +267,6 @@
       const [activeInvoiceModal, setActiveInvoiceModal] = useState(null);
       const [selectedSupplierDetail, setSelectedSupplierDetail] = useState(null);
       const [drawerOpen, setDrawerOpen] = useState(false);
-
       const [editItemData, setEditItemData] = useState(null);
 
       const [searchMainCat, setSearchMainCat] = useState("");
@@ -273,30 +275,17 @@
 
       const todayDate = new Date().toISOString().split('T')[0];
 
-      const nextSuggestedProjectId = useMemo(() => {
-        const consNumbers = projects.map(p => { 
-          const m = String(p.id).match(/^cons-(\d+)$/i); 
-          return m ? parseInt(m[1], 10) : 0; 
-        }).filter(n => n > 0);
-        const maxNum = consNumbers.length > 0 ? Math.max(...consNumbers) : 0;
-        const next = maxNum + 1;
-        return `cons-${next < 10 ? '0' + next : next}`;
-      }, [projects]);
-
-      const [newProj, setNewProj] = useState({ id: "cons-01", name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
-      const [newExp, setNewExp] = useState({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", billStatus: "مدفوعة", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: "", receiptImg: "" });
-      const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: "" });
-      const [newExt, setNewExt] = useState({ date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: "" });
-      const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
-      const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
-
-      useEffect(() => { setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId })); }, [nextSuggestedProjectId]);
-      useEffect(() => { 
-        if (myEmpName) {
-          if (!newExp.custodyEmployee) setNewExp(prev => ({ ...prev, custodyEmployee: myEmpName }));
-          if (!newAdv.employeeName) setNewAdv(prev => ({ ...prev, employeeName: myEmpName }));
+      // ضبط الوضع الليلي
+      useEffect(() => {
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
         }
-      }, [myEmpName]);
+        localStorage.setItem('theme', theme);
+      }, [theme]);
+
+      const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
       const showToast = (message, type = "success") => { 
         setToast({ show: true, message, type }); 
@@ -319,6 +308,7 @@
         db.ref('login_logs').push(logEntry);
       };
 
+      // التحقق من الحساب والدور
       useEffect(() => {
         if (!auth) { 
           setAuthLoading(false); 
@@ -328,40 +318,13 @@
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           if (currentUser) {
             const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase();
-            const isManager = DIRECTOR_EMAILS.some(id => identifier.includes(id.toLowerCase()));
-            const isEng = ENGINEER_EMAILS.some(id => identifier.includes(id.toLowerCase()));
-            const authorized = isManager || isEng;
-            
-            let detectedRole = "موظف (Staff)";
-            if (isManager) { 
-              detectedRole = "مدير النظام (Admin)"; 
-            } else if (isEng) { 
-              detectedRole = "مهندس المشاريع"; 
-            }
-
             setUser({ 
               uid: currentUser.uid, 
               name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", 
               identifier 
             });
-            
-            setIsAdmin(authorized); 
-            setIsDirector(isManager); 
-            setIsProjectEng(isEng); 
-            setCanEditOrDelete(authorized);
-            setUserRole(detectedRole);
-
-            if (!sessionStorage.getItem('login_recorded')) { 
-              recordLoginLog(currentUser, detectedRole); 
-              sessionStorage.setItem('login_recorded', 'true'); 
-            }
           } else {
-            setUser(null); 
-            setIsAdmin(false); 
-            setIsDirector(false); 
-            setIsProjectEng(false); 
-            setCanEditOrDelete(false);
-            setUserRole("Staff");
+            setUser(null);
           }
           setAuthLoading(false);
         });
@@ -369,6 +332,7 @@
         return () => unsubscribe();
       }, []);
 
+      // جلب البيانات من Firebase
       useEffect(() => {
         if (!user || !db) return;
         setLoading(true);
@@ -389,6 +353,7 @@
             setAdvances([...toArr(data.advances)].reverse());
             setSupplierPayments([...toArr(data.supplier_payments)].reverse());
             setLoginLogs([...toArr(data.login_logs)].reverse());
+            setUserRolesMap(data.roles || {});
 
             const savedSettings = data.settings || {};
             setSettings({
@@ -414,6 +379,61 @@
         rootRef.on('value', handleValue);
         return () => { rootRef.off('value', handleValue); };
       }, [user]);
+
+      // تحديد الدور البرمجي الدقيق
+      const currentUserEmail = (user?.identifier || "").trim().toLowerCase();
+      const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
+
+      const userRoleKey = useMemo(() => {
+        if (!currentUserEmail) return 'guest';
+        if (DIRECTOR_EMAILS.some(id => currentUserEmail.includes(id.toLowerCase()))) return 'admin';
+        if (userRolesMap[sanitizedEmailKey]) return userRolesMap[sanitizedEmailKey];
+        if (ENGINEER_EMAILS.some(id => currentUserEmail.includes(id.toLowerCase()))) return 'engineer';
+        return 'engineer'; // الافتراضي مهندس
+      }, [currentUserEmail, userRolesMap]);
+
+      const isAdmin = userRoleKey === 'admin';
+      const isAccountant = userRoleKey === 'accountant';
+      const isEngineer = userRoleKey === 'engineer';
+      const canEditOrDelete = isAdmin || isAccountant || isEngineer;
+
+      const userRoleTitle = useMemo(() => {
+        if (isAdmin) return "مدير النظام (Admin)";
+        if (isAccountant) return "المحاسب (Accountant)";
+        return "مهندس الموقع (Site Engineer)";
+      }, [isAdmin, isAccountant]);
+
+      useEffect(() => {
+        if (user && !sessionStorage.getItem('login_recorded')) {
+          recordLoginLog(user, userRoleTitle);
+          sessionStorage.setItem('login_recorded', 'true');
+        }
+      }, [user, userRoleTitle]);
+
+      const nextSuggestedProjectId = useMemo(() => {
+        const consNumbers = projects.map(p => { 
+          const m = String(p.id).match(/^cons-(\d+)$/i); 
+          return m ? parseInt(m[1], 10) : 0; 
+        }).filter(n => n > 0);
+        const maxNum = consNumbers.length > 0 ? Math.max(...consNumbers) : 0;
+        const next = maxNum + 1;
+        return `cons-${next < 10 ? '0' + next : next}`;
+      }, [projects]);
+
+      const [newProj, setNewProj] = useState({ id: "cons-01", name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
+      const [newExp, setNewExp] = useState({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", billStatus: "مدفوعة", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: "", receiptImg: "" });
+      const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: "" });
+      const [newExt, setNewExt] = useState({ date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: "" });
+      const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
+      const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
+
+      useEffect(() => { setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId })); }, [nextSuggestedProjectId]);
+      useEffect(() => { 
+        if (myEmpName) {
+          if (!newExp.custodyEmployee) setNewExp(prev => ({ ...prev, custodyEmployee: myEmpName }));
+          if (!newAdv.employeeName) setNewAdv(prev => ({ ...prev, employeeName: myEmpName }));
+        }
+      }, [myEmpName]);
 
       const handleAddNewSettingItem = (settingKey, currentArray, title) => {
         if (!canEditOrDelete) {
@@ -490,8 +510,8 @@
       };
 
       const deleteItem = (path, id, list) => {
-        if (!canEditOrDelete) {
-          showToast("الحذف مصرح لمدير النظام ومهندس المشاريع فقط 🔒", "error");
+        if (!isAdmin && !isAccountant) {
+          showToast("الحذف مصرح لمدير النظام والمحاسب فقط 🔒", "error");
           return;
         }
         if (window.confirm("هل أنت متأكد من الحذف نهائياً؟")) {
@@ -510,7 +530,7 @@
       const handleSaveEditedItem = (e) => {
         e.preventDefault();
         if (!canEditOrDelete) {
-          showToast("التعديل مصرح لمدير النظام ومهندس المشاريع فقط 🔒", "error");
+          showToast("التعديل غير مصرح 🔒", "error");
           return;
         }
         if (!editItemData) return;
@@ -561,6 +581,7 @@
         showToast("تم حفظ التعديلات بنجاح! ✏️");
       };
 
+      // 1. تصدير Excel
       const exportToExcel = () => {
         const wb = XLSX.utils.book_new();
         const wsProjects = XLSX.utils.json_to_sheet(projects); 
@@ -596,59 +617,111 @@
         showToast("تم تحميل الإكسل بنجاح! 📥");
       };
 
-      if (authLoading) {
-        return (
-          <div class="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold text-sm">
-            جاري التحقق... 🔒
-          </div>
-        );
-      }
+      // 2. تصدير النسخة الاحتياطية الشاملة JSON
+      const exportJsonBackup = () => {
+        const fullBackup = {
+          projects,
+          expenses,
+          extracts,
+          payments,
+          advances,
+          supplier_payments: supplierPayments,
+          settings,
+          roles: userRolesMap,
+          exportDate: new Date().toISOString()
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `Construction_FullBackup_${todayDate}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        showToast("تم تحميل ملف النسخة الاحتياطية الكامل (JSON) بنجاح! 💾");
+      };
 
-      if (!user) {
-        return (
-          <div class="min-h-screen flex items-center justify-center bg-slate-900 px-4">
-            <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center">
-              <div class="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-inner">🏗</div>
-              <h2 class="text-2xl font-black text-slate-800 mb-1">MOMOHY ERP</h2>
-              <p class="text-slate-500 text-xs mb-6 font-semibold">بوابة الدخول السحابية</p>
-              
-              {loginError && <div class="bg-rose-100 text-rose-700 p-2.5 rounded-xl text-xs font-bold mb-4">{loginError}</div>}
-              
-              {loginMethod === "choose" && (
-                <div class="space-y-3">
-                  <button onClick={handleGoogleLogin} class="w-full flex items-center justify-center gap-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-2xl transition shadow-sm text-xs">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg> الدخول عبر Google 
-                  </button>
-                  <button onClick={() => setLoginMethod("phone")} class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-2xl transition shadow text-xs">
-                    📱 الدخول عبر الهاتف
-                  </button>
-                </div>
-              )}
-              
-              {loginMethod === "phone" && !verificationId && (
-                <form onSubmit={handleSendOtp} class="space-y-3">
-                  <input type="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)} placeholder="01xxxxxxxxx" class="w-full border p-3 rounded-xl text-center font-bold text-xs outline-none" dir="ltr" required />
-                  <div id="recaptcha-container"></div>
-                  <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl text-xs shadow-md">إرسال كود التحقق</button>
-                  <button type="button" onClick={() => setLoginMethod("choose")} class="w-full text-slate-500 text-xs">الرجوع</button>
-                </form>
-              )}
-              
-              {loginMethod === "phone" && verificationId && (
-                <form onSubmit={handleVerifyOtp} class="space-y-3">
-                  <input type="text" value={otpCode} onChange={e=>setOtpCode(e.target.value)} placeholder="کود التحقق (OTP)" class="w-full border p-3 rounded-xl text-center font-black tracking-widest text-sm outline-none" dir="ltr" required />
-                  <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-2xl text-xs shadow-md">تأكيد ودخول</button>
-                </form>
-              )}
-            </div>
-          </div>
-        );
-      }
+      // 3. استيراد بيانات سابقة (JSON أو Excel)
+      const handleImportData = (e) => {
+        if (!isAdmin) {
+          showToast("استيراد البيانات مقتصر على مدير النظام فقط 🔒", "error");
+          return;
+        }
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        if (file.name.endsWith('.json')) {
+          reader.onload = (evt) => {
+            try {
+              const parsed = JSON.parse(evt.target.result);
+              if (window.confirm("هل أنت متأكد من استيراد ودمج هذه البيانات؟")) {
+                if (parsed.projects) setProjects(parsed.projects);
+                if (parsed.expenses) setExpenses(parsed.expenses);
+                if (parsed.extracts) setExtracts(parsed.extracts);
+                if (parsed.payments) setPayments(parsed.payments);
+                if (parsed.advances) setAdvances(parsed.advances);
+                if (parsed.supplier_payments) setSupplierPayments(parsed.supplier_payments);
+                if (parsed.settings) setSettings(parsed.settings);
+                if (db) db.ref('/').update(parsed);
+                showToast("تم استيراد قاعدة البيانات بنجاح! 📥");
+              }
+            } catch (err) {
+              alert("خطأ في تنسيق ملف الـ JSON!");
+            }
+          };
+          reader.readAsText(file);
+        } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')) {
+          reader.onload = (evt) => {
+            try {
+              const data = new Uint8Array(evt.target.result);
+              const workbook = XLSX.read(data, { type: 'array' });
+              const sheetName = workbook.SheetNames[0];
+              const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+              if (rows.length > 0 && window.confirm(`تم العثور على ${rows.length} سجل، هل ترغب بإضافتها للمصروفات؟`)) {
+                const mapped = rows.map((r, i) => ({
+                  id: Date.now() + i,
+                  projectId: cleanId(selectedProjId),
+                  date: r['التاريخ'] || r.date || todayDate,
+                  mainCategory: r['البند الرئيسي'] || r.mainCategory || 'عام',
+                  subCategory: r['البند الفرعي'] || r.subCategory || 'عام',
+                  costType: r['نوع التكلفة'] || r.costType || 'مصنعيات',
+                  supplier: r['المورد'] || r.supplier || '',
+                  quantity: parseNum(r['الكمية'] || r.quantity || 1),
+                  unitPrice: parseNum(r['سعر الوحدة'] || r.unitPrice || 0),
+                  amount: parseNum(r['الإجمالي'] || r.amount || 0),
+                  billStatus: r['حالة الفاتورة'] || 'مدفوعة',
+                  paymentMethod: r['طريقة الدفع'] || 'كاش',
+                  description: r['الوصف'] || r.description || 'مستورد من إكسيل',
+                  createdBy: user.name
+                }));
+                const updated = [...mapped, ...expenses];
+                setExpenses(updated);
+                if (db) db.ref('expenses').set(updated);
+                showToast(`تم استيراد ${rows.length} حركة مصروفات بنجاح! 📥`);
+              }
+            } catch (err) {
+              alert("تعذر قراءة ملف الإكسيل!");
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        }
+      };
+
+      // إدارة الأدوار والصلاحيات
+      const [newRoleInput, setNewRoleInput] = useState({ email: "", role: "engineer" });
+      const handleSaveRole = (e) => {
+        e.preventDefault();
+        if (!isAdmin) return;
+        const cleanEmail = newRoleInput.email.trim().toLowerCase();
+        if (!cleanEmail) return;
+        const key = cleanEmail.replace(/\./g, '_');
+        const updated = { ...userRolesMap, [key]: newRoleInput.role };
+        setUserRolesMap(updated);
+        if (db) db.ref('roles').set(updated);
+        setNewRoleInput({ email: "", role: "engineer" });
+        showToast(`تم تعيين صلاحية (${newRoleInput.role}) بنجاح! 🛡️`);
+      };
 
       if (loading) {
         return (
@@ -748,18 +821,18 @@
 
       const activeEmployeesCustody = settings.employees.map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
-      // ترتيب التبويبات بالترتيب الدقيق المطلوب
+      // التبويبات المتاحة حسب الصلاحية
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "لوحة التحكم", icon: "📊" }] : [{ id: "my_custody", label: "لوحة عهدتي", icon: "💼" }]),
         { id: "projects", label: "المشاريع", icon: "📁" },
         { id: "advances", label: "العهدة", icon: "💵" },
         { id: "add_data", label: "إدخال", icon: "➕" },
-        { id: "payments", label: "الدفعات", icon: "💰" },
+        ...(isAdmin || isAccountant ? [{ id: "payments", label: "الدفعات", icon: "💰" }] : []),
         { id: "expenses", label: "المصاريف", icon: "💸" },
-        ...(isAdmin ? [{ id: "suppliers", label: "حساب الموردين", icon: "🚚" }] : []),
+        ...(isAdmin || isAccountant ? [{ id: "suppliers", label: "حساب الموردين", icon: "🚚" }] : []),
         ...(isAdmin ? [{ id: "statement", label: "كشف الحساب", icon: "📑" }] : []),
-        { id: "extracts", label: "المستخلصات", icon: "📄" },
-        ...(isDirector ? [{ id: "audit_log", label: "الدخول", icon: "🛡️" }] : []),
+        ...(isAdmin || isAccountant ? [{ id: "extracts", label: "المستخلصات", icon: "📄" }] : []),
+        ...(isAdmin ? [{ id: "audit_log", label: "الدخول", icon: "🛡️" }] : []),
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ];
 
@@ -773,12 +846,20 @@
                   <h1 class="text-sm sm:text-base font-black leading-tight">إدارة المعاملات الإنشائية</h1>
                   <div class="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">
                     <span class="truncate max-w-[130px] sm:max-w-none">{user.name}</span>
-                    <span class={`border px-1.5 py-0.2 rounded font-bold text-[10px] ${canEditOrDelete ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-slate-700/50 text-slate-300 border-slate-600'}`}>{userRole}</span>
+                    <span class={`border px-1.5 py-0.2 rounded font-bold text-[10px] ${
+                      isAdmin ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                      isAccountant ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                      'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                    }`}>
+                      {userRoleTitle}
+                    </span>
                   </div>
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                {/* زر الانتقال المباشر لقطاع المساحة */}
+                <button onClick={toggleTheme} class="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs border border-slate-700 transition" title="تبديل الوضع الليلي">
+                  {theme === 'dark' ? '☀️' : '🌙'}
+                </button>
                 <a href="/survey.html" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 shadow-sm transition">
                   📐 <span class="hidden sm:inline">قطاع المساحة</span>
                 </a>
@@ -837,39 +918,39 @@
 
           {["dashboard", "projects", "advances", "add_data", "payments", "expenses", "suppliers", "statement", "extracts", "my_custody"].includes(activeTab) && (
             <div class="print-hidden max-w-7xl mx-auto px-4 mt-3.5">
-              <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+              <div class="bg-white dark:bg-slate-800 p-3.5 rounded-2xl shadow-sm border border-slate-200/90 dark:border-slate-700 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                  <span class="font-extrabold text-slate-700 whitespace-nowrap">المشروع النشط:</span>
+                  <span class="font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap">المشروع النشط:</span>
                   <div class="relative w-full sm:w-64">
                     <select 
                       value={selectedProjId} 
                       onChange={(e) => setSelectedProjId(e.target.value)} 
-                      class="w-full bg-slate-100 border border-slate-300 font-extrabold text-blue-900 rounded-xl px-3 py-2 outline-none appearance-none focus:ring-2 focus:ring-blue-500"
+                      class="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 font-extrabold text-blue-900 dark:text-blue-300 rounded-xl px-3 py-2 outline-none appearance-none focus:ring-2 focus:ring-blue-500"
                     >
                       {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
                     </select>
                     <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">▼</div>
                   </div>
                 </div>
-                <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 bg-slate-50 md:bg-transparent p-2.5 md:p-0 rounded-xl text-slate-600 text-[11px] sm:text-xs">
-                  <div>العميل: <strong class="text-slate-900 block sm:inline font-bold">{currentProj.name || '-'}</strong></div>
-                  <div>الموقع: <strong class="text-slate-900 block sm:inline font-bold">{currentProj.location || '-'}</strong></div>
+                <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 bg-slate-50 dark:bg-slate-700/50 md:bg-transparent p-2.5 md:p-0 rounded-xl text-slate-600 dark:text-slate-300 text-[11px] sm:text-xs">
+                  <div>العميل: <strong class="text-slate-900 dark:text-white block sm:inline font-bold">{currentProj.name || '-'}</strong></div>
+                  <div>الموقع: <strong class="text-slate-900 dark:text-white block sm:inline font-bold">{currentProj.location || '-'}</strong></div>
                 </div>
               </div>
             </div>
           )}
 
           <main class="max-w-7xl mx-auto px-4 mt-3.5">
-            {/* 1. لوحة التحكم */}
+            {/* 1. لوحة التحكم (خاصة بالإدارة) */}
             {activeTab === "dashboard" && isAdmin && (
               <div class="space-y-4">
                 {projBudget > 0 && (
-                  <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
+                  <div class="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm text-xs">
                     <div class="flex justify-between items-center mb-1.5 font-bold">
-                      <span class="text-slate-700">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span>
-                      <span class={budgetConsumedPercent > 90 ? "text-rose-600" : "text-blue-700"}>{budgetConsumedPercent}% مستهلك</span>
+                      <span class="text-slate-700 dark:text-slate-300">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span>
+                      <span class={budgetConsumedPercent > 90 ? "text-rose-600" : "text-blue-700 dark:text-blue-400"}>{budgetConsumedPercent}% مستهلك</span>
                     </div>
-                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                    <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
                       <div class={`h-2.5 rounded-full transition-all duration-500 ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-blue-600"}`} style={{ width: `${budgetConsumedPercent}%` }}></div>
                     </div>
                   </div>
@@ -878,45 +959,45 @@
                 <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
 
                 <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-                  <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-                    <span class="text-[10px] text-slate-500 font-bold block">المستخلصات (الصافي)</span>
-                    <div class="text-sm font-black text-slate-800 mt-1">{totalWorkNet.toLocaleString()} ج.م</div>
+                  <div class="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <span class="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">المستخلصات (الصافي)</span>
+                    <div class="text-sm font-black text-slate-800 dark:text-white mt-1">{totalWorkNet.toLocaleString()} ج.م</div>
                   </div>
-                  <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-                    <span class="text-[10px] text-slate-500 font-bold block">إجمالي التحصيلات</span>
+                  <div class="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <span class="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">إجمالي التحصيلات</span>
                     <div class="text-sm font-black text-emerald-600 mt-1">{totalReceived.toLocaleString()} ج.م</div>
                   </div>
-                  <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-                    <span class="text-[10px] text-slate-500 font-bold block">المصروفات الفعلية</span>
+                  <div class="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <span class="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">المصروفات الفعلية</span>
                     <div class="text-sm font-black text-rose-600 mt-1">{totalCost.toLocaleString()} ج.م</div>
                   </div>
-                  <div class="bg-indigo-50/70 p-3 rounded-2xl border border-indigo-200 shadow-sm">
-                    <span class="text-[10px] text-indigo-800 font-extrabold block">🏦 خزينة الشركة الحرة</span>
-                    <div class={`text-base font-black mt-1 ${centralCashRemaining >= 0 ? 'text-indigo-700' : 'text-rose-600'}`}>{centralCashRemaining.toLocaleString()} ج.م</div>
+                  <div class="bg-indigo-50/70 dark:bg-indigo-950/40 p-3 rounded-2xl border border-indigo-200 dark:border-indigo-800 shadow-sm">
+                    <span class="text-[10px] text-indigo-800 dark:text-indigo-300 font-extrabold block">🏦 خزينة الشركة الحرة</span>
+                    <div class={`text-base font-black mt-1 ${centralCashRemaining >= 0 ? 'text-indigo-700 dark:text-indigo-300' : 'text-rose-600'}`}>{centralCashRemaining.toLocaleString()} ج.م</div>
                   </div>
-                  <div class="bg-amber-50/70 p-3 rounded-2xl border border-amber-200 shadow-sm">
-                    <span class="text-[10px] text-amber-800 font-extrabold block">💼 عهد معلقة بالموقع</span>
-                    <div class="text-base font-black text-amber-700 mt-1">{allEmpCustodyBalance.toLocaleString()} ج.م</div>
+                  <div class="bg-amber-50/70 dark:bg-amber-950/40 p-3 rounded-2xl border border-amber-200 dark:border-amber-800 shadow-sm">
+                    <span class="text-[10px] text-amber-800 dark:text-amber-300 font-extrabold block">💼 عهد معلقة بالموقع</span>
+                    <div class="text-base font-black text-amber-700 dark:text-amber-300 mt-1">{allEmpCustodyBalance.toLocaleString()} ج.م</div>
                   </div>
-                  <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-                    <span class="text-[10px] text-slate-500 font-bold block">صافي الربح الفعلي</span>
-                    <div class={`text-sm font-black mt-1 ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{netProfit.toLocaleString()} ج.م</div>
+                  <div class="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <span class="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">صافي الربح الفعلي</span>
+                    <div class={`text-sm font-black mt-1 ${netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700'}`}>{netProfit.toLocaleString()} ج.م</div>
                   </div>
                 </div>
 
                 {activeEmployeesCustody.length > 0 && (
-                  <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm text-xs">
-                    <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">💼 حالة العهد والسلف للموظفين (المشروع النشط)</h3>
+                  <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm text-xs">
+                    <h3 class="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-1.5 border-b dark:border-slate-700 pb-2">💼 حالة العهد والسلف للموظفين (المشروع النشط)</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {activeEmployeesCustody.map(emp => (
-                        <div key={emp.name} class="border rounded-xl p-3 bg-slate-50 flex flex-col gap-2">
-                          <span class="font-black text-blue-900 border-b border-slate-200 pb-1">{emp.name}</span>
-                          <div class="flex justify-between font-bold text-[10px] text-slate-500">
+                        <div key={emp.name} class="border dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-slate-700/50 flex flex-col gap-2">
+                          <span class="font-black text-blue-900 dark:text-blue-300 border-b dark:border-slate-600 pb-1">{emp.name}</span>
+                          <div class="flex justify-between font-bold text-[10px] text-slate-500 dark:text-slate-400">
                             <span>استلم: <span class="text-emerald-600">{emp.received.toLocaleString()}</span></span>
                             <span>صرف: <span class="text-rose-600">{emp.spent.toLocaleString()}</span></span>
                           </div>
-                          <div class="bg-white border rounded p-1.5 text-center font-bold text-slate-700 shadow-sm">
-                            الرصيد لديه: <span class="font-black text-indigo-700 text-sm">{emp.balance.toLocaleString()} ج.م</span>
+                          <div class="bg-white dark:bg-slate-800 border dark:border-slate-600 rounded p-1.5 text-center font-bold text-slate-700 dark:text-slate-200 shadow-sm">
+                            الرصيد لديه: <span class="font-black text-indigo-700 dark:text-indigo-400 text-sm">{emp.balance.toLocaleString()} ج.م</span>
                           </div>
                         </div>
                       ))}
@@ -928,21 +1009,21 @@
 
             {/* لوحة العهدة الخاصة بالموظف */}
             {activeTab === "my_custody" && !isAdmin && (
-              <div class="bg-indigo-50 border border-indigo-200 p-5 rounded-3xl shadow-sm">
+              <div class="bg-indigo-50 dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 p-5 rounded-3xl shadow-sm">
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-5">
                   <div>
-                    <h2 class="text-lg font-black text-indigo-900 flex items-center gap-2">💼 لوحة تحكم عهدة الموظف</h2>
-                    <p class="text-xs font-bold text-indigo-600 mt-1">تابع إجمالي السلف المستلمة والمنصرف والرصيد المتبقي معك.</p>
+                    <h2 class="text-lg font-black text-indigo-900 dark:text-indigo-300 flex items-center gap-2">💼 لوحة تحكم عهدة الموظف</h2>
+                    <p class="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-1">تابع إجمالي السلف المستلمة والمنصرف والرصيد المتبقي معك.</p>
                   </div>
                   <div class="w-full sm:w-64">
-                    <label class="block font-bold text-xs mb-1 text-indigo-800">تأكيد اسمك (صاحب العهدة):</label>
+                    <label class="block font-bold text-xs mb-1 text-indigo-800 dark:text-indigo-300">تأكيد اسمك (صاحب العهدة):</label>
                     <select 
                       value={myEmpName} 
                       onChange={(e) => { 
                         setMyEmpName(e.target.value); 
                         localStorage.setItem('myEmpName', e.target.value); 
                       }} 
-                      class="w-full bg-white border border-indigo-300 font-extrabold text-indigo-900 rounded-xl px-3 py-2 outline-none shadow-sm"
+                      class="w-full bg-white dark:bg-slate-700 border border-indigo-300 dark:border-slate-600 font-extrabold text-indigo-900 dark:text-indigo-200 rounded-xl px-3 py-2 outline-none shadow-sm"
                     >
                       <option value="">اختر اسمك من هنا...</option>
                       {settings.employees.map(emp => <option key={emp} value={emp}>{emp}</option>)}
@@ -954,12 +1035,12 @@
                   const myStats = getCustodyStats(myEmpName);
                   return (
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div class="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex flex-col justify-center items-center text-center">
-                        <span class="text-xs text-slate-500 font-bold mb-1">إجمالي السلف المستلمة 📥</span>
+                      <div class="bg-white dark:bg-slate-700 p-4 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-900 flex flex-col justify-center items-center text-center">
+                        <span class="text-xs text-slate-500 dark:text-slate-300 font-bold mb-1">إجمالي السلف المستلمة 📥</span>
                         <span class="text-2xl font-black text-emerald-600">{myStats.received.toLocaleString()} ج.م</span>
                       </div>
-                      <div class="bg-white p-4 rounded-2xl shadow-sm border border-rose-100 flex flex-col justify-center items-center text-center">
-                        <span class="text-xs text-slate-500 font-bold mb-1">المنصرف من العهدة 📤</span>
+                      <div class="bg-white dark:bg-slate-700 p-4 rounded-2xl shadow-sm border border-rose-100 dark:border-rose-900 flex flex-col justify-center items-center text-center">
+                        <span class="text-xs text-slate-500 dark:text-slate-300 font-bold mb-1">المنصرف من العهدة 📤</span>
                         <span class="text-2xl font-black text-rose-600">{myStats.spent.toLocaleString()} ج.م</span>
                       </div>
                       <div class="bg-indigo-600 p-4 rounded-2xl shadow-md flex flex-col justify-center items-center text-center">
@@ -969,7 +1050,7 @@
                     </div>
                   )
                 })() : (
-                  <div class="bg-white p-6 rounded-2xl text-center border border-dashed border-indigo-300 font-bold text-slate-500">
+                  <div class="bg-white dark:bg-slate-700 p-6 rounded-2xl text-center border border-dashed border-indigo-300 dark:border-slate-600 font-bold text-slate-500 dark:text-slate-400">
                     يرجى اختيار اسمك من القائمة العلوية لعرض رصيد عهدتك التفاعلي.
                   </div>
                 )}
@@ -979,9 +1060,9 @@
             {/* 2. المشاريع */}
             {activeTab === "projects" && (
               <div class="space-y-3.5">
-                {canEditOrDelete && (
-                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
-                    <h3 class="font-bold mb-2.5 border-b pb-1.5 text-xs sm:text-sm">📁 إضافة مشروع إنشائي جديد</h3>
+                {(isAdmin || isAccountant) && (
+                  <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm text-xs">
+                    <h3 class="font-bold mb-2.5 border-b dark:border-slate-700 pb-1.5 text-xs sm:text-sm">📁 إضافة مشروع إنشائي جديد</h3>
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       if (!newProj.id || !newProj.name) return;
@@ -994,41 +1075,41 @@
                       setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
                       showToast(`تمت إضافة المشروع بنجاح!`);
                     }} class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
-                      <div><label class="block font-bold mb-1">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border rounded-xl p-2 font-bold font-mono bg-blue-50 text-blue-900" placeholder="cons-01" required /></div>
-                      <div><label class="block font-bold mb-1">العميل / المالك</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border rounded-xl p-2" required /></div>
-                      <div><label class="block font-bold mb-1">المكتب الاستشاري</label><input type="text" value={newProj.consultant} onChange={e=>setNewProj({...newProj, consultant: e.target.value})} placeholder="الاستشاري المشرف" class="w-full border rounded-xl p-2" /></div>
-                      <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border rounded-xl p-2" /></div>
-                      <div><label class="block font-bold mb-1">الميزانية التقديرية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border rounded-xl p-2 text-blue-700 font-bold" /></div>
+                      <div><label class="block font-bold mb-1">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 font-bold font-mono bg-blue-50 dark:bg-slate-700 text-blue-900 dark:text-blue-300" placeholder="cons-01" required /></div>
+                      <div><label class="block font-bold mb-1">العميل / المالك</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700" required /></div>
+                      <div><label class="block font-bold mb-1">المكتب الاستشاري</label><input type="text" value={newProj.consultant} onChange={e=>setNewProj({...newProj, consultant: e.target.value})} placeholder="الاستشاري المشرف" class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700" /></div>
+                      <div><label class="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700" /></div>
+                      <div><label class="block font-bold mb-1">الميزانية التقديرية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 text-blue-700 dark:text-blue-400 font-bold dark:bg-slate-700" /></div>
                       <div><button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition">حفظ المشروع</button></div>
                     </form>
                   </div>
                 )}
-                <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm overflow-x-auto text-xs">
                   <table class="w-full text-right">
                     <thead>
-                      <tr class="bg-slate-100 text-slate-700">
+                      <tr class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                         <th class="p-2.5">الكود</th>
                         <th class="p-2.5">المالك</th>
                         <th class="p-2.5">الاستشاري</th>
                         <th class="p-2.5">الموقع</th>
                         <th class="p-2.5">الميزانية</th>
                         <th class="p-2.5">الحالة</th>
-                        {canEditOrDelete && (
-                          <th class="p-2.5 text-center bg-slate-200 font-bold sticky left-0 z-10 shadow-xs">إجراءات</th>
+                        {isAdmin && (
+                          <th class="p-2.5 text-center bg-slate-200 dark:bg-slate-600 font-bold sticky left-0 z-10 shadow-xs">إجراءات</th>
                         )}
                       </tr>
                     </thead>
                     <tbody>
                       {projects.map(p => (
-                        <tr key={p.id} class="border-b hover:bg-slate-50">
-                          <td class="p-2.5 font-bold text-blue-700 font-mono">{p.id}</td>
+                        <tr key={p.id} class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750">
+                          <td class="p-2.5 font-bold text-blue-700 dark:text-blue-400 font-mono">{p.id}</td>
                           <td class="p-2.5 font-semibold">{p.name}</td>
-                          <td class="p-2.5 text-slate-600">{p.consultant || '-'}</td>
+                          <td class="p-2.5 text-slate-600 dark:text-slate-400">{p.consultant || '-'}</td>
                           <td class="p-2.5">{p.location || '-'}</td>
-                          <td class="p-2.5 font-bold text-slate-700">{parseNum(p.budget).toLocaleString()} ج.م</td>
-                          <td class="p-2.5"><span class="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-lg text-[10px]">{p.status || 'جاري'}</span></td>
-                          {canEditOrDelete && (
-                            <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 sticky left-0 z-10 shadow-xs">
+                          <td class="p-2.5 font-bold text-slate-700 dark:text-slate-300">{isAdmin || isAccountant ? `${parseNum(p.budget).toLocaleString()} ج.م` : '🔒 محجوب'}</td>
+                          <td class="p-2.5"><span class="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-lg text-[10px]">{p.status || 'جاري'}</span></td>
+                          {isAdmin && (
+                            <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                               <div class="flex items-center justify-center gap-1.5">
                                 <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏ تعديل</button>
                                 <button onClick={()=>deleteItem('projects', p.id, projects)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
@@ -1046,8 +1127,8 @@
             {/* 3. العهدة */}
             {activeTab === "advances" && (
               <div class="space-y-4">
-                <div class="bg-emerald-50 p-4 sm:p-5 rounded-2xl border border-emerald-300 shadow-sm text-xs">
-                  <h3 class="font-black text-emerald-900 text-sm mb-3 border-b border-emerald-200 pb-2 flex items-center gap-1.5">
+                <div class="bg-emerald-50 dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-emerald-300 dark:border-slate-700 shadow-sm text-xs">
+                  <h3 class="font-black text-emerald-900 dark:text-emerald-300 text-sm mb-3 border-b border-emerald-200 dark:border-slate-700 pb-2 flex items-center gap-1.5">
                     <span>💵</span> تسجيل استلام / تسليم عهدة مالية أو سلفة جديدة
                   </h3>
                   <form onSubmit={(e) => {
@@ -1069,46 +1150,46 @@
                   }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 mb-4">
                     <div>
                       <label class="block font-bold mb-1">التاريخ</label>
-                      <input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold bg-white" required/>
+                      <input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} class="w-full border border-emerald-300 dark:border-slate-600 rounded-xl p-2 font-bold bg-white dark:bg-slate-700" required/>
                     </div>
                     <div>
                       <label class="block font-bold mb-1">اسم الموظف المستلم</label>
                       <div class="flex gap-1">
-                        <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 font-bold bg-white" required>
+                        <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} class="w-full border border-emerald-300 dark:border-slate-600 rounded-xl p-2 font-bold bg-white dark:bg-slate-700" required>
                           <option value="">اختر الموظف...</option>
                           {settings.employees.map(c => <option key={c}>{c}</option>)}
                         </select>
                         {canEditOrDelete && (
-                          <button type="button" onClick={()=>handleAddNewSettingItem('employees', settings.employees, 'موظف')} class="bg-emerald-200 text-emerald-800 px-3 rounded-xl font-black text-lg hover:bg-emerald-300 transition">+</button>
+                          <button type="button" onClick={()=>handleAddNewSettingItem('employees', settings.employees, 'موظف')} class="bg-emerald-200 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 px-3 rounded-xl font-black text-lg hover:bg-emerald-300 transition">+</button>
                         )}
                       </div>
                     </div>
                     <div>
                       <label class="block font-bold mb-1">المبلغ (ج.م)</label>
-                      <input type="number" step="any" value={newAdv.amount} onChange={e=>setNewAdv({...newAdv, amount: e.target.value})} class="w-full border border-emerald-300 rounded-xl p-2 bg-white font-black text-emerald-700" placeholder="مثال: 5000" required/>
+                      <input type="number" step="any" value={newAdv.amount} onChange={e=>setNewAdv({...newAdv, amount: e.target.value})} class="w-full border border-emerald-300 dark:border-slate-600 rounded-xl p-2 bg-white dark:bg-slate-700 font-black text-emerald-700 dark:text-emerald-400" placeholder="مثال: 5000" required/>
                     </div>
                     <div>
                       <label class="block font-bold mb-1">البيان / ملاحظات</label>
-                      <input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="بيان العهدة أو سبب الصرف..." class="w-full border border-emerald-300 rounded-xl p-2 bg-white"/>
+                      <input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="بيان العهدة أو سبب الصرف..." class="w-full border border-emerald-300 dark:border-slate-600 rounded-xl p-2 bg-white dark:bg-slate-700"/>
                     </div>
                     <div class="sm:col-span-4">
                       <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow transition">حفظ العهدة في حساب الموظف</button>
                     </div>
                   </form>
 
-                  <div class="mt-4 pt-3 border-t border-emerald-300">
-                    <h4 class="font-black text-emerald-950 mb-2 text-xs">سجل العهد والسلف المسجلة لمشروع ({currentProj.name}):</h4>
-                    <div class="overflow-x-auto bg-white rounded-xl border border-emerald-200 shadow-xs">
+                  <div class="mt-4 pt-3 border-t border-emerald-300 dark:border-slate-700">
+                    <h4 class="font-black text-emerald-950 dark:text-emerald-300 mb-2 text-xs">سجل العهد والسلف المسجلة لمشروع ({currentProj.name}):</h4>
+                    <div class="overflow-x-auto bg-white dark:bg-slate-800 rounded-xl border border-emerald-200 dark:border-slate-700 shadow-xs">
                       <table class="w-full text-right text-xs border-collapse">
                         <thead>
-                          <tr class="bg-emerald-100 text-emerald-950 border-b">
+                          <tr class="bg-emerald-100 dark:bg-slate-700 text-emerald-950 dark:text-slate-200 border-b">
                             <th class="p-2.5">التاريخ</th>
                             <th class="p-2.5">اسم الموظف</th>
                             <th class="p-2.5 text-center">المبلغ</th>
                             <th class="p-2.5">البيان</th>
                             <th class="p-2.5">بواسطة</th>
                             {canEditOrDelete && (
-                              <th class="p-2.5 text-center bg-emerald-200/90 font-black sticky left-0 z-10 shadow-xs">إجراءات</th>
+                              <th class="p-2.5 text-center bg-emerald-200/90 dark:bg-slate-600 font-black sticky left-0 z-10 shadow-xs">إجراءات</th>
                             )}
                           </tr>
                         </thead>
@@ -1117,14 +1198,14 @@
                             <tr><td colSpan={canEditOrDelete ? 6 : 5} class="p-4 text-center text-slate-400 font-bold">لا توجد عهد أو سلف مسجلة لهذا المشروع بعد</td></tr>
                           ) : (
                             projAdvances.map(a => (
-                              <tr key={a.id} class="border-b hover:bg-emerald-50/50">
-                                <td class="p-2.5 text-slate-600 whitespace-nowrap">{a.date}</td>
-                                <td class="p-2.5 font-bold text-emerald-950">{a.employeeName}</td>
-                                <td class="p-2.5 text-center font-black text-emerald-700 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
-                                <td class="p-2.5 text-slate-600">{a.notes || '-'}</td>
+                              <tr key={a.id} class="border-b dark:border-slate-700 hover:bg-emerald-50/50 dark:hover:bg-slate-750">
+                                <td class="p-2.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{a.date}</td>
+                                <td class="p-2.5 font-bold text-emerald-950 dark:text-white">{a.employeeName}</td>
+                                <td class="p-2.5 text-center font-black text-emerald-700 dark:text-emerald-400 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
+                                <td class="p-2.5 text-slate-600 dark:text-slate-400">{a.notes || '-'}</td>
                                 <td class="p-2.5 text-slate-500 whitespace-nowrap">{a.createdBy || '-'}</td>
                                 {canEditOrDelete && (
-                                  <td class="p-2.5 text-center whitespace-nowrap bg-emerald-50/90 sticky left-0 z-10 shadow-xs">
+                                  <td class="p-2.5 text-center whitespace-nowrap bg-emerald-50/90 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                                     <div class="flex items-center justify-center gap-1.5">
                                       <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1 rounded-lg font-bold text-[10px] shadow-xs">✏️ تعديل</button>
                                       <button onClick={() => deleteItem('advances', a.id, advances)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
@@ -1144,8 +1225,8 @@
 
             {/* 4. إدخال المصروفات */}
             {activeTab === "add_data" && (
-              <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
-                <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة توريد</h3>
+              <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm text-xs">
+                <h3 class="font-bold text-slate-800 dark:text-white mb-3 border-b dark:border-slate-700 pb-2 text-xs sm:text-sm">💸 تسجيل مصروف جديد وفاتورة توريد</h3>
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   if(parseNum(newExp.unitPrice) <= 0 || parseNum(newExp.quantity) <= 0) return;
@@ -1171,52 +1252,52 @@
                   showToast(`تم حفظ المصروف بنجاح!`);
                 }} class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
                   <div>
-                    <label class="block font-bold mb-1 text-blue-700">التاريخ</label>
-                    <input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/>
+                    <label class="block font-bold mb-1 text-blue-700 dark:text-blue-400">التاريخ</label>
+                    <input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 bg-blue-50 dark:bg-slate-700 font-bold" required/>
                   </div>
                   <div>
                     <label class="block font-bold mb-1">البند الرئيسي</label>
                     <div class="flex gap-1">
-                      <select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border rounded-xl p-2" required>
+                      <select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700" required>
                         <option value="">اختر...</option>
                         {settings.mainCategories.map(c => <option key={c}>{c}</option>)}
                       </select>
-                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
                     </div>
                   </div>
                   <div>
                     <label class="block font-bold mb-1">البند الفرعي</label>
                     <div class="flex gap-1">
-                      <select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border rounded-xl p-2" required>
+                      <select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700" required>
                         <option value="">اختر...</option>
                         {settings.subCategories.map(c => <option key={c}>{c}</option>)}
                       </select>
-                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
                     </div>
                   </div>
                   <div>
                     <label class="block font-bold mb-1">نوع التكلفة</label>
                     <div class="flex gap-1">
-                      <select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border rounded-xl p-2">
+                      <select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700">
                         <option value="">اختر...</option>
                         {settings.costTypes.map(c => <option key={c}>{c}</option>)}
                       </select>
-                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
                     </div>
                   </div>
                   <div>
                     <label class="block font-bold mb-1">المورد / الجهة</label>
                     <div class="flex gap-1">
-                      <select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border rounded-xl p-2">
+                      <select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700">
                         <option value="">اختر...</option>
                         {settings.suppliers.map(c => <option key={c}>{c}</option>)}
                       </select>
-                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} class="bg-blue-50 text-blue-700 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
+                      {canEditOrDelete && <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 px-3 rounded-xl font-black text-lg hover:bg-blue-100 transition">+</button>}
                     </div>
                   </div>
                   <div>
                     <label class="block font-bold mb-1">طريقة السداد</label>
-                    <select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-slate-700">
+                    <select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 font-bold text-slate-700 dark:text-slate-300 dark:bg-slate-700">
                       <option value="خصم من العهدة">خصم من العهدة (موقع)</option>
                       <option value="كاش">كاش من الخزينة</option>
                       <option value="تحويل بنكي">تحويل بنكي مركزي</option>
@@ -1224,8 +1305,8 @@
                     </select>
                   </div>
                   <div>
-                    <label class="block font-bold mb-1 text-indigo-700">حالة الفاتورة (مشتريات)</label>
-                    <select value={newExp.billStatus} onChange={e=>setNewExp({...newExp, billStatus: e.target.value})} class="w-full border-2 border-indigo-200 p-2 rounded-xl font-bold bg-indigo-50/40">
+                    <label class="block font-bold mb-1 text-indigo-700 dark:text-indigo-400">حالة الفاتورة (مشتريات)</label>
+                    <select value={newExp.billStatus} onChange={e=>setNewExp({...newExp, billStatus: e.target.value})} class="w-full border-2 border-indigo-200 dark:border-slate-600 p-2 rounded-xl font-bold bg-indigo-50/40 dark:bg-slate-700">
                       <option value="مدفوعة">✅ مسددة فوراً (لا دين على الشركة)</option>
                       <option value="آجلة">⏳ آجلة (تسجل كمديونية للمورد)</option>
                     </select>
@@ -1233,7 +1314,7 @@
                   {newExp.paymentMethod === 'خصم من العهدة' && (
                     <div>
                       <label class="block font-bold mb-1 text-rose-600">خصم من عهدة الموظف:</label>
-                      <select value={newExp.custodyEmployee || ""} onChange={e=>setNewExp({...newExp, custodyEmployee: e.target.value})} class="w-full border border-rose-300 bg-rose-50 rounded-xl p-2 font-bold" required>
+                      <select value={newExp.custodyEmployee || ""} onChange={e=>setNewExp({...newExp, custodyEmployee: e.target.value})} class="w-full border border-rose-300 dark:border-slate-600 bg-rose-50 dark:bg-slate-700 rounded-xl p-2 font-bold" required>
                         <option value="">اختر اسم الموظف...</option>
                         {settings.employees.map(c => <option key={c}>{c}</option>)}
                       </select>
@@ -1241,24 +1322,24 @@
                   )}
                   <div>
                     <label class="block font-bold mb-1">الكمية</label>
-                    <input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/>
+                    <input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 bg-amber-50 dark:bg-slate-700 font-bold" required/>
                   </div>
                   <div>
                     <label class="block font-bold mb-1">سعر الوحدة</label>
-                    <input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-amber-50 font-bold" required/>
+                    <input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 bg-amber-50 dark:bg-slate-700 font-bold" required/>
                   </div>
                   <div class="sm:col-span-2">
-                    <label class="block font-bold mb-1 text-slate-700">الوصف / ملاحظات التوريد</label>
-                    <input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="بيانات إذن الاستلام، رقم الفاتورة..." class="w-full border rounded-xl p-2 bg-slate-50 focus:bg-white outline-none"/>
+                    <label class="block font-bold mb-1 text-slate-700 dark:text-slate-300">الوصف / ملاحظات التوريد</label>
+                    <input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="بيانات إذن الاستلام، رقم الفاتورة..." class="w-full border dark:border-slate-600 rounded-xl p-2 bg-slate-50 dark:bg-slate-700 focus:bg-white outline-none"/>
                   </div>
                   <div class="sm:col-span-2">
-                    <label class="block font-bold mb-1 text-slate-700">📸 إرفاق صورة الفاتورة</label>
-                    <input type="file" accept="image/*" capture="environment" onChange={handleReceiptUpload} class="w-full text-xs border border-dashed border-slate-300 p-2 rounded-xl bg-slate-50"/>
+                    <label class="block font-bold mb-1 text-slate-700 dark:text-slate-300">📸 إرفاق صورة الفاتورة</label>
+                    <input type="file" accept="image/*" capture="environment" onChange={handleReceiptUpload} class="w-full text-xs border border-dashed border-slate-300 dark:border-slate-600 p-2 rounded-xl bg-slate-50 dark:bg-slate-700"/>
                     {newExp.receiptImg && <span class="text-[11px] text-emerald-600 font-bold mt-1 inline-block">✅ تم إرفاق الفاتورة</span>}
                   </div>
-                  <div class="sm:col-span-4 bg-rose-50 border border-rose-200 p-2.5 rounded-xl flex justify-between items-center">
-                    <span class="font-bold text-rose-900">إجمالي قيمة الفاتورة:</span>
-                    <span class="text-sm font-black text-rose-600">{(parseNum(newExp.quantity) * parseNum(newExp.unitPrice)).toLocaleString()} ج.م</span>
+                  <div class="sm:col-span-4 bg-rose-50 dark:bg-slate-700 border border-rose-200 dark:border-slate-600 p-2.5 rounded-xl flex justify-between items-center">
+                    <span class="font-bold text-rose-900 dark:text-rose-300">إجمالي قيمة الفاتورة:</span>
+                    <span class="text-sm font-black text-rose-600 dark:text-rose-400">{(parseNum(newExp.quantity) * parseNum(newExp.unitPrice)).toLocaleString()} ج.م</span>
                   </div>
                   <div class="sm:col-span-4">
                     <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المصروف والفاتورة ({selectedProjId})</button>
@@ -1268,51 +1349,49 @@
             )}
 
             {/* 5. الدفعات */}
-            {activeTab === "payments" && (
+            {activeTab === "payments" && (isAdmin || isAccountant) && (
               <div class="space-y-3.5">
-                {isAdmin && (
-                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
-                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">💰 تسجيل دفعة مستلمة من العميل</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const targetProj = cleanId(selectedProjId);
-                      const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user.name};
-                      const updated = [newItem, ...payments];
-                      setPayments(updated);
-                      if (db) db.ref('payments').set(updated);
-                      setNewPay({date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: ""});
-                      showToast("تم تسجيل الدفعة بنجاح! 💵");
-                    }} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                      <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-1">المبلغ (ج.م)</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-bold text-emerald-600 bg-emerald-50" required/></div>
-                      <div class="sm:col-span-3"><label class="block font-bold mb-1">البيان / تفاصيل التحويل</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border rounded-xl p-2" placeholder="دفعة تحت الحساب المستخلص 1..."/></div>
-                      <div class="sm:col-span-3"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ التحصيل</button></div>
-                    </form>
-                  </div>
-                )}
-                <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm text-xs">
+                  <h3 class="font-bold text-slate-800 dark:text-white mb-3 border-b dark:border-slate-700 pb-2 text-xs sm:text-sm">💰 تسجيل دفعة مستلمة من العميل</h3>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const targetProj = cleanId(selectedProjId);
+                    const newItem = {id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user.name};
+                    const updated = [newItem, ...payments];
+                    setPayments(updated);
+                    if (db) db.ref('payments').set(updated);
+                    setNewPay({date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: ""});
+                    showToast("تم تسجيل الدفعة بنجاح! 💵");
+                  }} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div><label class="block font-bold mb-1 text-blue-700 dark:text-blue-400">التاريخ</label><input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 bg-blue-50 dark:bg-slate-700 font-bold" required/></div>
+                    <div><label class="block font-bold mb-1">المبلغ (ج.م)</label><input type="number" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 font-bold text-emerald-600 bg-emerald-50 dark:bg-slate-700" required/></div>
+                    <div class="sm:col-span-3"><label class="block font-bold mb-1">البيان / تفاصيل التحويل</label><input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700" placeholder="دفعة تحت الحساب المستخلص 1..."/></div>
+                    <div class="sm:col-span-3"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ التحصيل</button></div>
+                  </form>
+                </div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm overflow-x-auto p-4 text-xs">
                   <table class="w-full text-right">
                     <thead>
-                      <tr class="bg-slate-100 text-slate-600">
+                      <tr class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                         <th class="p-2.5">التاريخ</th>
                         <th class="p-2.5">المشروع</th>
                         <th class="p-2.5 text-center">المبلغ</th>
                         <th class="p-2.5">البيان</th>
                         <th class="p-2.5">بواسطة</th>
-                        {canEditOrDelete && (
-                          <th class="p-2.5 text-center bg-slate-200 font-bold sticky left-0 z-10 shadow-xs">إجراءات</th>
+                        {isAdmin && (
+                          <th class="p-2.5 text-center bg-slate-200 dark:bg-slate-600 font-bold sticky left-0 z-10 shadow-xs">إجراءات</th>
                         )}
                       </tr>
                     </thead>
                     <tbody>{projPayments.map((p) => (
-                      <tr key={p.id} class="border-b hover:bg-slate-50">
-                        <td class="p-2.5 text-slate-600">{p.date}</td>
-                        <td class="p-2.5 font-bold text-blue-700">{p.projectId}</td>
+                      <tr key={p.id} class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750">
+                        <td class="p-2.5 text-slate-600 dark:text-slate-400">{p.date}</td>
+                        <td class="p-2.5 font-bold text-blue-700 dark:text-blue-400">{p.projectId}</td>
                         <td class="p-2.5 text-center text-emerald-600 font-bold">{parseNum(p.amount).toLocaleString()}</td>
                         <td class="p-2.5">{p.notes}</td>
                         <td class="p-2.5 text-slate-500">{p.createdBy || '-'}</td>
-                        {canEditOrDelete && (
-                          <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 sticky left-0 z-10 shadow-xs">
+                        {isAdmin && (
+                          <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                             <div class="flex items-center justify-center gap-1.5">
                               <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏ تعديل</button>
                               <button onClick={()=>deleteItem('payments', p.id, payments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
@@ -1329,32 +1408,32 @@
             {/* 6. المصاريف */}
             {activeTab === "expenses" && (
               <div class="space-y-4">
-                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-300 text-xs shadow-sm">
-                  <h3 class="font-bold text-indigo-900 mb-3 flex items-center gap-1.5"><span>🔍</span> محرك البحث والفلترة الدقيقة لمصروفات المشروع</h3>
+                <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-300 dark:border-slate-700 text-xs shadow-sm">
+                  <h3 class="font-bold text-indigo-900 dark:text-indigo-300 mb-3 flex items-center gap-1.5"><span>🔍</span> محرك البحث والفلترة الدقيقة لمصروفات المشروع</h3>
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="border rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
+                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} class="border dark:border-slate-600 rounded-xl p-2 bg-white dark:bg-slate-700 outline-none focus:ring-2 focus:ring-indigo-400">
                       <option value="">كل البنود الرئيسية</option>
                       {settings.mainCategories.map(c => <option key={c}>{c}</option>)}
                     </select>
-                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="border rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
+                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} class="border dark:border-slate-600 rounded-xl p-2 bg-white dark:bg-slate-700 outline-none focus:ring-2 focus:ring-indigo-400">
                       <option value="">كل البنود الفرعية</option>
                       {settings.subCategories.map(c => <option key={c}>{c}</option>)}
                     </select>
-                    <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="border rounded-xl p-2 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
+                    <select value={searchCostType} onChange={e=>setSearchCostType(e.target.value)} class="border dark:border-slate-600 rounded-xl p-2 bg-white dark:bg-slate-700 outline-none focus:ring-2 focus:ring-indigo-400">
                       <option value="">كل أنواع التكلفة</option>
                       {settings.costTypes.map(c => <option key={c}>{c}</option>)}
                     </select>
                   </div>
-                  <div class="bg-indigo-100/70 border border-indigo-200 text-indigo-900 px-4 py-2.5 rounded-xl flex justify-between items-center font-bold">
+                  <div class="bg-indigo-100/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-300 px-4 py-2.5 rounded-xl flex justify-between items-center font-bold">
                     <span>إجمالي المصروفات المطابقة للبحث:</span>
-                    <span class="text-sm font-black text-indigo-800">{filteredSearchTotal.toLocaleString()} ج.م</span>
+                    <span class="text-sm font-black text-indigo-800 dark:text-indigo-300">{filteredSearchTotal.toLocaleString()} ج.م</span>
                   </div>
                 </div>
 
-                <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto p-4 text-xs">
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm overflow-x-auto p-4 text-xs">
                   <table class="w-full text-right border-collapse">
                     <thead>
-                      <tr class="bg-slate-100 text-slate-700 border-b">
+                      <tr class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-b">
                         <th class="p-2.5">التاريخ</th>
                         <th class="p-2.5">المشروع</th>
                         <th class="p-2.5">البند</th>
@@ -1369,7 +1448,7 @@
                         <th class="p-2.5">واتساب</th>
                         <th class="p-2.5">بواسطة</th>
                         {canEditOrDelete && (
-                          <th class="p-2.5 text-center bg-slate-200 text-slate-800 font-black sticky left-0 z-10 shadow-xs">إجراءات</th>
+                          <th class="p-2.5 text-center bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-200 font-black sticky left-0 z-10 shadow-xs">إجراءات</th>
                         )}
                       </tr>
                     </thead>
@@ -1378,12 +1457,12 @@
                       filteredSearchExpenses.map((e) => {
                         const expMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n🧾 *إشعار فاتورة توريد / مصروف*\n🏗️ *المشروع:* ${currentProj.name} (${e.projectId})\n📌 *البند:* ${e.mainCategory} - ${e.subCategory}\n📝 *البيان:* ${e.description || '-'}\n🚚 *المورد:* ${e.supplier || '-'}\n🔢 *الكمية:* ${e.quantity} | *السعر:* ${parseNum(e.unitPrice).toLocaleString()} ج.م\n💰 *الإجمالي:* ${parseNum(e.amount).toLocaleString()} ج.م\n💳 *الحالة:* ${e.billStatus || 'مدفوعة'}\n🗓️ *التاريخ:* ${e.date}`;
                         return (
-                          <tr key={e.id} class="border-b hover:bg-slate-50">
-                            <td class="p-2.5 text-slate-600 whitespace-nowrap">{e.date}</td>
-                            <td class="p-2.5 font-bold text-blue-700 font-mono">{e.projectId}</td>
+                          <tr key={e.id} class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750">
+                            <td class="p-2.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{e.date}</td>
+                            <td class="p-2.5 font-bold text-blue-700 dark:text-blue-400 font-mono">{e.projectId}</td>
                             <td class="p-2.5 font-semibold">{e.mainCategory} - {e.subCategory}</td>
-                            <td class="p-2.5 text-slate-700 max-w-[150px] truncate" title={e.description || ""}>{e.description || '-'}</td>
-                            <td class="p-2.5 text-slate-600">{e.supplier || '-'}</td>
+                            <td class="p-2.5 text-slate-700 dark:text-slate-300 max-w-[150px] truncate" title={e.description || ""}>{e.description || '-'}</td>
+                            <td class="p-2.5 text-slate-600 dark:text-slate-400">{e.supplier || '-'}</td>
                             <td class="p-2.5 text-center font-bold">{parseNum(e.quantity)}</td>
                             <td class="p-2.5 text-center font-mono">{parseNum(e.unitPrice).toLocaleString()}</td>
                             <td class="p-2.5 text-center font-black text-rose-600 font-mono">{parseNum(e.amount).toLocaleString()}</td>
@@ -1393,12 +1472,12 @@
                               </span>
                             </td>
                             <td class="p-2.5">
-                              <span class={`px-1.5 py-0.5 rounded-lg text-[10px] ${e.paymentMethod === 'خصم من العهدة' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-600'}`}>
+                              <span class={`px-1.5 py-0.5 rounded-lg text-[10px] ${e.paymentMethod === 'خصم من العهدة' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
                                 {e.paymentMethod} {e.custodyEmployee && `(${e.custodyEmployee})`}
                               </span>
                             </td>
                             <td class="p-2.5">
-                              {e.receiptImg ? <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg font-bold">عرض</button> : <span class="text-slate-400">لا</span>}
+                              {e.receiptImg ? <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="bg-blue-50 dark:bg-slate-700 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-slate-600 px-2 py-0.5 rounded-lg font-bold">عرض</button> : <span class="text-slate-400">لا</span>}
                             </td>
                             <td class="p-2.5 text-center whitespace-nowrap">
                               <button onClick={() => {
@@ -1411,10 +1490,10 @@
                             <td class="p-2.5 text-slate-500 whitespace-nowrap">{e.createdBy || '-'}</td>
                             
                             {canEditOrDelete && (
-                              <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 sticky left-0 z-10 shadow-xs">
+                              <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                                 <div class="flex items-center justify-center gap-1.5">
                                   <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold shadow-xs">✏️ تعديل</button>
-                                  <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold">🗑️ حذف</button>
+                                  {isAdmin && <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold">🗑️ حذف</button>}
                                 </div>
                               </td>
                             )}
@@ -1428,17 +1507,17 @@
             )}
 
             {/* 7. حساب الموردين */}
-            {activeTab === "suppliers" && isAdmin && (
+            {activeTab === "suppliers" && (isAdmin || isAccountant) && (
               <div class="space-y-4">
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
-                  <div class="flex justify-between items-center mb-3 border-b pb-2">
-                    <h3 class="font-bold text-slate-800 flex items-center gap-1.5">
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm text-xs">
+                  <div class="flex justify-between items-center mb-3 border-b dark:border-slate-700 pb-2">
+                    <h3 class="font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
                       <span>💵</span> تسجيل دفعة نقدية لمورد ({currentProj.name})
                     </h3>
                     <div class="flex items-center gap-2">
                       <span class="text-slate-500">نطاق عرض الحساب:</span>
-                      <button onClick={()=>setSuppScope("project")} class={`px-2 py-1 rounded-lg font-bold ${suppScope === "project" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"}`}>مشروع ({selectedProjId})</button>
-                      <button onClick={()=>setSuppScope("company")} class={`px-2 py-1 rounded-lg font-bold ${suppScope === "company" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"}`}>كل مشاريع الشركة</button>
+                      <button onClick={()=>setSuppScope("project")} class={`px-2 py-1 rounded-lg font-bold ${suppScope === "project" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"}`}>مشروع ({selectedProjId})</button>
+                      <button onClick={()=>setSuppScope("company")} class={`px-2 py-1 rounded-lg font-bold ${suppScope === "company" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"}`}>كل مشاريع الشركة</button>
                     </div>
                   </div>
                   <form onSubmit={(e) => {
@@ -1451,27 +1530,27 @@
                     setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" });
                     showToast(`تم تسجيل الدفعة للمورد بنجاح!`);
                   }} class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-                    <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} class="w-full border rounded-xl p-2 font-bold bg-slate-50" required/></div>
+                    <div><label class="block font-bold mb-1">التاريخ</label><input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 font-bold bg-slate-50 dark:bg-slate-700" required/></div>
                     <div>
                       <label class="block font-bold mb-1">اسم المورد</label>
-                      <select value={newSuppPay.supplier} onChange={e=>setNewSuppPay({...newSuppPay, supplier: e.target.value})} class="w-full border rounded-xl p-2" required>
+                      <select value={newSuppPay.supplier} onChange={e=>setNewSuppPay({...newSuppPay, supplier: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700" required>
                         <option value="">اختر...</option>
                         {settings.suppliers.map(c => <option key={c}>{c}</option>)}
                       </select>
                     </div>
-                    <div><label class="block font-bold mb-1">المبلغ المسدد (ج.م)</label><input type="number" step="any" value={newSuppPay.amount} onChange={e=>setNewSuppPay({...newSuppPay, amount: e.target.value})} class="w-full border rounded-xl p-2 font-black text-emerald-600 bg-emerald-50" required/></div>
-                    <div><label class="block font-bold mb-1">رقم الإيصال / الشيك</label><input type="text" value={newSuppPay.notes} onChange={e=>setNewSuppPay({...newSuppPay, notes: e.target.value})} class="w-full border rounded-xl p-2"/></div>
+                    <div><label class="block font-bold mb-1">المبلغ المسدد (ج.م)</label><input type="number" step="any" value={newSuppPay.amount} onChange={e=>setNewSuppPay({...newSuppPay, amount: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 font-black text-emerald-600 bg-emerald-50 dark:bg-slate-700" required/></div>
+                    <div><label class="block font-bold mb-1">رقم الإيصال / الشيك</label><input type="text" value={newSuppPay.notes} onChange={e=>setNewSuppPay({...newSuppPay, notes: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700"/></div>
                     <div class="sm:col-span-4"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ الدفعة في حساب المورد</button></div>
                   </form>
                 </div>
 
-                <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
-                  <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-1.5 border-b pb-2">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm overflow-x-auto text-xs">
+                  <h3 class="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-1.5 border-b dark:border-slate-700 pb-2">
                     <span>🚚</span> موقف الموردين المحاسبي - {suppScope === "project" ? `خاص بالمشروع الحالي (${selectedProjId})` : "مجمع لكل مشاريع الشركة"}
                   </h3>
                   <table class="w-full text-right border-collapse">
                     <thead>
-                      <tr class="bg-slate-100 text-slate-700 border-b">
+                      <tr class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-b">
                         <th class="p-2.5">اسم المورد</th>
                         <th class="p-2.5 text-center">إجمالي المسحوبات</th>
                         <th class="p-2.5 text-center">مسدد فوراً</th>
@@ -1479,25 +1558,25 @@
                         <th class="p-2.5 text-center text-emerald-700">دفعات سداد للمورد</th>
                         <th class="p-2.5 text-center">الرصيد الصافي</th>
                         <th class="p-2.5 text-center">الموقف المحاسبي</th>
-                        <th class="p-2.5 text-center bg-slate-200 font-bold sticky left-0 z-10 shadow-xs">كشف الحساب</th>
+                        <th class="p-2.5 text-center bg-slate-200 dark:bg-slate-600 font-bold sticky left-0 z-10 shadow-xs">كشف الحساب</th>
                       </tr>
                     </thead>
                     <tbody>
                       {suppliersLedger.length === 0 ? <tr><td colSpan="8" class="text-center p-4 text-slate-500">لا توجد حركات مسجلة لهذا النطاق</td></tr> :
                       suppliersLedger.map((s, i) => (
-                        <tr key={i} class="border-b hover:bg-slate-50">
-                          <td class="p-2.5 font-bold text-indigo-900">{s.name}</td>
-                          <td class="p-2.5 text-center font-bold text-slate-700">{s.totalPurchases.toLocaleString()}</td>
-                          <td class="p-2.5 text-center text-slate-500">{s.paidPurchases.toLocaleString()}</td>
+                        <tr key={i} class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750">
+                          <td class="p-2.5 font-bold text-indigo-900 dark:text-indigo-300">{s.name}</td>
+                          <td class="p-2.5 text-center font-bold text-slate-700 dark:text-slate-300">{s.totalPurchases.toLocaleString()}</td>
+                          <td class="p-2.5 text-center text-slate-500 dark:text-slate-400">{s.paidPurchases.toLocaleString()}</td>
                           <td class="p-2.5 text-center font-black text-amber-600 font-mono">{s.creditPurchases.toLocaleString()}</td>
                           <td class="p-2.5 text-center font-black text-emerald-600 font-mono">{s.totalPaid.toLocaleString()}</td>
                           <td class={`p-2.5 text-center font-black text-sm ${s.balance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{Math.abs(s.balance).toLocaleString()} ج.م</td>
                           <td class="p-2.5 text-center">
-                            {s.balance === 0 ? <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-bold text-[10px]">خالص الحساب</span> :
+                            {s.balance === 0 ? <span class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-lg font-bold text-[10px]">خالص الحساب</span> :
                              s.balance > 0 ? <span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg font-bold text-[10px]">دفعة مقدمة للمورد</span> :
                              <span class="bg-rose-100 text-rose-800 px-2 py-1 rounded-lg font-bold text-[10px]">مستحق للمورد</span>}
                           </td>
-                          <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 sticky left-0 z-10 shadow-xs">
+                          <td class="p-2.5 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                             <button onClick={()=>setSelectedSupplierDetail(s.name)} class="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-lg font-bold text-[10px] shadow-xs">
                               📑 كشف حساب
                             </button>
@@ -1508,20 +1587,19 @@
                   </table>
                 </div>
 
-                {/* سجل الدفعات المسددة للموردين */}
-                <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto text-xs">
-                  <h4 class="font-bold text-slate-700 mb-2">سجل الدفعات المسددة للموردين:</h4>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm overflow-x-auto text-xs">
+                  <h4 class="font-bold text-slate-700 dark:text-slate-300 mb-2">سجل الدفعات المسددة للموردين:</h4>
                   <table class="w-full text-right border-collapse">
                     <thead>
-                      <tr class="bg-slate-50 text-slate-600 border-b">
+                      <tr class="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b">
                         <th class="p-2">التاريخ</th>
                         <th class="p-2">المورد</th>
                         <th class="p-2 text-center">المبلغ المسدد</th>
                         <th class="p-2">رقم الإيصال / البيان</th>
                         <th class="p-2 text-center">واتساب</th>
                         <th class="p-2">بواسطة</th>
-                        {canEditOrDelete && (
-                          <th class="p-2 text-center bg-slate-200 text-slate-800 font-bold sticky left-0 z-10 shadow-xs">إجراءات</th>
+                        {isAdmin && (
+                          <th class="p-2 text-center bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold sticky left-0 z-10 shadow-xs">إجراءات</th>
                         )}
                       </tr>
                     </thead>
@@ -1529,9 +1607,9 @@
                       {projSuppPayments.map(p => {
                         const suppMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n💵 *إشعار سداد دفعة نقدية*\n🚚 *السيد/المورد:* ${p.supplier}\n🏗️ *المشروع:* ${currentProj.name}\n💰 *المبلغ المسدد:* ${parseNum(p.amount).toLocaleString()} ج.م\n📝 *البيان / الإيصال:* ${p.notes || '-'}\n🗓️ *التاريخ:* ${p.date}`;
                         return (
-                          <tr key={p.id} class="border-b hover:bg-slate-50">
+                          <tr key={p.id} class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750">
                             <td class="p-2">{p.date}</td>
-                            <td class="p-2 font-bold text-indigo-950">{p.supplier}</td>
+                            <td class="p-2 font-bold text-indigo-950 dark:text-indigo-300">{p.supplier}</td>
                             <td class="p-2 text-center text-emerald-600 font-bold font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
                             <td class="p-2">{p.notes || '-'}</td>
                             <td class="p-2 text-center whitespace-nowrap">
@@ -1543,8 +1621,8 @@
                               </button>
                             </td>
                             <td class="p-2 text-slate-500">{p.createdBy || '-'}</td>
-                            {canEditOrDelete && (
-                              <td class="p-2 text-center whitespace-nowrap bg-slate-50 sticky left-0 z-10 shadow-xs">
+                            {isAdmin && (
+                              <td class="p-2 text-center whitespace-nowrap bg-slate-50 dark:bg-slate-800 sticky left-0 z-10 shadow-xs">
                                 <div class="flex items-center justify-center gap-1.5">
                                   <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
                                   <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded-lg font-bold text-[10px]">🗑️ حذف</button>
@@ -1560,15 +1638,15 @@
               </div>
             )}
 
-            {/* 8. كشف الحساب */}
+            {/* 8. كشف الحساب (خاص بالإدارة) */}
             {activeTab === "statement" && isAdmin && (() => {
               const statementMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📑 *الموقف المالي الشامل لمشروع:* ${currentProj.name} (${currentProj.id})\n📍 *الموقع:* ${currentProj.location || '-'}\n📊 *الميزانية المعتمدة:* ${parseNum(currentProj.budget).toLocaleString()} ج.م\n----------------------------------\n📄 *إجمالي صافي المستخلصات:* ${totalWorkNet.toLocaleString()} ج.م\n📥 *إجمالي التحصيلات المستلمة:* ${totalReceived.toLocaleString()} ج.م\n📤 *إجمالي المصروفات المنفذة:* ${totalCost.toLocaleString()} ج.م\n🏦 *خزينة المشروع الحرة:* ${centralCashRemaining.toLocaleString()} ج.م\n📈 *صافي أرباح المشروع:* ${netProfit.toLocaleString()} ج.م\n----------------------------------\n🗓️ *تاريخ التقرير:* ${todayDate}`;
               return (
-                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm print-area text-xs">
-                  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b pb-3 print-hidden">
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm print-area text-xs">
+                  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b dark:border-slate-700 pb-3 print-hidden">
                     <div>
-                      <h3 class="font-black text-slate-800 text-sm">📑 كشف حساب وموقف مالي متكامل للمشروع</h3>
-                      <p class="text-slate-500 text-[11px]">مقارنة المستخلصات والتحصيلات بالمنصرف والسيولة النقدية الحقيقية.</p>
+                      <h3 class="font-black text-slate-800 dark:text-white text-sm">📑 كشف حساب وموقف مالي متكامل للمشروع</h3>
+                      <p class="text-slate-500 dark:text-slate-400 text-[11px]">مقارنة المستخلصات والتحصيلات بالمنصرف والسيولة النقدية الحقيقية.</p>
                     </div>
                     <div class="flex items-center gap-2">
                       <button onClick={() => generatePdfAndOpenWhatsApp('statement-pdf-target', `كشف_حساب_${currentProj.id}.pdf`, statementMsg)} class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold shadow text-xs flex items-center gap-1.5 transition">
@@ -1580,7 +1658,7 @@
                     </div>
                   </div>
 
-                  <div id="statement-pdf-target" class="p-2 bg-white">
+                  <div id="statement-pdf-target" class="p-2 bg-white text-slate-800">
                     <div class="border border-slate-300 p-3.5 rounded-2xl mb-4">
                       <div class="flex justify-between items-center mb-2.5">
                         <div>
@@ -1667,46 +1745,44 @@
             })()}
 
             {/* 9. المستخلصات */}
-            {activeTab === "extracts" && (
+            {activeTab === "extracts" && (isAdmin || isAccountant) && (
               <div class="space-y-4">
-                {canEditOrDelete && (
-                  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs print-hidden">
-                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-xs sm:text-sm">📄 اعتماد مستخلص أعمال للمشروع ({currentProj.name})</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const totalWork = parseNum(newExt.quantity) * parseNum(newExt.unitPrice);
-                      const net = totalWork - parseNum(newExt.deductions);
-                      const targetProj = cleanId(selectedProjId);
-                      const newItem = { 
-                        id: Date.now(), 
-                        projectId: targetProj, 
-                        ...newExt, 
-                        quantity: parseNum(newExt.quantity),
-                        unitPrice: parseNum(newExt.unitPrice),
-                        totalWork, 
-                        deductions: parseNum(newExt.deductions), 
-                        net, 
-                        createdBy: user.name 
-                      };
-                      const updated = [newItem, ...extracts];
-                      setExtracts(updated);
-                      if (db) db.ref('extracts').set(updated);
-                      setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""});
-                      showToast("تم اعتماد المستخلص وحفظه!");
-                    }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                      <div><label class="block font-bold mb-1 text-blue-700">التاريخ</label><input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} class="w-full border rounded-xl p-2 bg-blue-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-1">رقم المستخلص</label><input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} class="w-full border rounded-xl p-2" required placeholder="مستخلص جاري 1"/></div>
-                      <div class="sm:col-span-2"><label class="block font-bold mb-1">بيان وتوصيف الأعمال المعتمدة</label><input type="text" value={newExt.workDescription} onChange={e=>setNewExt({...newExt, workDescription: e.target.value})} class="w-full border rounded-xl p-2" required placeholder="أعمال خرسانة مسلحة للأساسات..."/></div>
-                      <div><label class="block font-bold mb-1">الكمية المنفذة</label><input type="number" step="any" value={newExt.quantity} onChange={e=>setNewExt({...newExt, quantity: e.target.value})} class="w-full border rounded-xl p-2 bg-indigo-50 font-bold" required/></div>
-                      <div><label class="block font-bold mb-1">فئة البند التعاقدية (السعر)</label><input type="number" step="any" value={newExt.unitPrice} onChange={e=>setNewExt({...newExt, unitPrice: e.target.value})} class="w-full border rounded-xl p-2 bg-indigo-50 font-bold" required/></div>
-                      <div class="sm:col-span-2"><label class="block font-bold mb-1">الاستقطاعات وتأمين الأعمال (ج.م)</label><input type="number" step="any" value={newExt.deductions} onChange={e=>setNewExt({...newExt, deductions: e.target.value})} class="w-full border rounded-xl p-2 text-rose-600"/></div>
-                      <div class="sm:col-span-2 bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl flex justify-between items-center"><span class="font-bold text-indigo-900">الصافي المعتمد للصرف:</span><span class="text-sm font-black text-indigo-700">{((parseNum(newExt.quantity) * parseNum(newExt.unitPrice)) - parseNum(newExt.deductions)).toLocaleString()} ج.م</span></div>
-                      <div class="sm:col-span-2"><button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المستخلص الهندسي</button></div>
-                    </form>
-                  </div>
-                )}
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm text-xs print-hidden">
+                  <h3 class="font-bold text-slate-800 dark:text-white mb-3 border-b dark:border-slate-700 pb-2 text-xs sm:text-sm">📄 اعتماد مستخلص أعمال للمشروع ({currentProj.name})</h3>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const totalWork = parseNum(newExt.quantity) * parseNum(newExt.unitPrice);
+                    const net = totalWork - parseNum(newExt.deductions);
+                    const targetProj = cleanId(selectedProjId);
+                    const newItem = { 
+                      id: Date.now(), 
+                      projectId: targetProj, 
+                      ...newExt, 
+                      quantity: parseNum(newExt.quantity),
+                      unitPrice: parseNum(newExt.unitPrice),
+                      totalWork, 
+                      deductions: parseNum(newExt.deductions), 
+                      net, 
+                      createdBy: user.name 
+                    };
+                    const updated = [newItem, ...extracts];
+                    setExtracts(updated);
+                    if (db) db.ref('extracts').set(updated);
+                    setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""});
+                    showToast("تم اعتماد المستخلص وحفظه!");
+                  }} class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    <div><label class="block font-bold mb-1 text-blue-700 dark:text-blue-400">التاريخ</label><input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 bg-blue-50 dark:bg-slate-700 font-bold" required/></div>
+                    <div><label class="block font-bold mb-1">رقم المستخلص</label><input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700" required placeholder="مستخلص جاري 1"/></div>
+                    <div class="sm:col-span-2"><label class="block font-bold mb-1">بيان وتوصيف الأعمال المعتمدة</label><input type="text" value={newExt.workDescription} onChange={e=>setNewExt({...newExt, workDescription: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 dark:bg-slate-700" required placeholder="أعمال خرسانة مسلحة للأساسات..."/></div>
+                    <div><label class="block font-bold mb-1">الكمية المنفذة</label><input type="number" step="any" value={newExt.quantity} onChange={e=>setNewExt({...newExt, quantity: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 bg-indigo-50 dark:bg-slate-700 font-bold" required/></div>
+                    <div><label class="block font-bold mb-1">فئة البند التعاقدية (السعر)</label><input type="number" step="any" value={newExt.unitPrice} onChange={e=>setNewExt({...newExt, unitPrice: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 bg-indigo-50 dark:bg-slate-700 font-bold" required/></div>
+                    <div class="sm:col-span-2"><label class="block font-bold mb-1">الاستقطاعات وتأمين الأعمال (ج.م)</label><input type="number" step="any" value={newExt.deductions} onChange={e=>setNewExt({...newExt, deductions: e.target.value})} class="w-full border dark:border-slate-600 rounded-xl p-2 text-rose-600 dark:bg-slate-700"/></div>
+                    <div class="sm:col-span-2 bg-indigo-50 dark:bg-slate-700 border border-indigo-200 dark:border-slate-600 p-2.5 rounded-xl flex justify-between items-center"><span class="font-bold text-indigo-900 dark:text-indigo-300">الصافي المعتمد للصرف:</span><span class="text-sm font-black text-indigo-700 dark:text-indigo-400">{((parseNum(newExt.quantity) * parseNum(newExt.unitPrice)) - parseNum(newExt.deductions)).toLocaleString()} ج.م</span></div>
+                    <div class="sm:col-span-2"><button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl shadow transition">حفظ المستخلص الهندسي</button></div>
+                  </form>
+                </div>
 
-                <div class="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto print-area text-xs">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto print-area text-xs text-slate-800">
                   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b pb-3 print-hidden">
                     <h3 class="font-black text-slate-800 text-sm">عرض مستخلص الأعمال المعتمد للطباعة والتوقيعات</h3>
                     <div class="flex items-center gap-2">
@@ -1753,13 +1829,13 @@
                           <th class="p-2 border border-slate-300 text-center">الاستقطاعات</th>
                           <th class="p-2 border border-slate-300 text-center">الصافي المستحق</th>
                           <th class="p-2 border border-slate-300 text-center print-hidden">واتساب الأدمن</th>
-                          {canEditOrDelete && (
+                          {isAdmin && (
                             <th class="p-2 border border-slate-300 text-center bg-slate-300 print-hidden sticky left-0 z-10 shadow-xs">إجراءات</th>
                           )}
                         </tr>
                       </thead>
                       <tbody>
-                        {projExtracts.length === 0 ? <tr><td colSpan={canEditOrDelete ? 10 : 9} class="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
+                        {projExtracts.length === 0 ? <tr><td colSpan={isAdmin ? 10 : 9} class="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
                         projExtracts.map((ex) => {
                           const extractMsg = `🏢 *شركة مساحة للمقاولات والاستشارات*\n📄 *إشعار اعتماد مستخلص أعمال رسمـي*\n🏗️ *المشروع:* ${currentProj.name} (${currentProj.id})\n🔢 *رقم المستخلص:* ${ex.extractNo}\n📝 *بيان الأعمال:* ${ex.workDescription}\n📐 *الكمية المنفذة:* ${ex.quantity} | *الفئة التعاقدية:* ${parseNum(ex.unitPrice).toLocaleString()} ج.م\n💵 *إجمالي قيمة الأعمال:* ${parseNum(ex.totalWork).toLocaleString()} ج.م\n📉 *الاستقطاعات وتأمين الأعمال:* ${parseNum(ex.deductions).toLocaleString()} ج.م\n✅ *الصافي المعتمد للصرف:* ${parseNum(ex.net).toLocaleString()} ج.م\n🗓️ *التاريخ:* ${ex.date}`;
                           return (
@@ -1777,7 +1853,7 @@
                                   <span>📲 PDF للأدمن</span>
                                 </button>
                               </td>
-                              {canEditOrDelete && (
+                              {isAdmin && (
                                 <td class="p-2 border border-slate-300 text-center whitespace-nowrap bg-slate-50 print-hidden sticky left-0 z-10 shadow-xs">
                                   <div class="flex items-center justify-center gap-1.5">
                                     <button onClick={() => setEditItemData({ type: 'extract', data: { ...ex } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-1 rounded-lg font-bold text-[10px]">✏️ تعديل</button>
@@ -1795,7 +1871,7 @@
                           <td class="p-2.5 text-left" colSpan="6">إجمالي الصافي المعتمد لكافة المستخلصات:</td>
                           <td class="p-2.5 text-center text-sm">{totalWorkNet.toLocaleString()} ج.م</td>
                           <td class="border print-hidden"></td>
-                          {canEditOrDelete && <td class="p-2.5 print-hidden"></td>}
+                          {isAdmin && <td class="p-2.5 print-hidden"></td>}
                         </tr>
                       </tfoot>
                     </table>
@@ -1820,19 +1896,19 @@
             )}
 
             {/* 10. الدخول */}
-            {activeTab === "audit_log" && isDirector && (
-              <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs">
-                <h3 class="font-bold text-slate-800 mb-2.5 border-b pb-2">🛡️ سجل دخول المستخدمين</h3>
+            {activeTab === "audit_log" && isAdmin && (
+              <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm text-xs">
+                <h3 class="font-bold text-slate-800 dark:text-white mb-2.5 border-b dark:border-slate-700 pb-2">🛡️ سجل دخول المستخدمين</h3>
                 <div class="overflow-x-auto">
                   <table class="w-full text-right">
-                    <thead><tr class="bg-slate-100 text-slate-700 border-b"><th class="p-2.5">المستخدم</th><th class="p-2.5">المعرف</th><th class="p-2.5">الرتبة</th><th class="p-2.5">الجهاز</th><th class="p-2.5">الوقت</th></tr></thead>
+                    <thead><tr class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-b"><th class="p-2.5">المستخدم</th><th class="p-2.5">المعرف</th><th class="p-2.5">الرتبة</th><th class="p-2.5">الجهاز</th><th class="p-2.5">الوقت</th></tr></thead>
                     <tbody>{loginLogs.map((log, i) => (
-                      <tr key={i} class="border-b hover:bg-slate-50">
+                      <tr key={i} class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750">
                         <td class="p-2.5 font-bold">{log.name}</td>
-                        <td class="p-2.5 font-mono text-slate-600">{log.identifier}</td>
+                        <td class="p-2.5 font-mono text-slate-600 dark:text-slate-400">{log.identifier}</td>
                         <td class="p-2.5"><span class={`px-2 py-0.5 rounded-lg font-bold ${log.role.includes("Admin") ? "bg-amber-100 text-amber-800" : log.role.includes("مهندس") ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-700"}`}>{log.role}</span></td>
                         <td class="p-2.5">{log.device}</td>
-                        <td class="p-2.5 text-slate-500 font-mono">{log.formattedDate}</td>
+                        <td class="p-2.5 text-slate-500 dark:text-slate-400 font-mono">{log.formattedDate}</td>
                       </tr>
                     ))}</tbody>
                   </table>
@@ -1840,27 +1916,152 @@
               </div>
             )}
 
-            {/* 11. الإعدادات */}
+            {/* 11. الإعدادات المدمجة الاحترافية */}
             {activeTab === "settings" && (
-              <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm text-xs max-w-xl">
-                <h3 class="font-bold mb-3 text-sm">🖼️ شعار الشركة المعتمد للترويسة الهندسية والطباعة</h3>
-                <input type="file" accept="image/*" onChange={(e)=>{
-                  if (!canEditOrDelete) {
-                    showToast("تعديل الشعار مصرح لمدير النظام والمهندس فقط 🔒", "error");
-                    return;
-                  }
-                  const file = e.target.files && e.target.files[0];
-                  if(!file) return;
-                  const reader = new FileReader();
-                  reader.onload = (evt) => {
-                    const base64 = evt.target.result;
-                    if(db) db.ref('settings/logo').set(base64);
-                    setSettings(prev=>({...prev, logo: base64}));
-                    showToast("تم تحديث وحفظ اللوجو بنجاح! 🖼️");
-                  };
-                  reader.readAsDataURL(file);
-                }} class="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
-                {settings.logo && <div class="mt-4"><img src={settings.logo} class="h-20 object-contain border p-2 rounded-2xl" /></div>}
+              <div class="space-y-4 text-xs font-bold">
+                
+                {/* 1. قسم النسخ الاحتياطي واستيراد وتصدير البيانات */}
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm space-y-3">
+                  <div class="flex items-center gap-2 border-b dark:border-slate-700 pb-2">
+                    <span class="text-lg">💾</span>
+                    <div>
+                      <h3 class="text-sm font-black text-slate-900 dark:text-white">النسخ الاحتياطي وتصدير البيانات (Backup & Data Portability)</h3>
+                      <p class="text-[11px] text-slate-400 font-normal">حفظ واسترجاع كافة بيانات العمليات والمستخلصات لضمان أمان السجلات</p>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                    <button onClick={exportJsonBackup} class="p-3 bg-slate-50 dark:bg-slate-700 rounded-xl border dark:border-slate-600 flex items-center justify-between hover:bg-slate-100 transition">
+                      <div class="text-right">
+                        <span class="block text-xs font-black">تحميل نسخة شاملة (JSON)</span>
+                        <span class="text-[10px] text-slate-400 font-normal">نسخة احتياطية لكافة الجداول</span>
+                      </div>
+                      <span class="text-xl">💾</span>
+                    </button>
+
+                    <button onClick={exportToExcel} class="p-3 bg-slate-50 dark:bg-slate-700 rounded-xl border dark:border-slate-600 flex items-center justify-between hover:bg-slate-100 transition">
+                      <div class="text-right">
+                        <span class="block text-xs font-black">تصدير شيت إكسيل (Excel)</span>
+                        <span class="text-[10px] text-slate-400 font-normal">تصدير الجداول بصيغة XLSX</span>
+                      </div>
+                      <span class="text-xl">📊</span>
+                    </button>
+
+                    {isAdmin && (
+                      <div class="p-3 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-dashed border-blue-400 flex items-center justify-between">
+                        <label class="cursor-pointer w-full flex items-center justify-between">
+                          <div class="text-right">
+                            <span class="block text-xs font-black text-blue-700 dark:text-blue-300">استيراد بيانات (JSON / Excel)</span>
+                            <span class="text-[10px] text-slate-400 font-normal">رفع شيت أو مقايسة سابقة</span>
+                          </div>
+                          <span class="text-xl">📥</span>
+                          <input type="file" accept=".json,.xlsx,.xls,.csv" onChange={handleImportData} class="hidden"/>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. قسم إدارة الصلاحيات والأدوار (خاص بمدير النظام) */}
+                {isAdmin && (
+                  <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm space-y-3">
+                    <div class="flex items-center gap-2 border-b dark:border-slate-700 pb-2">
+                      <span class="text-lg">🛡️</span>
+                      <div>
+                        <h3 class="text-sm font-black text-slate-900 dark:text-white">إدارة الصلاحيات والمستخدمين (Roles & Access Control)</h3>
+                        <p class="text-[11px] text-slate-400 font-normal">تخصيص الصلاحيات بين مدير النظام، المحاسب، ومهندس الموقع</p>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleSaveRole} class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                      <input 
+                        type="email" 
+                        placeholder="البريد الإلكتروني لحساب Google..." 
+                        value={newRoleInput.email} 
+                        onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} 
+                        class="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 text-xs" 
+                        required
+                      />
+                      <select 
+                        value={newRoleInput.role} 
+                        onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} 
+                        class="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 text-xs font-bold"
+                      >
+                        <option value="engineer">👷 مهندس موقع (يوميات، حصر، بدون أسعار وأرباح)</option>
+                        <option value="accountant">💼 محاسب (مستخلصات، أذون صرف، دفعات الموردين)</option>
+                        <option value="admin">👑 مدير نظام (صلاحية كاملة، خزينة، أرباح، تعديل وحذف)</option>
+                      </select>
+                      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black py-2.5">
+                        حفظ الصلاحية للمستخدم
+                      </button>
+                    </form>
+
+                    <div class="border dark:border-slate-700 rounded-xl overflow-hidden mt-2">
+                      <table class="w-full text-right text-xs">
+                        <thead class="bg-slate-100 dark:bg-slate-700">
+                          <tr>
+                            <th class="p-2">المستخدم</th>
+                            <th class="p-2 text-center">الدور المعين</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y dark:divide-slate-700">
+                          <tr class="bg-amber-50/50 dark:bg-amber-950/20">
+                            <td class="p-2 font-mono text-amber-900 dark:text-amber-300 font-bold">{SUPER_ADMIN_EMAIL}</td>
+                            <td class="p-2 text-center font-bold text-amber-700">👑 مدير النظام الرئيسي</td>
+                          </tr>
+                          {Object.entries(userRolesMap).map(([k, r]) => (
+                            <tr key={k}>
+                              <td class="p-2 font-mono text-slate-600 dark:text-slate-400">{k.replace(/_/g, '.')}</td>
+                              <td class="p-2 text-center">
+                                <span class={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                                  r === 'admin' ? 'bg-amber-100 text-amber-800' :
+                                  r === 'accountant' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {r === 'admin' ? 'مدير نظام' : r === 'accountant' ? 'محاسب' : 'مهندس موقع'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. شعار الشركة والمظهر */}
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm">
+                    <h3 class="font-bold mb-2 text-xs">🖼️ شعار الشركة المعتمد للترويسة</h3>
+                    <input type="file" accept="image/*" onChange={(e)=>{
+                      if (!canEditOrDelete) {
+                        showToast("تعديل الشعار مصرح لمدير النظام والمهندس فقط 🔒", "error");
+                        return;
+                      }
+                      const file = e.target.files && e.target.files[0];
+                      if(!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (evt) => {
+                        const base64 = evt.target.result;
+                        if(db) db.ref('settings/logo').set(base64);
+                        setSettings(prev=>({...prev, logo: base64}));
+                        showToast("تم تحديث وحفظ اللوجو بنجاح! 🖼️");
+                      };
+                      reader.readAsDataURL(file);
+                    }} class="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 cursor-pointer"/>
+                    {settings.logo && <div class="mt-3"><img src={settings.logo} class="h-16 object-contain border dark:border-slate-700 p-1.5 rounded-xl bg-white" /></div>}
+                  </div>
+
+                  <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h4 class="font-bold text-xs mb-1">🌙 مظهر الواجهة والوضع الليلي (Dark Mode)</h4>
+                      <p class="text-[11px] text-slate-400 font-normal">تبديل الواجهة للمظهر الليلي لراحة العين في الموقع</p>
+                    </div>
+                    <button onClick={toggleTheme} class="mt-3 w-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 py-2.5 rounded-xl font-bold transition">
+                      {theme === 'dark' ? '☀️ التبديل إلى الوضع الفاتح' : '🌙 التبديل إلى الوضع الليلي'}
+                    </button>
+                  </div>
+                </div>
+
               </div>
             )}
           </main>
@@ -1868,16 +2069,16 @@
           {/* نافذة كشف حساب المورد التفاعلية */}
           {selectedSupplierDetail && (
             <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-5">
-              <div class="bg-white rounded-3xl p-5 w-full max-w-4xl shadow-2xl border text-xs max-h-[90vh] flex flex-col justify-between">
+              <div class="bg-white dark:bg-slate-800 rounded-3xl p-5 w-full max-w-4xl shadow-2xl border dark:border-slate-700 text-xs max-h-[90vh] flex flex-col justify-between">
                 <div>
-                  <div class="flex justify-between items-center border-b pb-3 mb-3">
-                    <h3 class="font-black text-sm text-slate-900 flex items-center gap-2">
-                      <span>📑</span> كشف حساب تفصيلي للمورد: <span class="text-indigo-700 font-bold">{selectedSupplierDetail}</span>
+                  <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                    <h3 class="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>📑</span> كشف حساب تفصيلي للمورد: <span class="text-indigo-700 dark:text-indigo-400 font-bold">{selectedSupplierDetail}</span>
                     </h3>
-                    <button onClick={()=>setSelectedSupplierDetail(null)} class="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full w-8 h-8 flex items-center justify-center font-bold">✕</button>
+                    <button onClick={()=>setSelectedSupplierDetail(null)} class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full w-8 h-8 flex items-center justify-center font-bold">✕</button>
                   </div>
 
-                  <div id="supplier-statement-pdf-target" class="overflow-y-auto max-h-[60vh] p-2 bg-white">
+                  <div id="supplier-statement-pdf-target" class="overflow-y-auto max-h-[60vh] p-2 bg-white text-slate-800">
                     <h4 class="font-bold text-slate-700 mb-2">1. الفواتير والمسحوبات:</h4>
                     <table class="w-full text-right border-collapse mb-4 border">
                       <thead>
@@ -1912,7 +2113,7 @@
                               {canEditOrDelete && (
                                 <td class="p-2 border text-center whitespace-nowrap bg-slate-50 print-hidden">
                                   <div class="flex items-center justify-center gap-1.5">
-                                    <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏️️ تعديل</button>
+                                    <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏ تعديل</button>
                                     <button onClick={() => deleteItem('expenses', e.id, expenses)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-0.5 rounded font-bold text-[10px]">🗑️ حذف</button>
                                   </div>
                                 </td>
@@ -1948,7 +2149,7 @@
                                 <td class="p-2 border text-center whitespace-nowrap bg-slate-50 print-hidden">
                                   <div class="flex items-center justify-center gap-1.5">
                                     <button onClick={() => setEditItemData({ type: 'supp_payment', data: { ...p } })} class="bg-blue-600 text-white hover:bg-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">✏️ تعديل</button>
-                                    <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-0.5 rounded font-bold text-[10px]">🗑️ حذف</button>
+                                    <button onClick={() => deleteItem('supplier_payments', p.id, supplierPayments)} class="bg-rose-100 text-rose-700 hover:bg-rose-200 px-2 py-1 rounded font-bold text-[10px]">🗑️ حذف</button>
                                   </div>
                                 </td>
                               )}
@@ -1960,7 +2161,7 @@
                   </div>
                 </div>
 
-                <div class="pt-3 border-t flex justify-end gap-2 mt-3">
+                <div class="pt-3 border-t dark:border-slate-700 flex justify-end gap-2 mt-3">
                   <button onClick={() => {
                     const suppInvoices = expenses.filter(e => (e.supplier || '').trim() === selectedSupplierDetail);
                     const suppPays = supplierPayments.filter(p => (p.supplier || '').trim() === selectedSupplierDetail);
@@ -1981,9 +2182,9 @@
           {/* نافذة التعديل المنبثقة الموحدة */}
           {editItemData && canEditOrDelete && (
             <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-              <div class="bg-white rounded-3xl p-5 w-full max-w-lg shadow-2xl border text-xs max-h-[90vh] overflow-y-auto">
-                <div class="flex justify-between items-center border-b pb-3 mb-3">
-                  <h3 class="font-bold text-sm text-slate-800">
+              <div class="bg-white dark:bg-slate-800 rounded-3xl p-5 w-full max-w-lg shadow-2xl border dark:border-slate-700 text-xs max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                  <h3 class="font-bold text-sm text-slate-800 dark:text-white">
                     ✏️ تعديل {
                       editItemData.type === 'expense' ? 'فاتورة مصروف' : 
                       editItemData.type === 'advance' ? 'سلفة / عهدة' : 
@@ -1993,21 +2194,20 @@
                       'دفعة مورد'
                     }
                   </h3>
-                  <button onClick={() => setEditItemData(null)} class="bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 rounded-full w-8 h-8 flex items-center justify-center font-bold transition">✕</button>
+                  <button onClick={() => setEditItemData(null)} class="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-full w-8 h-8 flex items-center justify-center font-bold transition">✕</button>
                 </div>
 
                 <form onSubmit={handleSaveEditedItem} class="space-y-3">
-                  {/* تعديل المصروف */}
                   {editItemData.type === 'expense' && (
                     <>
                       <div class="grid grid-cols-2 gap-2">
                         <div>
                           <label class="block font-bold mb-1">التاريخ</label>
-                          <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                          <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                         </div>
                         <div>
                           <label class="block font-bold mb-1">المورد</label>
-                          <select value={editItemData.data.supplier} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, supplier: e.target.value}})} class="w-full border p-2 rounded-xl">
+                          <select value={editItemData.data.supplier} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, supplier: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700">
                             <option value="">اختر...</option>
                             {settings.suppliers.map(s=><option key={s}>{s}</option>)}
                           </select>
@@ -2016,15 +2216,15 @@
 
                       <div class="grid grid-cols-2 gap-2">
                         <div>
-                          <label class="block font-bold mb-1 text-indigo-700">حالة الفاتورة</label>
-                          <select value={editItemData.data.billStatus || 'مدفوعة'} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, billStatus: e.target.value}})} class="w-full border-2 border-indigo-200 bg-indigo-50 p-2 rounded-xl font-bold">
+                          <label class="block font-bold mb-1 text-indigo-700 dark:text-indigo-400">حالة الفاتورة</label>
+                          <select value={editItemData.data.billStatus || 'مدفوعة'} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, billStatus: e.target.value}})} class="w-full border-2 border-indigo-200 dark:border-slate-600 bg-indigo-50 dark:bg-slate-700 p-2 rounded-xl font-bold">
                             <option value="مدفوعة">✅ مسددة (لا دين)</option>
                             <option value="آجلة">⏳ آجلة (مديونية)</option>
                           </select>
                         </div>
                         <div>
                           <label class="block font-bold mb-1">طريقة الدفع</label>
-                          <select value={editItemData.data.paymentMethod} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, paymentMethod: e.target.value}})} class="w-full border p-2 rounded-xl">
+                          <select value={editItemData.data.paymentMethod} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, paymentMethod: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700">
                             <option value="خصم من العهدة">خصم من العهدة</option>
                             <option value="كاش">كاش</option>
                             <option value="تحويل بنكي">تحويل بنكي</option>
@@ -2035,148 +2235,143 @@
                       <div class="grid grid-cols-2 gap-2">
                         <div>
                           <label class="block font-bold mb-1">الكمية</label>
-                          <input type="number" step="any" value={editItemData.data.quantity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, quantity: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                          <input type="number" step="any" value={editItemData.data.quantity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, quantity: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                         </div>
                         <div>
                           <label class="block font-bold mb-1">سعر الوحدة</label>
-                          <input type="number" step="any" value={editItemData.data.unitPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, unitPrice: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                          <input type="number" step="any" value={editItemData.data.unitPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, unitPrice: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                         </div>
                       </div>
 
                       <div>
                         <label class="block font-bold mb-1">البيان / الوصف</label>
-                        <input type="text" value={editItemData.data.description || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, description: e.target.value}})} class="w-full border p-2 rounded-xl"/>
+                        <input type="text" value={editItemData.data.description || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, description: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/>
                       </div>
                     </>
                   )}
 
-                  {/* تعديل السلفة / العهدة */}
                   {editItemData.type === 'advance' && (
                     <>
                       <div>
                         <label class="block font-bold mb-1">التاريخ</label>
-                        <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                        <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">اسم الموظف</label>
-                        <select value={editItemData.data.employeeName} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, employeeName: e.target.value}})} class="w-full border p-2 rounded-xl" required>
+                        <select value={editItemData.data.employeeName} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, employeeName: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required>
                           <option value="">اختر...</option>
                           {settings.employees.map(c => <option key={c}>{c}</option>)}
                         </select>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">المبلغ (ج.م)</label>
-                        <input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border p-2 rounded-xl font-bold text-emerald-700" required/>
+                        <input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl font-bold text-emerald-700 dark:bg-slate-700" required/>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">البيان / ملاحظات</label>
-                        <input type="text" value={editItemData.data.notes || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, notes: e.target.value}})} class="w-full border p-2 rounded-xl"/>
+                        <input type="text" value={editItemData.data.notes || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, notes: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/>
                       </div>
                     </>
                   )}
 
-                  {/* تعديل المستخلص */}
                   {editItemData.type === 'extract' && (
                     <>
                       <div class="grid grid-cols-2 gap-2">
                         <div>
                           <label class="block font-bold mb-1">التاريخ</label>
-                          <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                          <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                         </div>
                         <div>
                           <label class="block font-bold mb-1">رقم المستخلص</label>
-                          <input type="text" value={editItemData.data.extractNo} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, extractNo: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                          <input type="text" value={editItemData.data.extractNo} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, extractNo: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                         </div>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">توصيف الأعمال</label>
-                        <input type="text" value={editItemData.data.workDescription} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, workDescription: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                        <input type="text" value={editItemData.data.workDescription} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, workDescription: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                       </div>
                       <div class="grid grid-cols-2 gap-2">
                         <div>
                           <label class="block font-bold mb-1">الكمية</label>
-                          <input type="number" step="any" value={editItemData.data.quantity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, quantity: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                          <input type="number" step="any" value={editItemData.data.quantity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, quantity: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                         </div>
                         <div>
                           <label class="block font-bold mb-1">الفئة (السعر)</label>
-                          <input type="number" step="any" value={editItemData.data.unitPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, unitPrice: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                          <input type="number" step="any" value={editItemData.data.unitPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, unitPrice: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                         </div>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">الاستقطاعات (ج.م)</label>
-                        <input type="number" step="any" value={editItemData.data.deductions} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, deductions: e.target.value}})} class="w-full border p-2 rounded-xl text-rose-600"/>
+                        <input type="number" step="any" value={editItemData.data.deductions} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, deductions: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl text-rose-600 dark:bg-slate-700"/>
                       </div>
                     </>
                   )}
 
-                  {/* تعديل تحصيل العميل */}
                   {editItemData.type === 'payment' && (
                     <>
                       <div>
                         <label class="block font-bold mb-1">التاريخ</label>
-                        <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                        <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">المبلغ (ج.م)</label>
-                        <input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border p-2 rounded-xl font-bold text-emerald-600" required/>
+                        <input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl font-bold text-emerald-600 dark:bg-slate-700" required/>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">البيان / الملاحظات</label>
-                        <input type="text" value={editItemData.data.notes || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, notes: e.target.value}})} class="w-full border p-2 rounded-xl"/>
+                        <input type="text" value={editItemData.data.notes || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, notes: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/>
                       </div>
                     </>
                   )}
 
-                  {/* تعديل دفعة المورد */}
                   {editItemData.type === 'supp_payment' && (
                     <>
                       <div>
                         <label class="block font-bold mb-1">التاريخ</label>
-                        <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                        <input type="date" value={editItemData.data.date} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, date: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">المورد</label>
-                        <select value={editItemData.data.supplier} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, supplier: e.target.value}})} class="w-full border p-2 rounded-xl" required>
+                        <select value={editItemData.data.supplier} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, supplier: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required>
                           <option value="">اختر...</option>
                           {settings.suppliers.map(s => <option key={s}>{s}</option>)}
                         </select>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">المبلغ المسدد (ج.م)</label>
-                        <input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border p-2 rounded-xl font-bold text-emerald-600" required/>
+                        <input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl font-bold text-emerald-600 dark:bg-slate-700" required/>
                       </div>
                       <div>
                         <label class="block font-bold mb-1">البيان / الإيصال</label>
-                        <input type="text" value={editItemData.data.notes || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, notes: e.target.value}})} class="w-full border p-2 rounded-xl"/>
+                        <input type="text" value={editItemData.data.notes || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, notes: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/>
                       </div>
                     </>
                   )}
 
-                  {/* تعديل المشروع */}
                   {editItemData.type === 'project' && (
                     <>
                       <div>
                         <label class="block font-bold mb-1">اسم المالك / العميل</label>
-                        <input type="text" value={editItemData.data.name} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, name: e.target.value}})} class="w-full border p-2 rounded-xl" required/>
+                        <input type="text" value={editItemData.data.name} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, name: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700" required/>
                       </div>
                       <div class="grid grid-cols-2 gap-2">
                         <div>
                           <label class="block font-bold mb-1">المكتب الاستشاري</label>
-                          <input type="text" value={editItemData.data.consultant || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, consultant: e.target.value}})} class="w-full border p-2 rounded-xl"/>
+                          <input type="text" value={editItemData.data.consultant || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, consultant: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/>
                         </div>
                         <div>
                           <label class="block font-bold mb-1">الموقع</label>
-                          <input type="text" value={editItemData.data.location || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, location: e.target.value}})} class="w-full border p-2 rounded-xl"/>
+                          <input type="text" value={editItemData.data.location || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, location: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/>
                         </div>
                       </div>
                       <div class="grid grid-cols-2 gap-2">
                         <div>
                           <label class="block font-bold mb-1">الميزانية التقديرية</label>
-                          <input type="number" step="any" value={editItemData.data.budget} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, budget: e.target.value}})} class="w-full border p-2 rounded-xl font-bold text-blue-700"/>
+                          <input type="number" step="any" value={editItemData.data.budget} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, budget: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl font-bold text-blue-700 dark:bg-slate-700"/>
                         </div>
                         <div>
                           <label class="block font-bold mb-1">الحالة</label>
-                          <select value={editItemData.data.status || 'جاري العمل'} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, status: e.target.value}})} class="w-full border p-2 rounded-xl">
+                          <select value={editItemData.data.status || 'جاري العمل'} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, status: e.target.value}})} class="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700">
                             <option value="جاري العمل">جاري العمل</option>
                             <option value="تم التسليم">تم التسليم</option>
                             <option value="متوقف">متوقف</option>
@@ -2186,7 +2381,7 @@
                     </>
                   )}
 
-                  <div class="flex gap-2 pt-2 border-t mt-4">
+                  <div class="flex gap-2 pt-2 border-t dark:border-slate-700 mt-4">
                     <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow transition">تأكيد وحفظ التعديلات</button>
                   </div>
                 </form>
@@ -2195,12 +2390,12 @@
           )}
 
           {/* شريط التنقل السفلي للهواتف الذكية */}
-          <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-lg z-40 px-2 py-1.5 flex justify-around items-center">
+          <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-700 shadow-lg z-40 px-2 py-1.5 flex justify-around items-center">
             {navTabs.slice(0, 4).map(tab => (
               <button 
                 key={tab.id} 
                 onClick={() => setActiveTab(tab.id)} 
-                class={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition duration-200 ${activeTab === tab.id ? "text-blue-600 font-black scale-105" : "text-slate-400 hover:text-slate-600"}`}
+                class={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition duration-200 ${activeTab === tab.id ? "text-blue-600 dark:text-blue-400 font-black scale-105" : "text-slate-400 hover:text-slate-600"}`}
               >
                 <span class="text-base">{tab.icon}</span>
                 <span class="text-[10px] mt-0.5">{tab.label}</span>
@@ -2228,10 +2423,10 @@
           {/* نافذة معاينة الفاتورة */}
           {activeInvoiceModal && (
             <div class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-              <div class="bg-white p-4 rounded-3xl max-w-lg w-full flex flex-col items-center shadow-2xl">
-                <h4 class="font-bold mb-3 text-xs text-slate-800">صورة الفاتورة المرفقة</h4>
-                <img src={activeInvoiceModal} class="max-h-[65vh] object-contain rounded-2xl border mb-4 w-full" />
-                <button onClick={()=>setActiveInvoiceModal(null)} class="w-full bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-2xl text-xs transition">إغلاق المعاينة</button>
+              <div class="bg-white dark:bg-slate-800 p-4 rounded-3xl max-w-lg w-full flex flex-col items-center shadow-2xl">
+                <h4 class="font-bold mb-3 text-xs text-slate-800 dark:text-white">صورة الفاتورة المرفقة</h4>
+                <img src={activeInvoiceModal} class="max-h-[65vh] object-contain rounded-2xl border dark:border-slate-700 mb-4 w-full" />
+                <button onClick={()=>setActiveInvoiceModal(null)} class="w-full bg-slate-900 dark:bg-slate-700 hover:bg-black text-white font-bold py-2.5 rounded-2xl text-xs transition">إغلاق المعاينة</button>
               </div>
             </div>
           )}
