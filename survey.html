@@ -123,8 +123,9 @@
     };
 
     const SUPER_ADMIN_EMAIL = "mohamedmohy676676@gmail.com";
+    const PROJECT_MANAGER_EMAIL = "alaayousef1698@gmail.com";
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com", "ahmnab23@gmail.com"];
-    const ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, ...ENGINEER_EMAILS, "+201095545982"];
+    const ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, PROJECT_MANAGER_EMAIL, ...ENGINEER_EMAILS, "+201095545982"];
 
     let db = null;
     let auth = null;
@@ -345,10 +346,12 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
+      // تعريف الصلاحيات المحدثة
       const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
       const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
+      const isProjectManager = userEmail === PROJECT_MANAGER_EMAIL.toLowerCase() || userEmail.includes("alaayousef1698");
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
-      const isAdmin = isSuperAdmin || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
+      const isAdmin = isSuperAdmin || isProjectManager || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
 
       const initialOpState = {
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", engineer: "م أحمد نبيل",
@@ -415,7 +418,9 @@
           date: new Date().toLocaleString('ar-EG'),
           timestamp: Date.now()
         };
-        if (navigator.onLine && db) db.ref('survey_data/login_logs').push(entry);
+        if (navigator.onLine && db) {
+          db.ref('survey_data/login_logs').push(entry);
+        }
       };
 
       useEffect(() => {
@@ -491,8 +496,11 @@
 
       const saveListSafely = (path, storageKey, data) => {
         offlineStorage.set(storageKey, data);
-        if (navigator.onLine && db) db.ref(`survey_data/${path}`).set(data);
-        else offlineStorage.addToQueue(`survey_data/${path}`, data);
+        if (navigator.onLine && db) {
+          db.ref(`survey_data/${path}`).set(data);
+        } else {
+          offlineStorage.addToQueue(`survey_data/${path}`, data);
+        }
       };
 
       const updateSettingArray = (key, title) => {
@@ -586,7 +594,7 @@
           setOperations(updatedOps);
           saveListSafely('operations', 'operations', updatedOps);
           logActivity(`تعديل طلعة للعميل: ${finalOp.clientName}`);
-          showToast("تم تحديث الطلعة بنجاح! ✏️");
+          showToast(navigator.onLine ? "تم تحديث الطلعة بنجاح! ✏️" : "تم حفظ التعديل محلياً بجهازك 💾");
           setEditingOp(null);
         } else {
           const opToSave = { id: Date.now(), ...finalOp, ...shares, createdBy: user?.email || 'Admin' };
@@ -606,7 +614,7 @@
           }
 
           logActivity(`تسجيل طلعة جديدة: ${finalOp.clientName} بقيمة ${finalAgreed} ج.م`);
-          showToast("تم حفظ الطلعة بنجاح! 📐");
+          showToast(navigator.onLine ? "تم حفظ الطلعة بنجاح! 📐" : "تم حفظ الطلعة بنجاح بدون إنترنت 💾");
         }
         setOpModalOpen(false);
       };
@@ -743,7 +751,7 @@
         { id: "extracts", label: "المستخلصات", icon: "📄" },
         { id: "statement", label: "كشف الحساب", icon: "📑" },
         { id: "office", label: "أرباح المكتب", icon: "🏢" },
-        ...(isSuperAdmin ? [{ id: "logs", label: "سجل الدخول والمراقبة", icon: "🛡️" }] : []),
+        ...(isSuperAdmin ? [{ id: "logs", label: "سجل الدخول والمراقبة", icon: "🛡️️" }] : []),
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ], [isSuperAdmin]);
 
@@ -780,7 +788,7 @@
           {!isOnline && (
             <div class="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
               <span>📡</span>
-              <span>أنت تعمل في وضع عدم الاتصال (بدون إنترنت). يتم حفظ جميع العمليات محلياً على جهازك.</span>
+              <span>أنت تعمل الآن في وضع عدم الاتصال (بدون إنترنت). يتم حفظ جميع العمليات محلياً على جهازك وسوف ترفع تلقائياً عند توفر الشبكة.</span>
             </div>
           )}
 
@@ -792,6 +800,8 @@
                   <h1 class="text-sm font-black leading-tight text-indigo-700 dark:text-indigo-400">مساحة ERP</h1>
                   {isSuperAdmin ? (
                     <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">👑 مدير النظام</span>
+                  ) : isProjectManager ? (
+                    <span class="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">💼 مدير مشاريع</span>
                   ) : isEngineer ? (
                     <span class="bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">👷 مهندس معتمد</span>
                   ) : (
@@ -838,7 +848,8 @@
                     <div class="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
                       <div>
                         <span class="font-black text-sm">أقسام نظام المساحة</span>
-                        {isSuperAdmin && <span class="block text-[10px] text-amber-400 font-bold">👑 صلاحية مدير النظام</span>}
+                        {isSuperAdmin ? <span class="block text-[10px] text-amber-400 font-bold">👑 صلاحية مدير النظام</span> : 
+                         isProjectManager ? <span class="block text-[10px] text-indigo-400 font-bold">💼 صلاحية مدير مشاريع</span> : null}
                       </div>
                       <button onClick={()=>setDrawerOpen(false)} class="text-slate-400 hover:text-white text-lg">✕</button>
                     </div>
@@ -1156,7 +1167,7 @@
                 </div>
               )}
 
-              {/* تبويب المستخلصات بعد التحديث الدقيق للترويسة وجدول الـ PDF */}
+              {/* تبويب المستخلصات - تم عزل تداخل الأرقام وترتيب الترويسة */}
               {activeTab === 'extracts' && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs print-hidden flex flex-col sm:flex-row gap-3 items-center">
@@ -1283,7 +1294,7 @@
                           </button>
                         </div>
 
-                        {/* بطاقات الإجماليات المعزولة عن تداخل الأرقام */}
+                        {/* إجماليات الحساب - عزل الأرقام */}
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200">
                           <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
                             <span class="text-[11px] text-slate-500 font-bold block mb-1">إجمالي الأعمال المنجزة</span>
@@ -1375,27 +1386,27 @@
                         </div>
 
                         <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-xs">
-                          <div class="p-2.5 bg-slate-50 rounded-xl border">إجمالي العمل: <strong class="block text-indigo-700 font-black text-sm">{tBilled.toLocaleString()}</strong></div>
-                          <div class="p-2.5 bg-amber-50 rounded-xl border">عمالة: <strong class="block text-amber-700 font-black text-sm">{tLabor.toLocaleString()}</strong></div>
-                          <div class="p-2.5 bg-blue-50 rounded-xl border">سيارة: <strong class="block text-blue-700 font-black text-sm">{tCar.toLocaleString()}</strong></div>
-                          <div class="p-2.5 bg-purple-50 rounded-xl border">نصيب RTK: <strong class="block text-purple-700 font-black text-sm">{tRtk.toLocaleString()}</strong></div>
-                          <div class="p-2.5 bg-emerald-50 rounded-xl border">أتعاب المهندسين: <strong class="block text-emerald-700 font-black text-sm">{tEng.toLocaleString()}</strong></div>
-                          <div class="p-2.5 bg-rose-50 rounded-xl border">المتبقي على العميل: <strong class="block text-rose-700 font-black text-sm">{netDue.toLocaleString()}</strong></div>
+                          <div class="p-2.5 bg-slate-50 rounded-xl border">إجمالي العمل: <strong class="block text-indigo-700 font-black text-sm"><span class="pdf-num">{tBilled.toLocaleString('en-US')}</span></strong></div>
+                          <div class="p-2.5 bg-amber-50 rounded-xl border">عمالة: <strong class="block text-amber-700 font-black text-sm"><span class="pdf-num">{tLabor.toLocaleString('en-US')}</span></strong></div>
+                          <div class="p-2.5 bg-blue-50 rounded-xl border">سيارة: <strong class="block text-blue-700 font-black text-sm"><span class="pdf-num">{tCar.toLocaleString('en-US')}</span></strong></div>
+                          <div class="p-2.5 bg-purple-50 rounded-xl border">نصيب RTK: <strong class="block text-purple-700 font-black text-sm"><span class="pdf-num">{tRtk.toLocaleString('en-US')}</span></strong></div>
+                          <div class="p-2.5 bg-emerald-50 rounded-xl border">أتعاب المهندسين: <strong class="block text-emerald-700 font-black text-sm"><span class="pdf-num">{tEng.toLocaleString('en-US')}</span></strong></div>
+                          <div class="p-2.5 bg-rose-50 rounded-xl border">المتبقي على العميل: <strong class="block text-rose-700 font-black text-sm"><span class="pdf-num">{netDue.toLocaleString('en-US')}</span></strong></div>
                         </div>
 
                         <div class="overflow-x-auto custom-scroll">
-                          <table class="w-full text-right border text-xs">
+                          <table class="w-full text-right border text-xs" style={{ tableLayout: 'fixed' }}>
                             <thead class="bg-slate-100">
                               <tr>
-                                <th class="p-2 border">التاريخ</th>
+                                <th class="p-2 border w-24">التاريخ</th>
                                 <th class="p-2 border">العمل والموقع</th>
-                                <th class="p-2 border text-center">المبلغ</th>
-                                <th class="p-2 border text-center text-amber-700">عمالة</th>
-                                <th class="p-2 border text-center text-blue-700">سيارة</th>
-                                <th class="p-2 border text-center text-purple-700">حصة RTK</th>
-                                <th class="p-2 border text-center text-emerald-700">أتعاب المهندس</th>
-                                <th class="p-2 border text-center text-indigo-700">صافي المكتب</th>
-                                <th class="p-2 border text-center text-emerald-600">المحصل فورا</th>
+                                <th class="p-2 border text-center w-20">المبلغ</th>
+                                <th class="p-2 border text-center text-amber-700 w-16">عمالة</th>
+                                <th class="p-2 border text-center text-blue-700 w-16">سيارة</th>
+                                <th class="p-2 border text-center text-purple-700 w-20">حصة RTK</th>
+                                <th class="p-2 border text-center text-emerald-700 w-24">أتعاب المهندس</th>
+                                <th class="p-2 border text-center text-indigo-700 w-24">صافي المكتب</th>
+                                <th class="p-2 border text-center text-emerald-600 w-24">المحصل فورا</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1403,13 +1414,13 @@
                                 <tr key={o.id} class="border-b">
                                   <td class="p-2 border whitespace-nowrap text-slate-500 font-mono">{o.date}</td>
                                   <td class="p-2 border font-bold">{o.opType} ({o.workDescription || '-'}) <span class="text-amber-700 text-[10px]">[{o.siteLocation||'عام'}]</span></td>
-                                  <td class="p-2 border text-center font-bold text-indigo-600">{parseNum(o.agreedAmount).toLocaleString()}</td>
-                                  <td class="p-2 border text-center text-amber-700">{parseNum(o.laborCost).toLocaleString()}</td>
-                                  <td class="p-2 border text-center text-blue-700">{parseNum(o.carCost).toLocaleString()}</td>
-                                  <td class="p-2 border text-center text-purple-700">{parseNum(o.deviceFee).toLocaleString()}</td>
-                                  <td class="p-2 border text-center text-emerald-700">{parseNum(o.engFee).toLocaleString()}</td>
-                                  <td class="p-2 border text-center text-indigo-700">{parseNum(o.officeFee).toLocaleString()}</td>
-                                  <td class="p-2 border text-center text-emerald-600 font-bold">{parseNum(o.paidNow).toLocaleString()}</td>
+                                  <td class="p-2 border text-center font-bold text-indigo-600"><span class="pdf-num">{parseNum(o.agreedAmount).toLocaleString('en-US')}</span></td>
+                                  <td class="p-2 border text-center text-amber-700"><span class="pdf-num">{parseNum(o.laborCost).toLocaleString('en-US')}</span></td>
+                                  <td class="p-2 border text-center text-blue-700"><span class="pdf-num">{parseNum(o.carCost).toLocaleString('en-US')}</span></td>
+                                  <td class="p-2 border text-center text-purple-700"><span class="pdf-num">{parseNum(o.deviceFee).toLocaleString('en-US')}</span></td>
+                                  <td class="p-2 border text-center text-emerald-700"><span class="pdf-num">{parseNum(o.engFee).toLocaleString('en-US')}</span></td>
+                                  <td class="p-2 border text-center text-indigo-700"><span class="pdf-num">{parseNum(o.officeFee).toLocaleString('en-US')}</span></td>
+                                  <td class="p-2 border text-center text-emerald-600 font-bold"><span class="pdf-num">{parseNum(o.paidNow).toLocaleString('en-US')}</span></td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1435,6 +1446,7 @@
                 </div>
               )}
 
+              {/* 12. سجل الدخول للمراقبة */}
               {activeTab === 'logs' && isSuperAdmin && (
                 <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto p-4 space-y-3 font-bold custom-scroll">
                   <h3 class="text-sm font-black text-indigo-700 dark:text-indigo-400">🛡 سجل نشاطات وحركات المستخدمين (خاص بمدير النظام):</h3>
@@ -1448,11 +1460,11 @@
                 </div>
               )}
 
-              {activeTab === 'settings' && (
+              {/* 13. الإعدادات والنسخ الاحتياطي */}
+              {activeTab === 'settings' && isAdmin && (
                 <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs max-w-sm font-bold space-y-3">
                   <h3>🖼 شعار الترويسة المعتمد:</h3>
                   <input type="file" accept="image/*" onChange={(e)=>{
-                    if(!isAdmin) return;
                     const f = e.target.files[0]; if(!f) return;
                     const r = new FileReader(); r.onload = (evt) => {
                       const newSettings = { ...settings, logo: evt.target.result };
@@ -1628,7 +1640,7 @@
                         onClick={()=>setNewOp({...newOp, engCalcMethod: 'engDay_devHalf'})}
                         class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'engDay_devHalf' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
                       >
-                        🛰️️ مهندس يوم + جهاز 1/2
+                        🛰 مهندس يوم + جهاز 1/2
                       </button>
                       <button 
                         type="button" 
