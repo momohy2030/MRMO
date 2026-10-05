@@ -1,0 +1,10 @@
+{
+  "name": "مساحة - نظام الإدارة المتكامل",
+  "short_name": "MOMOHY ERP",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "description": "نظام إدارة المعاملات الإنشائية والمساحية"
+}
