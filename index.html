@@ -317,16 +317,28 @@
 
       const [loading, setLoading] = useState(false);
 
-      const [projects, setProjects] = useState(() => constructionStorage.get('projects', initialProjects));
-      const [expenses, setExpenses] = useState(() => constructionStorage.get('expenses', []));
-      const [extracts, setExtracts] = useState(() => constructionStorage.get('extracts', []));
-      const [payments, setPayments] = useState(() => constructionStorage.get('payments', []));
-      const [advances, setAdvances] = useState(() => constructionStorage.get('advances', []));
-      const [supplierPayments, setSupplierPayments] = useState(() => constructionStorage.get('supplier_payments', []));
-      const [loginLogs, setLoginLogs] = useState(() => constructionStorage.get('login_logs', []));
-      const [settings, setSettings] = useState(() => constructionStorage.get('settings', initialSettings));
-      const [userRolesMap, setUserRolesMap] = useState(() => constructionStorage.get('roles', {}));
+      // حارس الأمان لمنع الشاشة البيضاء (يُجبر البيانات أن تكون مصفوفة)
+      const ensureArr = (data) => Array.isArray(data) ? data : (data ? Object.values(data) : []);
 
+      const [projects, setProjects] = useState(() => ensureArr(constructionStorage.get('projects', initialProjects)));
+      const [expenses, setExpenses] = useState(() => ensureArr(constructionStorage.get('expenses', [])));
+      const [extracts, setExtracts] = useState(() => ensureArr(constructionStorage.get('extracts', [])));
+      const [payments, setPayments] = useState(() => ensureArr(constructionStorage.get('payments', [])));
+      const [advances, setAdvances] = useState(() => ensureArr(constructionStorage.get('advances', [])));
+      const [supplierPayments, setSupplierPayments] = useState(() => ensureArr(constructionStorage.get('supplier_payments', [])));
+      const [loginLogs, setLoginLogs] = useState(() => ensureArr(constructionStorage.get('login_logs', [])));
+      
+      const [settings, setSettings] = useState(() => {
+        const saved = constructionStorage.get('settings', {});
+        return {
+          mainCategories: ensureArr(saved.mainCategories || initialSettings.mainCategories),
+          subCategories: ensureArr(saved.subCategories || initialSettings.subCategories),
+          costTypes: ensureArr(saved.costTypes || initialSettings.costTypes),
+          suppliers: ensureArr(saved.suppliers || initialSettings.suppliers),
+          employees: ensureArr(saved.employees || initialSettings.employees),
+          logo: saved.logo || ""
+        };
+      });
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
       const [activeTab, setActiveTab] = useState("dashboard");
       const [myEmpName, setMyEmpName] = useState(localStorage.getItem('myEmpName') || "");
