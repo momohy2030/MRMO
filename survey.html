@@ -325,18 +325,23 @@
       const [payModalOpen, setPayModalOpen] = useState(false);
       const [editingOp, setEditingOp] = useState(null);
 
-      const [operations, setOperations] = useState(() => offlineStorage.get('operations', []));
-      const [transactions, setTransactions] = useState(() => offlineStorage.get('transactions', []));
-      const [payments, setPayments] = useState(() => offlineStorage.get('payments', []));
-      const [loginLogs, setLoginLogs] = useState(() => offlineStorage.get('login_logs', []));
-      
-      const [settings, setSettings] = useState(() => offlineStorage.get('settings', {
-        engineers: ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"],
-        opTypes: ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"],
-        logo: "",
-        theme: localStorage.getItem('theme') || 'light'
-      }));
+      // حارس الأمان لمنع الشاشة البيضاء
+      const ensureArr = (data) => Array.isArray(data) ? data : (data ? Object.values(data) : []);
 
+      const [operations, setOperations] = useState(() => ensureArr(offlineStorage.get('operations', [])));
+      const [transactions, setTransactions] = useState(() => ensureArr(offlineStorage.get('transactions', [])));
+      const [payments, setPayments] = useState(() => ensureArr(offlineStorage.get('payments', [])));
+      const [loginLogs, setLoginLogs] = useState(() => ensureArr(offlineStorage.get('login_logs', [])));
+      
+      const [settings, setSettings] = useState(() => {
+        const saved = offlineStorage.get('settings', {});
+        return {
+          engineers: ensureArr(saved.engineers || ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"]),
+          opTypes: ensureArr(saved.opTypes || ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"]),
+          logo: saved.logo || "",
+          theme: localStorage.getItem('theme') || 'light'
+        };
+      });
       const todayDate = new Date().toISOString().split('T')[0];
       const currentMonthStr = todayDate.substring(0, 7);
 
