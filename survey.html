@@ -142,7 +142,13 @@
       return isNaN(n) ? 0 : n;
     };
 
-    const toArr = (v) => (v ? (Array.isArray(v) ? v : Object.values(v)) : []);
+    // دالة التحويل الآمنة 100% (تمنع تحويل النصوص لحروف منفصلة وتضمن المصفوفات السليمة)
+    const toArr = (v) => {
+      if (v === null || v === undefined) return [];
+      if (Array.isArray(v)) return v;
+      if (typeof v === 'object') return Object.values(v);
+      return [String(v)];
+    };
 
     const offlineStorage = {
       get(key, fallback = []) {
@@ -332,13 +338,25 @@
       const [payments, setPayments] = useState(() => toArr(offlineStorage.get('payments', [])));
       const [loginLogs, setLoginLogs] = useState(() => toArr(offlineStorage.get('login_logs', [])));
       
+      const defaultOpTypesList = ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"];
+      const defaultEngineersList = ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"];
+
       const [settings, setSettings] = useState(() => {
         const saved = offlineStorage.get('settings', {});
+        
+        let loadedOps = toArr(saved.opTypes);
+        const hasWrongOpsNames = loadedOps.some(item => String(item).includes("م أحمد") || String(item).includes("م أيمن") || String(item).includes("م علاء") || String(item).includes("م أسامة"));
+        let cleanOps = (loadedOps.length > 0 && !hasWrongOpsNames) ? loadedOps : defaultOpTypesList;
+
+        let loadedEngs = toArr(saved.engineers);
+        const hasWrongEngsNames = loadedEngs.some(item => String(item).includes("RTK") || String(item).includes("كروكي") || String(item).includes("تخطيط"));
+        let cleanEngs = (loadedEngs.length > 0 && !hasWrongEngsNames) ? loadedEngs : defaultEngineersList;
+
         return {
-          engineers: toArr(saved.engineers).length ? toArr(saved.engineers) : ["م أحمد نبيل", "م أيمن", "م علاء", "م أسامة"],
-          opTypes: toArr(saved.opTypes).length ? toArr(saved.opTypes) : ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"],
+          engineers: cleanEngs,
+          opTypes: cleanOps,
           logo: saved.logo || "",
-          theme: 'light'
+          theme: localStorage.getItem('theme') || 'light'
         };
       });
 
@@ -401,10 +419,10 @@
       }, []);
 
       useEffect(() => {
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+        if (settings.theme === 'dark') document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
-      }, []);
+        localStorage.setItem('theme', settings.theme);
+      }, [settings.theme]);
 
       const showToast = (message) => {
         setToast({ show: true, message });
@@ -480,28 +498,20 @@
             setLoginLogs(arr);
             offlineStorage.set('login_logs', arr);
           }
+          
           if (d.settings) {
-            const defaultOpTypes = [
-              "يوم RTK",
-              "1/2RTK (نصف يوم)",
-              "مهندس يوم + جهاز نصف يوم",
-              "قياس وكروكي",
-              "تخطيط شبكة",
-              "تخطيط جور"
-            ];
-
             setSettings(prev => {
-              const loadedOps = toArr(d.settings.opTypes);
-              const hasWrongNames = loadedOps.some(item => {
-                const s = String(item);
-                return s.includes("م أحمد") || s.includes("م أيمن") || s.includes("م علاء") || s.includes("م أسامة");
-              });
+              let loadedOps = toArr(d.settings.opTypes);
+              const hasWrongOpsNames = loadedOps.some(item => String(item).includes("م أحمد") || String(item).includes("م أيمن") || String(item).includes("م علاء") || String(item).includes("م أسامة"));
+              let cleanOps = (loadedOps.length > 0 && !hasWrongOpsNames) ? loadedOps : defaultOpTypesList;
 
-              const cleanOps = (loadedOps.length > 0 && !hasWrongNames) ? loadedOps : defaultOpTypes;
+              let loadedEngs = toArr(d.settings.engineers);
+              const hasWrongEngsNames = loadedEngs.some(item => String(item).includes("RTK") || String(item).includes("كروكي") || String(item).includes("تخطيط"));
+              let cleanEngs = (loadedEngs.length > 0 && !hasWrongEngsNames) ? loadedEngs : defaultEngineersList;
 
               const updated = {
                 ...prev,
-                engineers: toArr(d.settings.engineers).length ? toArr(d.settings.engineers) : prev.engineers,
+                engineers: cleanEngs,
                 opTypes: cleanOps,
                 logo: d.settings.logo || prev.logo
               };
@@ -525,6 +535,33 @@
         }
       };
 
+      const handleOpTypeChange = (selectedType) => {
+        setNewOp(prev => {
+          let defaultAmount = prev.agreedAmount;
+          let defaultMethod = prev.engCalcMethod || "auto";
+
+          if (selectedType === 'مهندس يوم + جهاز نصف يوم') {
+            defaultAmount = 3750;
+            defaultMethod = "engDay_devHalf";
+          } else if (selectedType === 'يوم RTK') {
+            defaultAmount = 5500;
+            defaultMethod = "auto";
+          } else if (selectedType.includes('1/2') || selectedType.includes('نص')) {
+            defaultAmount = 3250;
+            defaultMethod = "auto";
+          } else {
+            defaultMethod = "percent80";
+          }
+          
+          return {
+            ...prev,
+            opType: selectedType,
+            engCalcMethod: defaultMethod,
+            agreedAmount: prev.isFaddan ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : defaultAmount
+          };
+        });
+      };
+
       const updateSettingArray = (key, title) => {
         const val = prompt(`إضافة ${title} جديد:`);
         if (val && val.trim()) {
@@ -542,6 +579,7 @@
           setSettings(newSettings);
           saveListSafely('settings', 'settings', newSettings);
 
+          // تحديد العنصر المضاف فوراً لتحديث الحقول في الشاشة بشكل سليم
           if (key === 'opTypes') {
             handleOpTypeChange(cleanVal);
           } else if (key === 'engineers') {
@@ -590,31 +628,6 @@
           officeFee: Number(officeFee) || 0, 
           totalExpenses: Number(totalExpenses) || 0 
         };
-      };
-
-      const handleOpTypeChange = (selectedType) => {
-        let defaultAmount = newOp.agreedAmount;
-        let defaultMethod = "auto";
-
-        if (selectedType === 'مهندس يوم + جهاز نصف يوم') {
-          defaultAmount = 3750;
-          defaultMethod = "engDay_devHalf";
-        } else if (selectedType === 'يوم RTK') {
-          defaultAmount = 5500;
-          defaultMethod = "auto";
-        } else if (selectedType.includes('1/2') || selectedType.includes('نص')) {
-          defaultAmount = 3250;
-          defaultMethod = "auto";
-        } else {
-          defaultMethod = "percent80";
-        }
-        
-        setNewOp(prev => ({
-          ...prev,
-          opType: selectedType,
-          engCalcMethod: defaultMethod,
-          agreedAmount: prev.isFaddan ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : defaultAmount
-        }));
       };
 
       const handleSaveOperation = (e) => {
@@ -1546,7 +1559,7 @@
                     <div>نوع العمل 
                       <div class="flex gap-1 mt-1">
                         <select value={newOp.opType} onChange={e=>handleOpTypeChange(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
-                          {(Array.isArray(settings.opTypes) && settings.opTypes.length ? settings.opTypes : ["يوم RTK", "1/2RTK (نصف يوم)", "مهندس يوم + جهاز نصف يوم", "قياس وكروكي", "تخطيط شبكة", "تخطيط جور"]).map(o=><option key={o} value={o}>{o}</option>)}
+                          {toArr(settings.opTypes).map(o=><option key={o} value={o}>{o}</option>)}
                         </select>
                         <button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button>
                       </div>
@@ -1554,8 +1567,8 @@
                   </div>
                   <div>المهندس المشرف
                     <div class="flex gap-1 mt-1">
-                      <select value={newOp.engineer} onChange={e=>setNewOp({...newOp, engineer: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
-                        {settings.engineers.map(e=><option key={e}>{e}</option>)}
+                      <select value={newOp.engineer} onChange={e=>setNewOp(prev=>({...prev, engineer: e.target.value}))} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
+                        {toArr(settings.engineers).map(e=><option key={e} value={e}>{e}</option>)}
                       </select>
                       <button type="button" onClick={()=>updateSettingArray('engineers','مهندس')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button>
                     </div>
