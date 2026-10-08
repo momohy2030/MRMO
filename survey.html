@@ -121,9 +121,10 @@
     };
 
     const SUPER_ADMIN_EMAIL = "mohamedmohy676676@gmail.com";
-    const PROJECT_MANAGER_EMAIL = "alaayousef1698@gmail.com";
+    const EXECUTIVE_DIRECTOR_EMAIL = "aymanmousawahat@gmail.com";
+    const PROJECT_MANAGER_EMAILS = ["alaayousef1698@gmail.com"];
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com", "ahmnab23@gmail.com"];
-    const ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, PROJECT_MANAGER_EMAIL, ...ENGINEER_EMAILS, "+201095545982"];
+    const ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, EXECUTIVE_DIRECTOR_EMAIL, ...PROJECT_MANAGER_EMAILS, ...ENGINEER_EMAILS, "+201095545982"];
 
     let db = null;
     let auth = null;
@@ -366,11 +367,15 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "" });
 
+      // معالجة الصلاحيات بشكل دقيق
       const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
-      const isSuperAdmin = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
-      const isProjectManager = userEmail === PROJECT_MANAGER_EMAIL.toLowerCase() || userEmail.includes("alaayousef1698");
+      
+      const isSuperAdminExact = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
+      const isExecutive = userEmail === EXECUTIVE_DIRECTOR_EMAIL.toLowerCase() || userEmail.includes("aymanmousawahat");
+      const isProjectManager = PROJECT_MANAGER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim())) || isExecutive;
       const isEngineer = ENGINEER_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
-      const isAdmin = isSuperAdmin || isProjectManager || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
+      
+      const isAdmin = isSuperAdminExact || isProjectManager || isEngineer || ADMIN_EMAILS.some(e => userEmail.includes(e.toLowerCase().trim()));
 
       const initialOpState = {
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", 
@@ -818,9 +823,9 @@
         { id: "extracts", label: "المستخلصات", icon: "📄" },
         { id: "statement", label: "كشف الحساب", icon: "📑" },
         { id: "office", label: "أرباح المكتب", icon: "🏢" },
-        ...(isSuperAdmin ? [{ id: "logs", label: "سجل الدخول والمراقبة", icon: "🛡️" }] : []),
+        ...(isSuperAdminExact ? [{ id: "logs", label: "سجل الدخول والمراقبة", icon: "🛡️" }] : []),
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
-      ], [isSuperAdmin]);
+      ], [isSuperAdminExact]);
 
       const liveExpenses = useMemo(() => {
         const labor = parseNum(newOp?.laborCost);
@@ -864,9 +869,11 @@
               <span class="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
               <div>
                 <div class="flex items-center gap-2">
-                  <h1 class="text-sm font-black leading-tight text-indigo-700 dark:text-indigo-400">مساحة ERP</h1>
-                  {isSuperAdmin ? (
+                  <h1 class="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight">مساحة ERP</h1>
+                  {isSuperAdminExact ? (
                     <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">👑 مدير النظام</span>
+                  ) : isExecutive ? (
+                    <span class="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">💼 المدير التنفيذي</span>
                   ) : isProjectManager ? (
                     <span class="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">💼 مدير مشاريع</span>
                   ) : isEngineer ? (
@@ -875,7 +882,9 @@
                     <span class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full">مستخدم</span>
                   )}
                 </div>
-                <div class="text-[10px] text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none">{user.email}</div>
+                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[170px] sm:max-w-none mt-0.5">
+                  {user?.email || "غير مسجل"}
+                </div>
               </div>
             </div>
 
@@ -908,7 +917,7 @@
                 ))}
               </div>
               <div class="p-3 border-t border-slate-800 text-[11px]">
-                <div class="truncate text-slate-400 mb-1">{user.email}</div>
+                <div class="truncate text-slate-400 font-mono mb-2 text-center">👤 {user?.email}</div>
                 <button onClick={()=>auth.signOut()} class="w-full bg-rose-600/20 text-rose-400 py-2 rounded-xl font-bold">تسجيل الخروج</button>
               </div>
             </aside>
@@ -921,7 +930,8 @@
                     <div class="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
                       <div>
                         <span class="font-black text-sm">أقسام نظام المساحة</span>
-                        {isSuperAdmin ? <span class="block text-[10px] text-amber-400 font-bold">👑 صلاحية مدير النظام</span> : 
+                        {isSuperAdminExact ? <span class="block text-[10px] text-amber-400 font-bold">👑 صلاحية مدير النظام</span> : 
+                         isExecutive ? <span class="block text-[10px] text-indigo-400 font-bold">💼 المدير التنفيذي</span> :
                          isProjectManager ? <span class="block text-[10px] text-indigo-400 font-bold">💼 صلاحية مدير مشاريع</span> : null}
                       </div>
                       <button onClick={()=>setDrawerOpen(false)} class="text-slate-400 hover:text-white text-lg">✕</button>
@@ -935,6 +945,9 @@
                     </nav>
                   </div>
                   <div class="pt-3 border-t border-slate-800 text-xs">
+                    <div class="truncate text-slate-400 font-mono text-[10px] mb-2 px-1 text-center">
+                      👤 {user?.email}
+                    </div>
                     <button onClick={()=>auth.signOut()} class="w-full bg-rose-600/20 text-rose-400 py-2.5 rounded-xl font-bold">تسجيل الخروج</button>
                   </div>
                 </div>
@@ -1545,7 +1558,7 @@
                 </div>
               )}
 
-              {activeTab === 'statement' && (
+              {activeTab === 'statement' && isAdmin && (
                 <div class="space-y-4 font-bold">
                   <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-3 items-center print-hidden">
                     <div class="w-full sm:w-1/2">
@@ -1648,7 +1661,7 @@
                 </div>
               )}
 
-              {activeTab === 'logs' && isSuperAdmin && (
+              {activeTab === 'logs' && isSuperAdminExact && (
                 <div class="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto p-4 space-y-3 font-bold custom-scroll">
                   <h3 class="text-sm font-black text-indigo-700 dark:text-indigo-400">🛡 سجل نشاطات وحركات المستخدمين (خاص بمدير النظام):</h3>
                   <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2">الوقت</th><th class="p-2">المستخدم</th><th class="p-2">البريد</th><th class="p-2.5">النشاط والإجراء المنفذ</th></tr></thead>
@@ -1677,8 +1690,32 @@
                   }} class="w-full p-2 border rounded-xl dark:bg-slate-700"/>
                   {settings.logo && <img src={settings.logo} class="h-16 object-contain mt-2 border p-2 rounded-xl" />}
 
-                  {isSuperAdmin && (
-                    <div class="pt-3 border-t dark:border-slate-700">
+                  <div class="pt-3 border-t dark:border-slate-700 mt-4 space-y-3">
+                    <h3 class="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للمساحة</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const emailInput = window.prompt("أدخل البريد الإلكتروني للمستخدم:");
+                      if (!emailInput || !emailInput.trim()) return;
+                      const roleInput = e.target.elements.roleSelect.value;
+                      const cleanEmail = emailInput.trim().toLowerCase();
+                      const key = cleanEmail.replace(/\./g, '_');
+                      const updated = { ...userRolesMap, [key]: roleInput };
+                      setUserRolesMap(updated);
+                      saveListSafely('roles', 'roles', updated);
+                      showToast(`تم تعيين الصلاحية للمستخدم بنجاح!`);
+                    }} class="flex gap-2">
+                      <select name="roleSelect" class="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold w-full">
+                        <option value="engineer">👷 مهندس موقع</option>
+                        <option value="pm">💼 مدير مشاريع</option>
+                        <option value="executive">💼 المدير التنفيذي</option>
+                        <option value="admin">👑 إدارة عامة</option>
+                      </select>
+                      <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 font-black">تعيين</button>
+                    </form>
+                  </div>
+
+                  {isSuperAdminExact && (
+                    <div class="pt-3 border-t dark:border-slate-700 mt-4">
                       <button onClick={()=>setActiveTab('logs')} class="w-full bg-amber-600 hover:bg-amber-700 text-white p-2.5 rounded-xl text-xs font-black shadow-xs">
                         🛡️ فتح سجل النشاطات والمراقبة
                       </button>
@@ -1983,7 +2020,15 @@
             </button>
           </nav>
 
-          {toast.show && <div class="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs z-50 shadow-2xl font-bold print-hidden">{toast.message}</div>}
+          {toast.show && (
+            <div class="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
+              <div class={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
+                <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
+                <span>{toast.message}</span>
+              </div>
+            </div>
+          )}
+
         </div>
       );
     }
