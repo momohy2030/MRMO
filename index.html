@@ -135,8 +135,10 @@
 
     const ADMIN_WHATSAPP_NUMBER = "201095545982";
     const SUPER_ADMIN_EMAIL = "mohamedmohy676676@gmail.com";
-    const PROJECT_MANAGER_EMAIL = "alaayousef1698@gmail.com";
-    const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL, PROJECT_MANAGER_EMAIL, "+201000000000", "+201095545982"];
+    const EXECUTIVE_DIRECTOR_EMAIL = "aymanmousawahat@gmail.com";
+    const PROJECT_MANAGER_EMAILS = ["alaayousef1698@gmail.com"];
+    // نعتبر المدير التنفيذي ضمن الإدارة العليا
+    const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL, EXECUTIVE_DIRECTOR_EMAIL, ...PROJECT_MANAGER_EMAILS, "+201000000000", "+201095545982"];
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
     const BLOCKED_CONSTRUCTION_EMAILS = ["ahmnab23@gmail.com"];
 
@@ -483,8 +485,10 @@
       const currentUserEmail = (user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
+      // تعريف الصلاحيات للأدوار الجديدة
       const isSuperAdmin = currentUserEmail === SUPER_ADMIN_EMAIL.toLowerCase() || currentUserEmail.includes("mohamedmohy676676");
-      const isProjectManager = currentUserEmail === PROJECT_MANAGER_EMAIL.toLowerCase() || currentUserEmail.includes("alaayousef1698");
+      const isExecutive = currentUserEmail === EXECUTIVE_DIRECTOR_EMAIL.toLowerCase() || currentUserEmail.includes("aymanmousawahat");
+      const isProjectManager = PROJECT_MANAGER_EMAILS.some(e => currentUserEmail.includes(e.toLowerCase().trim()));
 
       const userRoleKey = useMemo(() => {
         if (!currentUserEmail) return 'guest';
@@ -501,11 +505,12 @@
 
       const userRoleTitle = useMemo(() => {
         if (isSuperAdmin) return "مدير النظام (Admin)";
+        if (isExecutive) return "المدير التنفيذي (CEO)";
         if (isProjectManager) return "مدير مشاريع (PM)";
         if (isAdmin) return "إدارة (Admin)";
         if (isAccountant) return "المحاسب (Accountant)";
         return "مهندس الموقع (Site Engineer)";
-      }, [isSuperAdmin, isProjectManager, isAdmin, isAccountant]);
+      }, [isSuperAdmin, isExecutive, isProjectManager, isAdmin, isAccountant]);
 
       useEffect(() => {
         if (!isAdmin && activeTab === 'dashboard') setActiveTab('projects');
@@ -830,11 +835,12 @@
               <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-lg">🏗️</div>
                 <div>
-                  <h1 class="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight">MOMOHY ERP</h1>
-                  <div class="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
-                    <span class="truncate max-w-[110px] sm:max-w-none font-semibold">{user.name}</span>
+                  <div class="flex items-center gap-2">
+                    <h1 class="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight">MOMOHY ERP</h1>
                     {isSuperAdmin ? (
                       <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">👑 مدير النظام</span>
+                    ) : isExecutive ? (
+                      <span class="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">💼 المدير التنفيذي</span>
                     ) : isProjectManager ? (
                       <span class="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">💼 مدير مشاريع</span>
                     ) : isAccountant ? (
@@ -844,6 +850,9 @@
                     ) : (
                       <span class="bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">👷 مهندس معتمد</span>
                     )}
+                  </div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[170px] sm:max-w-none mt-0.5">
+                    {user?.identifier || "غير مسجل"}
                   </div>
                 </div>
               </div>
@@ -904,6 +913,9 @@
                   </nav>
                 </div>
                 <div class="pt-4 border-t border-slate-200 dark:border-slate-800">
+                  <div class="truncate text-slate-400 font-mono text-[10px] mb-2 px-1 text-center">
+                    👤 {user?.identifier}
+                  </div>
                   <button onClick={handleLogout} class="w-full bg-rose-50 dark:bg-rose-950/30 text-rose-600 py-3 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2">
                     🚪 تسجيل الخروج
                   </button>
