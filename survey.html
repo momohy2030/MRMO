@@ -71,7 +71,7 @@
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-    /* Bike Loading Animation Styles */
+    /* حركات دراجة التحميل */
     .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
     .bike-svg { width: 100%; height: 100%; overflow: visible; }
     .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
@@ -83,13 +83,12 @@
     .loading-text::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
     @keyframes dots { 0%, 20% { content: ''; } 40% { content: '.'; } 60% { content: '..'; } 80%, 100% { content: '...'; } }
 
-    /* Animated Login Station Styles */
+    /* حركات جهاز توتال ستيشن في شاشة الدخول */
     .float-anim { animation: floating 4s ease-in-out infinite; }
     .laser-anim { animation: laser-scan 2s ease-in-out infinite alternate; }
     @keyframes floating { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
     @keyframes laser-scan { 0% { opacity: 0.2; transform: scaleX(0.8); } 100% { opacity: 0.8; transform: scaleX(1.2); } }
   </style>
-
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 antialiased transition-colors duration-300">
   <div id="root"></div>
@@ -104,15 +103,13 @@
       projectId: "mrmo-d8760",
       storageBucket: "mrmo-d8760.firebasestorage.app",
       messagingSenderId: "510855132508",
-      appId: "1:510855132508:web:feee377429a2d88c277d99",
-      measurementId: "G-N9DW5R28H0"
+      appId: "1:510855132508:web:feee377429a2d88c277d99"
     };
 
     const SUPER_ADMIN_EMAIL = "mohamedmohy676676@gmail.com";
     const EXECUTIVE_DIRECTOR_EMAIL = "aymanmousawahat@gmail.com";
     const PROJECT_MANAGER_EMAILS = ["alaayousef1698@gmail.com"];
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com", "ahmnab23@gmail.com"];
-    const ADMIN_WHATSAPP_NUMBER = "201095545982";
     
     let db = null;
     let auth = null;
@@ -185,7 +182,6 @@
         window.open(url, '_blank');
       }).catch((err) => {
         element.style.width = prevWidth; element.style.maxWidth = prevMaxWidth; element.style.padding = prevPadding; element.classList.remove('pdf-render-mode');
-        console.error(err);
         const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
         window.open(url, '_blank');
       });
@@ -240,11 +236,10 @@
     }
 
     function App() {
-      // 1. تعريف المتغيرات والحالات (States)
+      // States
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
       const [isOnline, setIsOnline] = useState(navigator.onLine);
-      
       const [loginEmail, setLoginEmail] = useState("");
       const [loginPassword, setLoginPassword] = useState("");
       const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
@@ -265,11 +260,9 @@
 
       const [settings, setSettings] = useState(() => {
         const saved = offlineStorage.get('settings', {});
-        let cleanOps = toArr(saved.opTypes).length > 0 ? toArr(saved.opTypes) : defaultOpTypesList;
-        let cleanEngs = toArr(saved.engineers).length > 0 ? toArr(saved.engineers) : defaultEngineersList;
         return {
-          engineers: cleanEngs,
-          opTypes: cleanOps,
+          engineers: toArr(saved.engineers).length ? toArr(saved.engineers) : defaultEngineersList,
+          opTypes: toArr(saved.opTypes).length ? toArr(saved.opTypes) : defaultOpTypesList,
           roles: saved.roles || {}, 
           logo: saved.logo || "",
           theme: localStorage.getItem('theme') || 'light'
@@ -283,12 +276,13 @@
       const [opsFilterMonth, setOpsFilterMonth] = useState(currentMonthStr);
       const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
-      const [newOp, setNewOp] = useState({
+      const initialOpState = {
         date: todayDate, clientName: "", siteLocation: "الموقع العام", opType: "يوم RTK", workDescription: "", 
         engineer: "م أحمد نبيل", hasSecondEngineer: false, secondEngineer: "م أيمن", isFaddan: false, faddanQty: 1, faddanPrice: 250,
         isSketch: false, sketchesCount: 1, agreedAmount: 5500, paidNow: 0, laborCost: 0, carCost: 0, engCalcMethod: "auto", engCustomPercent: 80, engCustomFixedAmount: 1500
-      });
+      };
 
+      const [newOp, setNewOp] = useState(initialOpState);
       const [newTx, setNewTx] = useState({ date: todayDate, type: "income", category: "إيراد عام", clientOrEntity: "", amount: "", notes: "" });
       const [newPayment, setNewPayment] = useState({ date: todayDate, clientName: "", siteLocation: "", amount: "", notes: "سداد دفعة من المستخلص" });
 
@@ -300,7 +294,7 @@
       const [extractItems, setExtractItems] = useState([]);
       const [statementClient, setStatementClient] = useState("");
 
-      // 2. التحقق من الصلاحيات والبيانات المحسوبة (Memos)
+      // Memos for Auth & Roles
       const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
       const sanitizedEmailKey = userEmail.replace(/\./g, '_');
       
@@ -326,10 +320,10 @@
                        userRoleKey === 'pm' ? "💼 مدير مشاريع" :
                        userRoleKey === 'admin' ? "👑 إدارة" : "👷 مهندس معتمد";
 
-      // 3. الخطافات (UseEffects) والتأثيرات الجانبية
+      // Effects
       useEffect(() => {
         const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) offlineStorage.syncQueue(db); };
-        const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡"); };
+        const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
         window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
         return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
       }, []);
@@ -402,7 +396,7 @@
         return () => { ref.off('value', handleData); };
       }, []);
 
-      // 4. دوال النظام (Handlers & Logic)
+      // Handlers
       const saveListSafely = (path, storageKey, data) => {
         offlineStorage.set(storageKey, data);
         if (navigator.onLine && db) db.ref(`survey_data/${path}`).set(data);
@@ -426,9 +420,7 @@
         auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch((error) => { setAuthLoading(false); showToast("تعذر الدخول: " + error.message, "error"); }); 
       };
 
-      const handlePhoneLoginClick = () => {
-        showToast("لتسجيل الدخول برقم الهاتف يجب تفعيل reCAPTCHA من لوحة تحكم Firebase أولاً.", "error");
-      };
+      const handlePhoneLoginClick = () => { showToast("لتسجيل الدخول برقم الهاتف يجب تفعيل reCAPTCHA من لوحة تحكم Firebase أولاً.", "error"); };
 
       const handleOpTypeChange = (selectedType) => {
         setNewOp(prev => {
@@ -551,6 +543,7 @@
       const handleAddEmptyExtractRow = () => setExtractItems([...extractItems, { id: Date.now(), date: todayDate, desc: "بند أعمال مساحية", qty: 1, unitPrice: 1000, rate: 100 }]);
       const handleRemoveExtractRow = (id) => setExtractItems(extractItems.filter(item => item.id !== id));
 
+      // Calculations used for UI
       const extractTotalWork = extractItems.reduce((sum, item) => sum + (parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100)), 0);
       const clientOpsForPayment = operations.filter(o => (o?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (o?.siteLocation||'').trim() === extractSite.trim()));
       const clientPaysForPayment = payments.filter(p => (p?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (p?.siteLocation||'').trim() === extractSite.trim()));
@@ -571,6 +564,13 @@
       const totalRtk = operations.reduce((s,o)=>s+(parseNum(o?.deviceFee)||0),0);
       const totalOffice = operations.reduce((s,o)=>s+(parseNum(o?.officeFee)||0),0);
 
+      const liveExpenses = useMemo(() => {
+        const labor = parseNum(newOp?.laborCost); const car = parseNum(newOp?.carCost); const totalExp = labor + car;
+        return { labor, car, totalExp, netAfterExp: Math.max(0, parseNum(newOp?.agreedAmount) - totalExp) };
+      }, [newOp?.laborCost, newOp?.carCost, newOp?.agreedAmount]);
+      
+      const livePreview = useMemo(() => calculateOperationShares(newOp), [newOp]);
+
       const navTabs = useMemo(() => [
         { id: "dashboard", label: "لوحة التحكم", icon: "📊" },
         { id: "clients_list", label: "العملاء", icon: "👥" },
@@ -587,15 +587,10 @@
         { id: "settings", label: "الإعدادات", icon: "⚙️" }
       ], [isSuperAdminExact]);
 
-      const liveExpenses = useMemo(() => {
-        const labor = parseNum(newOp?.laborCost); const car = parseNum(newOp?.carCost); const totalExp = labor + car;
-        return { labor, car, totalExp, netAfterExp: Math.max(0, parseNum(newOp?.agreedAmount) - totalExp) };
-      }, [newOp?.laborCost, newOp?.carCost, newOp?.agreedAmount]);
-      const livePreview = useMemo(() => calculateOperationShares(newOp), [newOp]);
 
-      // 5. الشاشات المبدئية والتحميل (Early Returns)
+      // Early Returns: Loading & Login Screens
       
-      // أ) شاشة التحميل التفاعلية (الدراجة - Bicycle Loader)
+      // أ) شاشة التحميل (Bicycle Loader)
       if (authLoading) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
@@ -632,15 +627,15 @@
         );
       }
 
-      // ب) شاشة تسجيل الدخول المقسمة (Animated Login Form)
+      // ب) شاشة تسجيل الدخول المزدوجة (Split Animated Login)
       if (!user) {
         return (
-          <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 md:p-8">
-            <div className="flex flex-col md:flex-row bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl overflow-hidden w-full max-w-5xl border border-slate-200 dark:border-slate-700">
+          <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 md:p-8 transition-colors duration-500">
+            <div className="flex flex-col md:flex-row bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl overflow-hidden w-full max-w-5xl border border-slate-200 dark:border-slate-700 min-h-[500px]">
               
               {/* الجانب الأيمن (الفورم) */}
-              <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
-                <div className="mb-8">
+              <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white dark:bg-slate-800 relative z-20">
+                <div className="mb-8 text-center md:text-right">
                   <h2 className="text-3xl font-black text-slate-900 dark:text-white">مكتب مساحة</h2>
                   <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-1">للأعمال الهندسية المتكاملة</p>
                 </div>
@@ -709,31 +704,23 @@
 
               {/* الجانب الأيسر (الرسمة التفاعلية للمساحة) */}
               <div className="w-full md:w-1/2 bg-gradient-to-br from-indigo-500 to-purple-600 p-8 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px]">
-                {/* دوائر خلفية جمالية */}
                 <div className="absolute top-[-50px] right-[-50px] w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
                 <div className="absolute bottom-[-50px] left-[-50px] w-60 h-60 bg-indigo-900/20 rounded-full blur-3xl"></div>
                 
                 <h3 className="text-white font-black text-xl mb-8 z-10 text-center drop-shadow-md">نظام إدارة متكامل</h3>
                 
-                {/* جهاز توتال ستيشن متحرك (Animated Total Station SVG) */}
                 <div className="relative z-10 float-anim w-48 h-48 flex items-center justify-center">
                   <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl">
-                    {/* الحامل الثلاثي (Tripod) */}
                     <path d="M100 130 L70 190" stroke="#cbd5e1" strokeWidth="6" strokeLinecap="round" />
                     <path d="M100 130 L130 190" stroke="#cbd5e1" strokeWidth="6" strokeLinecap="round" />
                     <path d="M100 130 L100 190" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" />
-                    {/* قاعدة الجهاز */}
                     <rect x="75" y="120" width="50" height="10" rx="4" fill="#334155" />
                     <rect x="85" y="110" width="30" height="10" fill="#475569" />
-                    {/* جسم الجهاز الرئيسي */}
                     <path d="M70 70 C70 50, 130 50, 130 70 L125 110 L75 110 Z" fill="#e2e8f0" />
-                    {/* العدسة / الشاشة */}
                     <circle cx="100" cy="85" r="18" fill="#1e293b" />
                     <circle cx="100" cy="85" r="10" fill="#38bdf8" className="opacity-80" />
-                    {/* أزرار وتفاصيل */}
                     <rect x="80" y="75" width="6" height="20" rx="2" fill="#94a3b8" />
                     <circle cx="120" cy="95" r="4" fill="#fbbf24" />
-                    {/* إشعاع الليزر (Laser Scan Animation) */}
                     <path d="M100 85 L20 40" stroke="#38bdf8" strokeWidth="3" strokeDasharray="5,5" className="laser-anim" />
                     <path d="M100 85 L180 40" stroke="#38bdf8" strokeWidth="3" strokeDasharray="5,5" className="laser-anim" />
                   </svg>
@@ -749,14 +736,12 @@
         );
       }
 
-      // 6. باقي الكود ومحتوى النظام الفعلي (ERP Dashboard)
+      // Main Render
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
-          
           {!isOnline && (
             <div className="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
-              <span>📡</span>
-              <span>أنت تعمل الآن في وضع عدم الاتصال (بدون إنترنت). يتم حفظ جميع العمليات محلياً على جهازك وسوف ترفع تلقائياً عند توفر الشبكة.</span>
+              <span>📡</span><span>أنت تعمل الآن في وضع عدم الاتصال (بدون إنترنت). يتم حفظ جميع العمليات محلياً على جهازك وسوف ترفع تلقائياً عند توفر الشبكة.</span>
             </div>
           )}
 
@@ -766,29 +751,15 @@
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-sm font-black text-indigo-700 dark:text-indigo-400">مكتب مساحة</h1>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs text-white ${userRoleKey === 'superadmin' ? 'bg-amber-500' : userRoleKey === 'executive' || userRoleKey === 'pm' ? 'bg-indigo-600' : userRoleKey === 'admin' ? 'bg-amber-500' : 'bg-emerald-600'}`}>
-                    {roleText}
-                  </span>
+                  <span className="bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs">{roleText}</span>
                 </div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">
-                  {user?.email || "غير مسجل"}
-                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">{user.email}</div>
               </div>
             </div>
-
             <div className="flex items-center gap-2">
-              <button onClick={() => {
-                const next = settings.theme === 'dark' ? 'light' : 'dark';
-                setSettings({...settings, theme: next});
-              }} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">
-                ☀️/🌙
-              </button>
-              <a href="/index.html" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition">
-                <span>🏗️</span> <span className="hidden sm:inline">الإنشاءات</span>
-              </a>
-              <button onClick={()=>setDrawerOpen(true)} className="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">
-                ☰
-              </button>
+              <button onClick={toggleTheme} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
+              <a href="index.html" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition"><span>🏗️</span> <span className="hidden sm:inline">الإنشاءات</span></a>
+              <button onClick={()=>setDrawerOpen(true)} className="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">☰</button>
             </div>
           </header>
 
@@ -813,10 +784,7 @@
                 <div className="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-4 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-                      <div>
-                        <span className="font-black text-sm">أقسام مكتب مساحة</span>
-                        <span className="block text-[10px] text-indigo-400 font-bold mt-1">{roleText}</span>
-                      </div>
+                      <div><span className="font-black text-sm">أقسام نظام المساحة</span><span className="block text-[10px] text-indigo-400 font-bold mt-1">{roleText}</span></div>
                       <button onClick={()=>setDrawerOpen(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
                     </div>
                     <nav className="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">
