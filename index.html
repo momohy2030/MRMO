@@ -78,7 +78,7 @@
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-    /* حركات دراجة التحميل (Bicycle Loader) */
+    /* Bike Loading Animation */
     .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
     .bike-svg { width: 100%; height: 100%; overflow: visible; }
     .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
@@ -90,6 +90,7 @@
     .loading-text::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
     @keyframes dots { 0%, 20% { content: ''; } 40% { content: '.'; } 60% { content: '..'; } 80%, 100% { content: '...'; } }
   </style>
+
 </head>
 <body className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200">
   <div id="root"></div>
@@ -198,7 +199,7 @@
     }
 
     function App() {
-      // 1. المتغيرات والحالات (State Hooks)
+      // 1. تعريف المتغيرات والحالات (States)
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
       const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
@@ -255,7 +256,7 @@
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
       const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
 
-      // 2. الحسابات والصلاحيات (Memos)
+      // 2. التحقق من الصلاحيات (Memos)
       const currentUserEmail = (user?.email || user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
@@ -528,9 +529,87 @@
         setNewRoleInput({ email: "", role: "engineer" }); showToast(`تم تعيين صلاحية (${newRoleInput.role}) بنجاح! 🛡️`);
       };
 
+      // 5. الحسابات الخاصة بالعرض في الشاشات
+      const currentProj = projects.find(p => cleanId(p?.id) === cleanId(selectedProjId)) || projects[0] || {};
+      const projExpenses = expenses.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
+      const projExtracts = extracts.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
+      const projPayments = payments.filter(p => cleanId(p?.projectId) === cleanId(currentProj?.id));
+      const projAdvances = advances.filter(a => cleanId(a?.projectId) === cleanId(currentProj?.id));
+      const projSuppPayments = supplierPayments.filter(p => cleanId(p?.projectId) === cleanId(currentProj?.id));
 
-      // 5. شاشات التحميل والدخول (EARLY RETURNS)
-      // أ) دراجة التحميل
+      const totalWorkNet = projExtracts.reduce((sum, item) => sum + parseNum(item?.net), 0);
+      const totalCost = projExpenses.reduce((sum, item) => sum + parseNum(item?.amount), 0);
+      const totalReceived = projPayments.reduce((sum, item) => sum + parseNum(item?.amount), 0);
+      const netProfit = totalWorkNet - totalCost;
+
+      const projDirectCashExp = projExpenses.filter(e => e?.paymentMethod !== 'خصم من العهدة' && (e?.billStatus || 'مدفوعة') === 'مدفوعة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
+      const projTotalAdvancesGiven = projAdvances.reduce((sum, a) => sum + parseNum(a?.amount), 0);
+      const projTotalSuppPaid = projSuppPayments.reduce((sum, p) => sum + parseNum(p?.amount), 0);
+      const centralCashRemaining = totalReceived - projDirectCashExp - projTotalAdvancesGiven - projTotalSuppPaid;
+
+      const allEmpCustodyBalance = (settings?.employees || []).reduce((acc, emp) => {
+        const adv = projAdvances.filter(a => a?.employeeName === emp).reduce((sum, a) => sum + parseNum(a?.amount), 0);
+        const spent = projExpenses.filter(e => e?.paymentMethod === 'خصم من العهدة' && e?.custodyEmployee === emp).reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        return acc + Math.max(0, adv - spent);
+      }, 0);
+
+      const projBudget = parseNum(currentProj?.budget);
+      const budgetConsumedPercent = projBudget > 0 ? Math.min(Math.round((totalCost / projBudget) * 100), 100) : 0;
+
+      const allWork = extracts.reduce((sum, item) => sum + parseNum(item?.totalWork), 0);
+      const allExp = expenses.reduce((sum, item) => sum + parseNum(item?.amount), 0);
+      const allPay = payments.reduce((sum, item) => sum + parseNum(item?.amount), 0);
+
+      const projExpMap = {};
+      projExpenses.forEach(e => { const cat = e?.mainCategory || 'غير محدد'; projExpMap[cat] = (projExpMap[cat] || 0) + parseNum(e?.amount); });
+      const projExpLabels = Object.keys(projExpMap);
+      const projExpData = Object.values(projExpMap);
+
+      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || e?.mainCategory === searchMainCat) && (searchSubCat === "" || e?.subCategory === searchSubCat) && (searchCostType === "" || e?.costType === searchCostType); });
+      const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + parseNum(e?.amount), 0);
+
+      const allSupplierNames = Array.from(new Set([...(settings?.suppliers || []), ...expenses.map(e => e?.supplier).filter(Boolean), ...supplierPayments.map(p => p?.supplier).filter(Boolean)])).map(s => String(s || '').trim()).filter(Boolean);
+      const cleanSuppliersList = Array.from(new Set(allSupplierNames));
+
+      const suppliersLedger = cleanSuppliersList.map(supp => {
+        const targetExp = suppScope === "project" ? projExpenses : expenses; const targetSuppPay = suppScope === "project" ? projSuppPayments : supplierPayments;
+        const allInvoices = targetExp.filter(e => String(e?.supplier || '').trim() === supp);
+        const totalPurchases = allInvoices.reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const creditPurchases = allInvoices.filter(e => (e?.billStatus || 'مدفوعة') === 'آجلة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const paidPurchases = totalPurchases - creditPurchases;
+        const totalPaidToCreditor = targetSuppPay.filter(p => String(p?.supplier || '').trim() === supp).reduce((sum, p) => sum + parseNum(p?.amount), 0);
+        const balance = totalPaidToCreditor - creditPurchases;
+        return { name: supp, totalPurchases, creditPurchases, paidPurchases, totalPaid: totalPaidToCreditor, balance };
+      }).filter(s => s.totalPurchases > 0 || s.totalPaid > 0);
+
+      const getCustodyStats = (empName) => {
+        const empAdv = projAdvances.filter(a => a?.employeeName === empName).reduce((sum, a) => sum + parseNum(a?.amount), 0);
+        const empExp = projExpenses.filter(e => e?.paymentMethod === 'خصم من العهدة' && e?.custodyEmployee === empName).reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        return { received: empAdv, spent: empExp, balance: empAdv - empExp };
+      };
+
+      const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
+
+      const navTabs = [
+        ...(isAdmin ? [{ id: "dashboard", label: "الرئيسية", icon: "📊" }] : [{ id: "my_custody", label: "عهدتي", icon: "💼" }]),
+        { id: "projects", label: "المشاريع", icon: "📁" },
+        { id: "add_data", label: "إدخال فاتورة", icon: "➕" },
+        { id: "expenses", label: "المصاريف", icon: "💸" },
+        { id: "advances", label: "العهدة", icon: "💵" },
+        ...(isAdmin || isAccountant ? [{ id: "payments", label: "الدفعات", icon: "💰" }] : []),
+        ...(isAdmin || isAccountant ? [{ id: "suppliers", label: "الموردين", icon: "🚚" }] : []),
+        ...(isAdmin ? [{ id: "statement", label: "كشف حساب", icon: "📑" }] : []),
+        ...(isAdmin || isAccountant ? [{ id: "extracts", label: "المستخلصات", icon: "📄" }] : []),
+        ...(isSuperAdminExact ? [{ id: "audit_log", label: "الدخول", icon: "🛡️" }] : []),
+        ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
+      ];
+
+
+      // ==========================================
+      // 6. شاشات التحميل والدخول المبكرة (EARLY RETURNS)
+      // ==========================================
+      
+      // أ) دراجة التحميل (Bike Loading Animation)
       if (authLoading) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
@@ -567,7 +646,7 @@
         );
       }
 
-      // ب) شاشة الدخول المزدوجة التفاعلية 
+      // ب) شاشة تسجيل الدخول المضيئة المنقسمة (Split Lamp Login)
       if (!user) {
         return (
           <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 md:p-8 transition-colors duration-500">
@@ -668,85 +747,12 @@
       }
 
 
-      // 6. الحسابات الأساسية للداشبورد (تعمل فقط بعد تسجيل الدخول)
-      const currentProj = projects.find(p => cleanId(p?.id) === cleanId(selectedProjId)) || projects[0] || {};
-      const projExpenses = expenses.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
-      const projExtracts = extracts.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
-      const projPayments = payments.filter(p => cleanId(p?.projectId) === cleanId(currentProj?.id));
-      const projAdvances = advances.filter(a => cleanId(a?.projectId) === cleanId(currentProj?.id));
-      const projSuppPayments = supplierPayments.filter(p => cleanId(p?.projectId) === cleanId(currentProj?.id));
-
-      const totalWorkNet = projExtracts.reduce((sum, item) => sum + parseNum(item?.net), 0);
-      const totalCost = projExpenses.reduce((sum, item) => sum + parseNum(item?.amount), 0);
-      const totalReceived = projPayments.reduce((sum, item) => sum + parseNum(item?.amount), 0);
-      const netProfit = totalWorkNet - totalCost;
-
-      const projDirectCashExp = projExpenses.filter(e => e?.paymentMethod !== 'خصم من العهدة' && (e?.billStatus || 'مدفوعة') === 'مدفوعة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
-      const projTotalAdvancesGiven = projAdvances.reduce((sum, a) => sum + parseNum(a?.amount), 0);
-      const projTotalSuppPaid = projSuppPayments.reduce((sum, p) => sum + parseNum(p?.amount), 0);
-      const centralCashRemaining = totalReceived - projDirectCashExp - projTotalAdvancesGiven - projTotalSuppPaid;
-
-      const allEmpCustodyBalance = (settings?.employees || []).reduce((acc, emp) => {
-        const adv = projAdvances.filter(a => a?.employeeName === emp).reduce((sum, a) => sum + parseNum(a?.amount), 0);
-        const spent = projExpenses.filter(e => e?.paymentMethod === 'خصم من العهدة' && e?.custodyEmployee === emp).reduce((sum, e) => sum + parseNum(e?.amount), 0);
-        return acc + Math.max(0, adv - spent);
-      }, 0);
-
-      const projBudget = parseNum(currentProj?.budget);
-      const budgetConsumedPercent = projBudget > 0 ? Math.min(Math.round((totalCost / projBudget) * 100), 100) : 0;
-
-      const allWork = extracts.reduce((sum, item) => sum + parseNum(item?.totalWork), 0);
-      const allExp = expenses.reduce((sum, item) => sum + parseNum(item?.amount), 0);
-      const allPay = payments.reduce((sum, item) => sum + parseNum(item?.amount), 0);
-
-      const projExpMap = {};
-      projExpenses.forEach(e => { const cat = e?.mainCategory || 'غير محدد'; projExpMap[cat] = (projExpMap[cat] || 0) + parseNum(e?.amount); });
-      const projExpLabels = Object.keys(projExpMap);
-      const projExpData = Object.values(projExpMap);
-
-      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || e?.mainCategory === searchMainCat) && (searchSubCat === "" || e?.subCategory === searchSubCat) && (searchCostType === "" || e?.costType === searchCostType); });
-      const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + parseNum(e?.amount), 0);
-
-      const allSupplierNames = Array.from(new Set([...(settings?.suppliers || []), ...expenses.map(e => e?.supplier).filter(Boolean), ...supplierPayments.map(p => p?.supplier).filter(Boolean)])).map(s => String(s || '').trim()).filter(Boolean);
-      const cleanSuppliersList = Array.from(new Set(allSupplierNames));
-
-      const suppliersLedger = cleanSuppliersList.map(supp => {
-        const targetExp = suppScope === "project" ? projExpenses : expenses; const targetSuppPay = suppScope === "project" ? projSuppPayments : supplierPayments;
-        const allInvoices = targetExp.filter(e => String(e?.supplier || '').trim() === supp);
-        const totalPurchases = allInvoices.reduce((sum, e) => sum + parseNum(e?.amount), 0);
-        const creditPurchases = allInvoices.filter(e => (e?.billStatus || 'مدفوعة') === 'آجلة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
-        const paidPurchases = totalPurchases - creditPurchases;
-        const totalPaidToCreditor = targetSuppPay.filter(p => String(p?.supplier || '').trim() === supp).reduce((sum, p) => sum + parseNum(p?.amount), 0);
-        const balance = totalPaidToCreditor - creditPurchases;
-        return { name: supp, totalPurchases, creditPurchases, paidPurchases, totalPaid: totalPaidToCreditor, balance };
-      }).filter(s => s.totalPurchases > 0 || s.totalPaid > 0);
-
-      const getCustodyStats = (empName) => {
-        const empAdv = projAdvances.filter(a => a?.employeeName === empName).reduce((sum, a) => sum + parseNum(a?.amount), 0);
-        const empExp = projExpenses.filter(e => e?.paymentMethod === 'خصم من العهدة' && e?.custodyEmployee === empName).reduce((sum, e) => sum + parseNum(e?.amount), 0);
-        return { received: empAdv, spent: empExp, balance: empAdv - empExp };
-      };
-
-      const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: emp, ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
-
-      const navTabs = [
-        ...(isAdmin ? [{ id: "dashboard", label: "الرئيسية", icon: "📊" }] : [{ id: "my_custody", label: "عهدتي", icon: "💼" }]),
-        { id: "projects", label: "المشاريع", icon: "📁" },
-        { id: "add_data", label: "إدخال فاتورة", icon: "➕" },
-        { id: "expenses", label: "المصاريف", icon: "💸" },
-        { id: "advances", label: "العهدة", icon: "💵" },
-        ...(isAdmin || isAccountant ? [{ id: "payments", label: "الدفعات", icon: "💰" }] : []),
-        ...(isAdmin || isAccountant ? [{ id: "suppliers", label: "الموردين", icon: "🚚" }] : []),
-        ...(isAdmin ? [{ id: "statement", label: "كشف حساب", icon: "📑" }] : []),
-        ...(isAdmin || isAccountant ? [{ id: "extracts", label: "المستخلصات", icon: "📄" }] : []),
-        ...(isSuperAdminExact ? [{ id: "audit_log", label: "الدخول", icon: "🛡️" }] : []),
-        ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
-      ];
-
-
-      // 7. واجهة النظام الرئيسية (Dashboard)
+      // ==========================================
+      // 7. الواجهة الرئيسية للنظام (Main App Render)
+      // ==========================================
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
+          
           {!isOnline && (
             <div className="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
               <span>📡</span><span>أنت متصل محلياً بدون إنترنت. يتم حفظ السجلات بالجهاز وترفع فور عودة الشبكة.</span>
@@ -758,14 +764,17 @@
               <span className="text-2xl p-1 bg-amber-50 dark:bg-amber-900/30 rounded-xl">🏗️</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-sm font-black text-slate-900 dark:text-white">مكتب مساحة</h1>
+                  <h1 className="text-sm font-black text-indigo-700 dark:text-indigo-400">مكتب مساحة</h1>
                   <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs text-white ${userRoleKey === 'superadmin' ? 'bg-amber-500' : userRoleKey === 'executive' || userRoleKey === 'pm' ? 'bg-indigo-600' : userRoleKey === 'accountant' ? 'bg-emerald-600' : userRoleKey === 'admin' ? 'bg-amber-500' : 'bg-blue-600'}`}>
                     {userRoleTitle}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">{user.email}</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">
+                  {user?.email || "غير مسجل"}
+                </div>
               </div>
             </div>
+
             <div className="flex items-center gap-2">
               <button onClick={toggleTheme} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
               <a href="survey.html" className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition"><span>📐</span> <span className="hidden sm:inline">قطاع المساحة</span></a>
@@ -973,7 +982,8 @@
                   <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
                     <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">💵 تسليم عهدة وسلفة جديدة</h3>
                     <form onSubmit={(e) => {
-                      e.preventDefault(); if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
+                      e.preventDefault();
+                      if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
                       const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newAdv, amount: parseNum(newAdv.amount), createdBy: user?.name || 'مستخدم' };
                       const updated = [newItem, ...advances]; setAdvances(updated); saveSafeConstructionData('advances', 'advances', updated);
                       setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" }); showToast("تم تسجيل العهدة بنجاح! 💵");
@@ -987,11 +997,14 @@
                   </div>
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">التاريخ</th><th className="p-3">الموظف</th><th className="p-3 text-center">المبلغ</th><th className="p-3">البيان</th>{canEditOrDelete && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">التاريخ</th><th className="p-3">الموظف</th><th className="p-3 text-center">المبلغ</th><th className="p-3">البيان</th>{canEditOrDelete && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projAdvances.map(a => (
                           <tr key={a.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td><td className="p-3 font-bold text-slate-900 dark:text-white">{a.employeeName}</td><td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td><td className="p-3 text-slate-500">{a.notes || '-'}</td>
+                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td>
+                            <td className="p-3 font-bold text-slate-900 dark:text-white">{a.employeeName}</td>
+                            <td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
+                            <td className="p-3 text-slate-500">{a.notes || '-'}</td>
                             {canEditOrDelete && (
                               <td className="p-3 text-center">
                                 <div className="inline-flex items-center gap-1.5">
@@ -1016,7 +1029,8 @@
                       e.preventDefault();
                       const targetProj = cleanId(selectedProjId);
                       const newItem = { id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...payments]; setPayments(updated); saveSafeConstructionData('payments', 'payments', updated);
+                      const updated = [newItem, ...payments];
+                      setPayments(updated); saveSafeConstructionData('payments', 'payments', updated);
                       setNewPay({ date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: "" }); showToast("تم تسجيل الدفعة بنجاح! 💵");
                     }} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
@@ -1025,15 +1039,15 @@
                       <button type="submit" className="sm:col-span-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ التحصيل</button>
                     </form>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">التاريخ</th><th className="p-3">المشروع</th><th className="p-3 text-center">المبلغ</th><th className="p-3">البيان</th>{isAdmin && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-2.5">التاريخ</th><th className="p-2.5">المشروع</th><th className="p-2.5 text-center">المبلغ</th><th className="p-2.5">البيان</th>{isAdmin && <th className="p-2.5 text-center">إجراءات</th>}</tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projPayments.map(p => (
                           <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 text-slate-500 font-mono text-[11px]">{p.date}</td><td className="p-3 font-bold text-indigo-600">{p.projectId}</td><td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td><td className="p-3 text-slate-500">{p.notes || '-'}</td>
+                            <td className="p-2.5 whitespace-nowrap text-slate-500 font-mono">{p.date}</td><td className="p-2.5 font-bold text-indigo-600">{p.projectId}</td><td className="p-2.5 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td><td className="p-2.5 text-slate-500">{p.notes || '-'}</td>
                             {isAdmin && (
-                              <td className="p-3 text-center">
+                              <td className="p-2.5 text-center">
                                 <div className="inline-flex items-center gap-1.5">
                                   <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
                                   <button onClick={()=>deleteItem('payments', p.id, payments)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
@@ -1059,9 +1073,11 @@
                       </div>
                     </div>
                     <form onSubmit={(e) => {
-                      e.preventDefault(); if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
+                      e.preventDefault();
+                      if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
                       const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newSuppPay, amount: parseNum(newSuppPay.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...supplierPayments]; setSupplierPayments(updated); saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
+                      const updated = [newItem, ...supplierPayments];
+                      setSupplierPayments(updated); saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
                       setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" }); showToast("تم تسجيل الدفعة للمورد بنجاح! 🚚");
                     }} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                       <input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
@@ -1071,9 +1087,10 @@
                       <button type="submit" className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">قيد الدفعة للمورد</button>
                     </form>
                   </div>
+
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">المورد</th><th className="p-3 text-center">إجمالي المسحوبات</th><th className="p-3 text-center text-amber-600">فواتير آجلة</th><th className="p-3 text-center text-emerald-600">المسدد له</th><th className="p-3 text-center">الرصيد النهائي</th><th className="p-3 text-center">كشف الحساب</th></tr></thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">المورد</th><th className="p-3 text-center">إجمالي المسحوبات</th><th className="p-3 text-center text-amber-600">فواتير آجلة</th><th className="p-3 text-center text-emerald-600">المسدد له</th><th className="p-3 text-center">الرصيد النهائي</th><th className="p-3 text-center">كشف الحساب</th></tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {suppliersLedger.map((s, i) => (
                           <tr key={i} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
@@ -1284,7 +1301,7 @@
                       <h3 className="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للإنشاءات</h3>
                       <form onSubmit={handleSaveRole} className="flex gap-2">
                         <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} className="flex-1 border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                        <select value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold w-1/3 text-xs">
+                        <select name="roleSelect" value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold w-1/3 text-xs">
                           <option value="engineer">👷 مهندس موقع</option>
                           <option value="accountant">💼 محاسب</option>
                           <option value="pm">💼 مدير مشاريع</option>
