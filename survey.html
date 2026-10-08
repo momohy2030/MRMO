@@ -1218,97 +1218,37 @@
                       {toArr(settings.engineers).map(e=><option key={e} value={e}>{e}</option>)}
                     </select>
                   </div>
-
                   {extractEngineer && (() => {
                     const engOps = operations.filter(o => o?.engineer === extractEngineer || (o?.hasSecondEngineer && o?.secondEngineer === extractEngineer));
-                    
-                    const isRtkOp = (type) => {
-                      const t = String(type || '').toUpperCase();
-                      return t.includes('RTK') || t.includes('مهندس يوم + جهاز نصف يوم');
-                    };
-
-                    const rtkOps = engOps.filter(o => isRtkOp(o.opType));
-                    const otherOps = engOps.filter(o => !isRtkOp(o.opType));
-
-                    const calcDue = (opsList) => opsList.reduce((s, o) => {
+                    const totalEngDues = engOps.reduce((s, o) => {
                       if (o?.hasSecondEngineer && (o?.engineer === extractEngineer || o?.secondEngineer === extractEngineer)) {
                         return s + (parseNum(o?.engFee) / 2);
                       }
                       return s + parseNum(o?.engFee);
                     }, 0);
-
-                    const rtkTotal = calcDue(rtkOps);
-                    const otherTotal = calcDue(otherOps);
-                    const grandTotal = rtkTotal + otherTotal;
-
+                    
                     return (
-                      <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs space-y-4">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b dark:border-slate-700 pb-3">
-                          <h3 class="text-sm font-black text-slate-900 dark:text-white">حساب: {extractEngineer}</h3>
-                          <div class="bg-indigo-600 text-white px-4 py-1.5 rounded-xl font-black text-sm shadow-xs">
-                            الإجمالي الكلي المستحق: {grandTotal.toLocaleString()} ج.م
-                          </div>
+                      <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs">
+                        <div class="flex justify-between items-center mb-3">
+                          <h3 class="text-sm font-black">حساب: {extractEngineer}</h3>
+                          <span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 px-3 py-1 rounded-xl font-black">المستحق: {totalEngDues.toLocaleString()} ج.م</span>
                         </div>
-
-                        {/* بطاقات الإجماليات */}
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div class="bg-purple-50 dark:bg-slate-700/50 border border-purple-200 dark:border-slate-600 p-3 rounded-xl flex justify-between items-center">
-                            <div>
-                              <span class="text-[11px] text-purple-800 dark:text-purple-300 font-bold block">🛰️ إجمالي أتعاب RTK</span>
-                              <span class="text-[10px] text-slate-500 block mt-0.5">{rtkOps.length} طلعات مسجلة</span>
-                            </div>
-                            <strong class="text-lg text-purple-700 dark:text-purple-400 font-black">{rtkTotal.toLocaleString()} ج.م</strong>
-                          </div>
-                          <div class="bg-amber-50 dark:bg-slate-700/50 border border-amber-200 dark:border-slate-600 p-3 rounded-xl flex justify-between items-center">
-                            <div>
-                              <span class="text-[11px] text-amber-800 dark:text-amber-300 font-bold block">📐 إجمالي أتعاب مساحية أخرى</span>
-                              <span class="text-[10px] text-slate-500 block mt-0.5">{otherOps.length} أعمال مسجلة</span>
-                            </div>
-                            <strong class="text-lg text-amber-700 dark:text-amber-400 font-black">{otherTotal.toLocaleString()} ج.م</strong>
-                          </div>
+                        <div class="overflow-x-auto custom-scroll">
+                          <table class="w-full text-right border"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border">التاريخ</th><th class="p-2 border">العميل والموقع</th><th class="p-2 border text-center text-emerald-600">حصة الأتعاب</th></tr></thead>
+                          <tbody>{engOps.map(o=><tr key={o.id} class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                            <td class="p-2 border whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td>
+                            <td class="p-2 border">
+                              {o.clientName} <span class="text-[10px] text-amber-700">({o.siteLocation})</span>
+                              {o.hasSecondEngineer && <span class="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}
+                            </td>
+                            <td class="p-2 border text-center font-black text-emerald-600 font-mono">
+                              {o?.hasSecondEngineer ? (parseNum(o.engFee) / 2).toLocaleString() : parseNum(o.engFee).toLocaleString()}
+                            </td>
+                          </tr>)}
+                          </tbody>
+                          {engOps.length === 0 && <tr><td colSpan="3" class="text-center p-4 text-slate-400">لا توجد طلعات مسجلة لهذا المهندس</td></tr>}
+                          </table>
                         </div>
-
-                        {/* جدول RTK */}
-                        <div>
-                          <h4 class="font-bold text-xs text-purple-800 dark:text-purple-300 mb-2">🛰️ سجل طلعات جهاز RTK</h4>
-                          <div class="overflow-x-auto custom-scroll border dark:border-slate-700 rounded-xl">
-                            <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border-b dark:border-slate-600">التاريخ</th><th class="p-2 border-b dark:border-slate-600">العميل والموقع</th><th class="p-2 border-b dark:border-slate-600 text-center text-purple-600">حصة الأتعاب</th></tr></thead>
-                            <tbody>{rtkOps.map(o=><tr key={o.id} class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                              <td class="p-2 border-b dark:border-slate-700 whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td>
-                              <td class="p-2 border-b dark:border-slate-700">
-                                <span class="text-slate-900 dark:text-white">{o.clientName}</span> <span class="text-[10px] text-amber-700">({o.siteLocation})</span> - {o.opType}
-                                {o.hasSecondEngineer && <span class="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}
-                              </td>
-                              <td class="p-2 border-b dark:border-slate-700 text-center font-black text-purple-600 font-mono">
-                                {o?.hasSecondEngineer ? (parseNum(o.engFee) / 2).toLocaleString() : parseNum(o.engFee).toLocaleString()}
-                              </td>
-                            </tr>)}
-                            {rtkOps.length === 0 && <tr><td colSpan="3" class="text-center p-4 text-slate-400 text-[11px]">لا توجد طلعات مسجلة</td></tr>}
-                            </tbody></table>
-                          </div>
-                        </div>
-
-                        {/* جدول أعمال أخرى */}
-                        <div>
-                          <h4 class="font-bold text-xs text-amber-800 dark:text-amber-300 mb-2 mt-4">📐 سجل الأعمال المساحية الأخرى (كروكيات/تخطيط/فدان)</h4>
-                          <div class="overflow-x-auto custom-scroll border dark:border-slate-700 rounded-xl">
-                            <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border-b dark:border-slate-600">التاريخ</th><th class="p-2 border-b dark:border-slate-600">العميل والموقع</th><th class="p-2 border-b dark:border-slate-600 text-center text-amber-600">حصة الأتعاب</th></tr></thead>
-                            <tbody>{otherOps.map(o=><tr key={o.id} class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                              <td class="p-2 border-b dark:border-slate-700 whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td>
-                              <td class="p-2 border-b dark:border-slate-700">
-                                <span class="text-slate-900 dark:text-white">{o.clientName}</span> <span class="text-[10px] text-amber-700">({o.siteLocation})</span> - {o.opType}
-                                <span class="block text-[10px] text-slate-500 mt-0.5">{o.workDescription}</span>
-                                {o.hasSecondEngineer && <span class="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}
-                              </td>
-                              <td class="p-2 border-b dark:border-slate-700 text-center font-black text-amber-600 font-mono">
-                                {o?.hasSecondEngineer ? (parseNum(o.engFee) / 2).toLocaleString() : parseNum(o.engFee).toLocaleString()}
-                              </td>
-                            </tr>)}
-                            {otherOps.length === 0 && <tr><td colSpan="3" class="text-center p-4 text-slate-400 text-[11px]">لا توجد أعمال مسجلة</td></tr>}
-                            </tbody></table>
-                          </div>
-                        </div>
-
                       </div>
                     )
                   })()}
@@ -1630,6 +1570,276 @@
 
             </main>
           </div>
+
+          {opModalOpen && (
+            <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
+              <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
+              <div class="relative bg-white dark:bg-slate-800 w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50 max-h-[90vh] overflow-y-auto custom-scroll">
+                <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                  <h3 class="font-black text-sm">{editingOp ? '✏️ تعديل طلعة مسجلة' : '➕ تسجيل طلعة يومية جديدة'}</h3>
+                  <button onClick={()=>setOpModalOpen(false)} class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                </div>
+                <form onSubmit={handleSaveOperation} class="space-y-3 text-xs font-bold">
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>التاريخ <input type="date" value={newOp.date} onChange={e=>setNewOp({...newOp, date: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                    <div>اسم العميل <input type="text" value={newOp.clientName} onChange={e=>setNewOp({...newOp, clientName: e.target.value})} placeholder="الواحة البحرية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>الموقع بالمزرعة <input type="text" value={newOp.siteLocation} onChange={e=>setNewOp({...newOp, siteLocation: e.target.value})} placeholder="المحمية، خط 2400..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1 bg-amber-50 dark:bg-amber-950/40" required/></div>
+                    <div>نوع العمل 
+                      <div class="flex gap-1 mt-1">
+                        <select value={newOp.opType} onChange={e=>handleOpTypeChange(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
+                          {toArr(settings.opTypes).map(o=><option key={o} value={o}>{o}</option>)}
+                        </select>
+                        <button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>المهندس المشرف
+                    <div class="flex gap-1 mt-1">
+                      <select value={newOp.engineer} onChange={e=>setNewOp(prev=>({...prev, engineer: e.target.value}))} class="w-full border p-2.5 rounded-xl dark:bg-slate-700">
+                        {toArr(settings.engineers).map(e=><option key={e} value={e}>{e}</option>)}
+                      </select>
+                      <button type="button" onClick={()=>updateSettingArray('engineers','مهندس')} class="bg-slate-200 dark:bg-slate-700 px-2.5 rounded-xl font-black">+</button>
+                    </div>
+                  </div>
+
+                  <div class="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl border dark:border-slate-700 space-y-2 col-span-1 sm:col-span-2">
+                    <label class="flex items-center gap-2 cursor-pointer font-bold text-xs text-indigo-700 dark:text-indigo-400">
+                      <input 
+                        type="checkbox" 
+                        checked={newOp.hasSecondEngineer} 
+                        onChange={e => setNewOp(prev => ({ ...prev, hasSecondEngineer: e.target.checked }))} 
+                        class="w-4 h-4 rounded"
+                      />
+                      👥 طلعة مشتركة (مهندسين اثنين بالتساوي)
+                    </label>
+                    {newOp.hasSecondEngineer && (
+                      <div>
+                        <label class="block text-[11px] mb-1 font-bold">المهندس الشريك الثاني:</label>
+                        <select 
+                          value={newOp.secondEngineer} 
+                          onChange={e => setNewOp(prev => ({ ...prev, secondEngineer: e.target.value }))} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-700 font-bold"
+                        >
+                          {toArr(settings.engineers).map(e => (
+                            <option key={e} value={e}>{e}</option>
+                          ))}
+                        </select>
+                        <span class="text-[10px] text-slate-500 block mt-1">يتم تقسيم إجمالي أتعاب الطلعة مناصفة (50% لكل مهندس) في كشوف الحساب.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>بيان الأعمال (الوصف الذي سيوضع في المستخلص) <input type="text" value={newOp.workDescription} onChange={e=>setNewOp({...newOp, workDescription: e.target.value})} placeholder="تخطيط 80 فدان موقع المحمية..." class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  
+                  <div class="flex gap-4 py-1">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={newOp.isFaddan} 
+                        onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({
+                            ...prev, 
+                            isFaddan: checked, 
+                            isSketch: checked ? false : prev.isSketch,
+                            agreedAmount: checked ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : prev.agreedAmount
+                          }));
+                        }} 
+                        class="w-4 h-4 rounded"
+                      /> 
+                      🌾 حساب بالفدان
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={newOp.isSketch} 
+                        onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({
+                            ...prev, 
+                            isSketch: checked, 
+                            isFaddan: checked ? false : prev.isFaddan
+                          }));
+                        }} 
+                        class="w-4 h-4 rounded"
+                      /> 
+                      📐 كروكيات
+                    </label>
+                  </div>
+
+                  {newOp.isFaddan && (
+                    <div class="grid grid-cols-2 gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800">
+                      <div>
+                        عدد الأفدنة: 
+                        <input 
+                          type="number" 
+                          step="any" 
+                          value={newOp.faddanQty} 
+                          onChange={e=>{
+                            const q = e.target.value;
+                            setNewOp(prev => ({
+                              ...prev, 
+                              faddanQty: q, 
+                              agreedAmount: parseNum(q) * parseNum(prev.faddanPrice)
+                            }));
+                          }} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"
+                        />
+                      </div>
+                      <div>
+                        سعر الفدان (الفئة): 
+                        <input 
+                          type="number" 
+                          step="any" 
+                          value={newOp.faddanPrice} 
+                          onChange={e=>{
+                            const p = e.target.value;
+                            setNewOp(prev => ({
+                              ...prev, 
+                              faddanPrice: p, 
+                              agreedAmount: parseNum(prev.faddanQty) * parseNum(p)
+                            }));
+                          }} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {newOp.isSketch && (
+                    <div class="p-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800">
+                      عدد الكروكيات: 
+                      <input 
+                        type="number" 
+                        value={newOp.sketchesCount} 
+                        onChange={e=>setNewOp({...newOp, sketchesCount: e.target.value})} 
+                        class="w-full border p-2 rounded-xl dark:bg-slate-700 mt-1"
+                      />
+                    </div>
+                  )}
+
+                  <div class="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1">
+                    <label class="block text-amber-900 dark:text-amber-300 font-black">💰 المبلغ النهائي المتفق عليه مع العميل (آلي مع إمكانية التعديل الحر):</label>
+                    <input 
+                      type="number" 
+                      step="any"
+                      value={newOp.agreedAmount} 
+                      onChange={e=>setNewOp({...newOp, agreedAmount: e.target.value})} 
+                      placeholder="أدخل المبلغ المتفق عليه..." 
+                      class="w-full border p-2.5 rounded-xl dark:bg-slate-700 bg-white text-indigo-700 dark:text-indigo-300 font-black text-sm" 
+                      required
+                    />
+                    <span class="text-[10px] text-amber-800 dark:text-amber-400 block">يُحسب تلقائياً من الفدان أو نوع العمل، ويمكنك تغييره يدوياً في أي وقت.</span>
+                  </div>
+
+                  <div class="p-3 bg-indigo-50 dark:bg-slate-700/60 rounded-2xl border border-indigo-200 dark:border-slate-600 space-y-2">
+                    <label class="block text-indigo-900 dark:text-indigo-300 font-black text-[11px]">⚙️ طريقة احتساب أتعاب المهندس في هذه العملية:</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'auto'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'auto' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        ⚡ تلقائي
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'engDay_devHalf'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'engDay_devHalf' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        🛰 مهندس يوم + جهاز 1/2
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent80'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent80' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        🎯 نسبة 80% مهندس
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent70'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent70' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        🎯 نسبة 70% مهندس
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={()=>setNewOp({...newOp, engCalcMethod: 'customFixed'})}
+                        class={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'customFixed' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        💵 مبلغ مقطوع ثابت
+                      </button>
+                    </div>
+
+                    {newOp.engCalcMethod === 'customFixed' && (
+                      <div class="pt-1">
+                        <label class="block text-[10px] text-slate-600 dark:text-slate-300 mb-1">أدخل مبلغ أتعاب المهندس المقطوع (ج.م):</label>
+                        <input 
+                          type="number" 
+                          step="any" 
+                          value={newOp.engCustomFixedAmount} 
+                          onChange={e=>setNewOp({...newOp, engCustomFixedAmount: e.target.value})} 
+                          class="w-full border p-2 rounded-xl dark:bg-slate-800 bg-white font-bold text-emerald-600"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
+                    <div>مصاريف سيارة <input type="number" value={newOp.carCost} onChange={e=>setNewOp({...newOp, carCost: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
+                  </div>
+
+                  <div>المحصل فوراً في الموقع (إن وجد) <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} class="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
+
+                  <div class="p-2.5 bg-emerald-50 dark:bg-slate-700 border border-emerald-200 dark:border-slate-600 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
+                    <div class="flex justify-between">
+                      <span>👷 أتعاب المهندس: <strong>{(livePreview.engFee || 0).toLocaleString()} ج.م</strong></span>
+                      <span>🛰 حصة الجهاز: <strong>{(livePreview.deviceFee || 0).toLocaleString()} ج.م</strong></span>
+                    </div>
+                    <div class="flex justify-between text-rose-600 dark:text-rose-400 pt-1 border-t dark:border-slate-600">
+                      <span>🚗 مصاريف الطلعة (عمالة + سيارة): <strong>{(liveExpenses.totalExp || 0).toLocaleString()} ج.م</strong></span>
+                      <span>🏢 صافي المكتب: <strong>{(livePreview.officeFee || 0).toLocaleString()} ج.م</strong></span>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">
+                    {editingOp ? 'حفظ التعديلات' : 'حفظ الطلعة اليومية'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {payModalOpen && (
+            <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
+              <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setPayModalOpen(false)}></div>
+              <div class="relative bg-white dark:bg-slate-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50">
+                <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                  <h3 class="font-black text-sm">💰 تسجيل دفعة مسددة من العميل</h3>
+                  <button onClick={()=>setPayModalOpen(false)} class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                </div>
+                <form onSubmit={handleAddPayment} class="space-y-3 text-xs font-bold">
+                  <div>التاريخ <input type="date" value={newPayment.date} onChange={e=>setNewPayment({...newPayment, date: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  <div>العميل 
+                    <select value={newPayment.clientName} onChange={e=>setNewPayment({...newPayment, clientName: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1" required>
+                      <option value="">-- اختر العميل --</option>
+                      {clientNames.map(c=><option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>المبلغ المسدد <input type="number" value={newPayment.amount} onChange={e=>setNewPayment({...newPayment, amount: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1 text-emerald-600 font-black text-sm" required/></div>
+                  <div>البيان / الملاحظات <input type="text" value={newPayment.notes} onChange={e=>setNewPayment({...newPayment, notes: e.target.value})} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 mt-1"/></div>
+                  <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">
+                    قيد الدفعة في الحساب
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
 
           <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg print-hidden">
             <button onClick={()=>setActiveTab('dashboard')} class={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}>
