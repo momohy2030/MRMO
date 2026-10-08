@@ -397,6 +397,7 @@
       const [extractSite, setExtractSite] = useState("");
       const [extractNumber, setExtractNumber] = useState("1");
       const [extractEngineer, setExtractEngineer] = useState("م أحمد نبيل");
+      const [engineerOpTypeFilter, setEngineerOpTypeFilter] = useState("ALL");
       const [extractItems, setExtractItems] = useState([]);
       const [statementClient, setStatementClient] = useState("");
 
@@ -593,12 +594,14 @@
       };
 
       const calculateOperationShares = (op) => {
-        const total = parseNum(op?.agreedAmount);
-        const labor = parseNum(op?.laborCost);
-        const car = parseNum(op?.carCost);
+        if (!op) return { engFee: 0, eng1Fee: 0, eng2Fee: 0, deviceFee: 0, officeFee: 0, totalExpenses: 0 };
+
+        const total = parseNum(op.agreedAmount);
+        const labor = parseNum(op.laborCost);
+        const car = parseNum(op.carCost);
         const totalExpenses = labor + car;
-        const type = String(op?.opType || '');
-        const method = op?.engCalcMethod || 'auto';
+        const type = String(op.opType || '');
+        const method = op.engCalcMethod || 'auto';
 
         let engFee = 0, deviceFee = 0, officeFee = 0;
 
@@ -610,12 +613,17 @@
         else if (isFullRtk) deviceFee = 3500;
         else deviceFee = 0;
 
-        if (isEngDayDevHalf) engFee = 2000;
-        else if (method === 'percent80') engFee = total * 0.80;
-        else if (method === 'percent70') engFee = total * 0.70;
-        else if (method === 'customPercent') engFee = total * ((parseNum(op?.engCustomPercent) || 80) / 100);
-        else if (method === 'customFixed') engFee = parseNum(op?.engCustomFixedAmount) || 0;
-        else {
+        if (isEngDayDevHalf) {
+          engFee = 2000;
+        } else if (method === 'percent80') {
+          engFee = total * 0.80;
+        } else if (method === 'percent70') {
+          engFee = total * 0.70;
+        } else if (method === 'customPercent') {
+          engFee = total * ((parseNum(op.engCustomPercent) || 80) / 100);
+        } else if (method === 'customFixed') {
+          engFee = parseNum(op.engCustomFixedAmount) || 0;
+        } else {
           if (isHalfRtk) engFee = 1500;
           else if (isFullRtk) engFee = 2000;
           else engFee = total * 0.80;
@@ -623,7 +631,7 @@
 
         officeFee = Math.max(0, total - engFee - deviceFee - totalExpenses);
 
-        const isShared = Boolean(op?.hasSecondEngineer);
+        const isShared = Boolean(op.hasSecondEngineer);
         const eng1Fee = isShared ? (engFee / 2) : engFee;
         const eng2Fee = isShared ? (engFee / 2) : 0;
 
@@ -996,7 +1004,7 @@
                     <button 
                       onClick={()=>{ 
                         setEditingOp(null); 
-                        setNewOp(initialOpState); 
+                        setNewOp({ ...initialOpState }); 
                         setOpModalOpen(true); 
                       }}
                       class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 shadow-sm text-xs"
@@ -1212,43 +1220,154 @@
 
               {activeTab === 'engineers' && (
                 <div class="space-y-4 font-bold">
-                  <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs">
-                    <label class="mb-1 block">اختر المهندس لعرض كشف حسابه:</label>
-                    <select value={extractEngineer} onChange={e=>setExtractEngineer(e.target.value)} class="w-full sm:w-1/2 border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-indigo-700 dark:text-indigo-400">
-                      {toArr(settings.engineers).map(e=><option key={e} value={e}>{e}</option>)}
-                    </select>
+                  <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs flex flex-col sm:flex-row gap-3">
+                    <div class="w-full sm:w-1/2">
+                      <label class="mb-1 block">اختر المهندس لعرض كشف حسابه:</label>
+                      <select value={extractEngineer} onChange={e=>setExtractEngineer(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-indigo-700 dark:text-indigo-400">
+                        {toArr(settings.engineers).map(e=><option key={e} value={e}>{e}</option>)}
+                      </select>
+                    </div>
+
+                    <div class="w-full sm:w-1/2">
+                      <label class="mb-1 block">تصفية نوع الشغل:</label>
+                      <select value={engineerOpTypeFilter} onChange={e=>setEngineerOpTypeFilter(e.target.value)} class="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-slate-800 dark:text-slate-200">
+                        <option value="ALL">🔍 كل أنواع الشغل (الإجمالي)</option>
+                        {toArr(settings.opTypes).map(t=><option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
                   </div>
+
                   {extractEngineer && (() => {
-                    const engOps = operations.filter(o => o?.engineer === extractEngineer || (o?.hasSecondEngineer && o?.secondEngineer === extractEngineer));
-                    const totalEngDues = engOps.reduce((s, o) => {
+                    const allEngOps = operations.filter(o => o?.engineer === extractEngineer || (o?.hasSecondEngineer && o?.secondEngineer === extractEngineer));
+                    
+                    const isRtkOp = (type) => {
+                      const t = String(type || '').toUpperCase();
+                      return t.includes('RTK') || t.includes('مهندس يوم + جهاز نصف يوم');
+                    };
+
+                    const rtkOps = allEngOps.filter(o => isRtkOp(o.opType));
+                    const otherOps = allEngOps.filter(o => !isRtkOp(o.opType));
+
+                    const calcDue = (opsList) => opsList.reduce((s, o) => {
                       if (o?.hasSecondEngineer && (o?.engineer === extractEngineer || o?.secondEngineer === extractEngineer)) {
                         return s + (parseNum(o?.engFee) / 2);
                       }
                       return s + parseNum(o?.engFee);
                     }, 0);
-                    
+
+                    const rtkTotal = calcDue(rtkOps);
+                    const otherTotal = calcDue(otherOps);
+                    const grandTotal = rtkTotal + otherTotal;
+
+                    const filteredOps = engineerOpTypeFilter === 'ALL'
+                      ? allEngOps
+                      : allEngOps.filter(o => o?.opType === engineerOpTypeFilter);
+
+                    const filteredTotal = calcDue(filteredOps);
+
                     return (
-                      <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs">
-                        <div class="flex justify-between items-center mb-3">
-                          <h3 class="text-sm font-black">حساب: {extractEngineer}</h3>
-                          <span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 px-3 py-1 rounded-xl font-black">المستحق: {totalEngDues.toLocaleString()} ج.م</span>
+                      <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b dark:border-slate-700 pb-3">
+                          <div>
+                            <h3 class="text-sm font-black text-slate-900 dark:text-white">حساب: {extractEngineer}</h3>
+                            {engineerOpTypeFilter !== 'ALL' && <span class="text-xs text-indigo-600 dark:text-indigo-400 block mt-0.5">تصفية نوع شغل: {engineerOpTypeFilter}</span>}
+                          </div>
+                          <div class="bg-indigo-600 text-white px-4 py-1.5 rounded-xl font-black text-sm shadow-xs">
+                            {engineerOpTypeFilter === 'ALL' ? `الإجمالي الكلي المستحق: ${grandTotal.toLocaleString()} ج.م` : `مستحق (${engineerOpTypeFilter}): ${filteredTotal.toLocaleString()} ج.م`}
+                          </div>
                         </div>
-                        <div class="overflow-x-auto custom-scroll">
-                          <table class="w-full text-right border"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border">التاريخ</th><th class="p-2 border">العميل والموقع</th><th class="p-2 border text-center text-emerald-600">حصة الأتعاب</th></tr></thead>
-                          <tbody>{engOps.map(o=><tr key={o.id} class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                            <td class="p-2 border whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td>
-                            <td class="p-2 border">
-                              {o.clientName} <span class="text-[10px] text-amber-700">({o.siteLocation})</span>
-                              {o.hasSecondEngineer && <span class="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}
-                            </td>
-                            <td class="p-2 border text-center font-black text-emerald-600 font-mono">
-                              {o?.hasSecondEngineer ? (parseNum(o.engFee) / 2).toLocaleString() : parseNum(o.engFee).toLocaleString()}
-                            </td>
-                          </tr>)}
-                          </tbody>
-                          {engOps.length === 0 && <tr><td colSpan="3" class="text-center p-4 text-slate-400">لا توجد طلعات مسجلة لهذا المهندس</td></tr>}
-                          </table>
-                        </div>
+
+                        {engineerOpTypeFilter === 'ALL' ? (
+                          <>
+                            {/* بطاقات الإجماليات */}
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div class="bg-purple-50 dark:bg-slate-700/50 border border-purple-200 dark:border-slate-600 p-3 rounded-xl flex justify-between items-center">
+                                <div>
+                                  <span class="text-[11px] text-purple-800 dark:text-purple-300 font-bold block">🛰️ إجمالي أتعاب RTK</span>
+                                  <span class="text-[10px] text-slate-500 block mt-0.5">{rtkOps.length} طلعات مسجلة</span>
+                                </div>
+                                <strong class="text-lg text-purple-700 dark:text-purple-400 font-black">{rtkTotal.toLocaleString()} ج.م</strong>
+                              </div>
+                              <div class="bg-amber-50 dark:bg-slate-700/50 border border-amber-200 dark:border-slate-600 p-3 rounded-xl flex justify-between items-center">
+                                <div>
+                                  <span class="text-[11px] text-amber-800 dark:text-amber-300 font-bold block">📐 إجمالي أتعاب مساحية أخرى</span>
+                                  <span class="text-[10px] text-slate-500 block mt-0.5">{otherOps.length} أعمال مسجلة</span>
+                                </div>
+                                <strong class="text-lg text-amber-700 dark:text-amber-400 font-black">{otherTotal.toLocaleString()} ج.م</strong>
+                              </div>
+                            </div>
+
+                            {/* جدول RTK */}
+                            <div>
+                              <h4 class="font-bold text-xs text-purple-800 dark:text-purple-300 mb-2">🛰️ سجل طلعات جهاز RTK</h4>
+                              <div class="overflow-x-auto custom-scroll border dark:border-slate-700 rounded-xl">
+                                <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border-b dark:border-slate-600">التاريخ</th><th class="p-2 border-b dark:border-slate-600">العميل والموقع</th><th class="p-2 border-b dark:border-slate-600 text-center text-purple-600">حصة الأتعاب</th></tr></thead>
+                                <tbody>{rtkOps.map(o=><tr key={o.id} class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                                  <td class="p-2 border-b dark:border-slate-700 whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td>
+                                  <td class="p-2 border-b dark:border-slate-700">
+                                    <span class="text-slate-900 dark:text-white">{o.clientName}</span> <span class="text-[10px] text-amber-700">({o.siteLocation})</span> - {o.opType}
+                                    {o.hasSecondEngineer && <span class="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}
+                                  </td>
+                                  <td class="p-2 border-b dark:border-slate-700 text-center font-black text-purple-600 font-mono">
+                                    {o?.hasSecondEngineer ? (parseNum(o.engFee) / 2).toLocaleString() : parseNum(o.engFee).toLocaleString()}
+                                  </td>
+                                </tr>)}
+                                {rtkOps.length === 0 && <tr><td colSpan="3" class="text-center p-4 text-slate-400 text-[11px]">لا توجد طلعات RTK مسجلة</td></tr>}
+                                </tbody></table>
+                              </div>
+                            </div>
+
+                            {/* جدول أعمال أخرى */}
+                            <div>
+                              <h4 class="font-bold text-xs text-amber-800 dark:text-amber-300 mb-2 mt-4">📐 سجل الأعمال المساحية الأخرى (كروكيات/تخطيط/فدان)</h4>
+                              <div class="overflow-x-auto custom-scroll border dark:border-slate-700 rounded-xl">
+                                <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border-b dark:border-slate-600">التاريخ</th><th class="p-2 border-b dark:border-slate-600">العميل والموقع</th><th class="p-2 border-b dark:border-slate-600 text-center text-amber-600">حصة الأتعاب</th></tr></thead>
+                                <tbody>{otherOps.map(o=><tr key={o.id} class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                                  <td class="p-2 border-b dark:border-slate-700 whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td>
+                                  <td class="p-2 border-b dark:border-slate-700">
+                                    <span class="text-slate-900 dark:text-white">{o.clientName}</span> <span class="text-[10px] text-amber-700">({o.siteLocation})</span> - {o.opType}
+                                    <span class="block text-[10px] text-slate-500 mt-0.5">{o.workDescription}</span>
+                                    {o.hasSecondEngineer && <span class="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}
+                                  </td>
+                                  <td class="p-2 border-b dark:border-slate-700 text-center font-black text-amber-600 font-mono">
+                                    {o?.hasSecondEngineer ? (parseNum(o.engFee) / 2).toLocaleString() : parseNum(o.engFee).toLocaleString()}
+                                  </td>
+                                </tr>)}
+                                {otherOps.length === 0 && <tr><td colSpan="3" class="text-center p-4 text-slate-400 text-[11px]">لا توجد أعمال مسجلة</td></tr>}
+                                </tbody></table>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          /* جدول مخصص عند اختيار نوع شغل محدد */
+                          <div>
+                            <div class="bg-indigo-50 dark:bg-slate-700/50 border border-indigo-200 dark:border-slate-600 p-3 rounded-xl mb-3 flex justify-between items-center">
+                              <div>
+                                <span class="text-xs text-indigo-900 dark:text-indigo-300 font-bold block">📋 إجمالي أتعاب: {engineerOpTypeFilter}</span>
+                                <span class="text-[10px] text-slate-500 block mt-0.5">{filteredOps.length} طلعات مسجلة بهذا النوع</span>
+                              </div>
+                              <strong class="text-xl text-indigo-700 dark:text-indigo-300 font-black">{filteredTotal.toLocaleString()} ج.م</strong>
+                            </div>
+
+                            <div class="overflow-x-auto custom-scroll border dark:border-slate-700 rounded-xl">
+                              <table class="w-full text-right"><thead class="bg-slate-100 dark:bg-slate-700"><tr><th class="p-2 border-b dark:border-slate-600">التاريخ</th><th class="p-2 border-b dark:border-slate-600">العميل والموقع</th><th class="p-2 border-b dark:border-slate-600">البيان</th><th class="p-2 border-b dark:border-slate-600 text-center text-indigo-600">الأتعاب</th></tr></thead>
+                              <tbody>{filteredOps.map(o=><tr key={o.id} class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                                <td class="p-2 border-b dark:border-slate-700 whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td>
+                                <td class="p-2 border-b dark:border-slate-700">
+                                  <span class="text-slate-900 dark:text-white">{o.clientName}</span> <span class="text-[10px] text-amber-700">({o.siteLocation})</span>
+                                  {o.hasSecondEngineer && <span class="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}
+                                </td>
+                                <td class="p-2 border-b dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[11px]">{o.workDescription || '-'}</td>
+                                <td class="p-2 border-b dark:border-slate-700 text-center font-black text-indigo-600 font-mono">
+                                  {o?.hasSecondEngineer ? (parseNum(o.engFee) / 2).toLocaleString() : parseNum(o.engFee).toLocaleString()}
+                                </td>
+                              </tr>)}
+                              {filteredOps.length === 0 && <tr><td colSpan="4" class="text-center p-4 text-slate-400 text-[11px]">لا توجد طلعات مسجلة بهذا النوع لهذا المهندس</td></tr>}
+                              </tbody></table>
+                            </div>
+                          </div>
+                        )}
+
                       </div>
                     )
                   })()}
