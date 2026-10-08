@@ -22,6 +22,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
@@ -71,7 +72,7 @@
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-    /* حركات دراجة التحميل */
+    /* Bike Loading Animation Styles */
     .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
     .bike-svg { width: 100%; height: 100%; overflow: visible; }
     .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
@@ -83,14 +84,15 @@
     .loading-text::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
     @keyframes dots { 0%, 20% { content: ''; } 40% { content: '.'; } 60% { content: '..'; } 80%, 100% { content: '...'; } }
 
-    /* حركات جهاز توتال ستيشن في شاشة الدخول */
+    /* Animated Login Station Styles */
     .float-anim { animation: floating 4s ease-in-out infinite; }
     .laser-anim { animation: laser-scan 2s ease-in-out infinite alternate; }
     @keyframes floating { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
     @keyframes laser-scan { 0% { opacity: 0.2; transform: scaleX(0.8); } 100% { opacity: 0.8; transform: scaleX(1.2); } }
   </style>
+
 </head>
-<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 antialiased transition-colors duration-300">
+<body className="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 antialiased transition-colors duration-300">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -238,10 +240,11 @@
     }
 
     function App() {
-      // States
+      // 1. States Initialization
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
       const [isOnline, setIsOnline] = useState(navigator.onLine);
+      
       const [loginEmail, setLoginEmail] = useState("");
       const [loginPassword, setLoginPassword] = useState("");
       const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
@@ -289,6 +292,7 @@
       const [newOp, setNewOp] = useState(initialOpState);
       const [newTx, setNewTx] = useState({ date: todayDate, type: "income", category: "إيراد عام", clientOrEntity: "", amount: "", notes: "" });
       const [newPayment, setNewPayment] = useState({ date: todayDate, clientName: "", siteLocation: "", amount: "", notes: "سداد دفعة من المستخلص" });
+      const [newRoleInput, setNewRoleInput] = useState({ email: "", role: "engineer" });
 
       const [extractClient, setExtractClient] = useState("");
       const [extractSite, setExtractSite] = useState("");
@@ -298,8 +302,8 @@
       const [extractItems, setExtractItems] = useState([]);
       const [statementClient, setStatementClient] = useState("");
 
-      // Memos for Auth & Roles
-      const userEmail = (user?.email || "").trim().toLowerCase();
+      // 2. Memos & Roles Logic
+      const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
       const sanitizedEmailKey = userEmail.replace(/\./g, '_');
       
       const isSuperAdminExact = userEmail === SUPER_ADMIN_EMAIL.toLowerCase() || userEmail.includes("mohamedmohy676676");
@@ -324,7 +328,74 @@
                        userRoleKey === 'pm' ? "💼 مدير مشاريع" :
                        userRoleKey === 'admin' ? "👑 إدارة" : "👷 مهندس معتمد";
 
-      // Functions MUST be declared before useMemo/useEffect
+      // 3. Side Effects (useEffect)
+      useEffect(() => {
+        const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) offlineStorage.syncQueue(db); };
+        const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
+        window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
+        return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
+      }, []);
+
+      useEffect(() => {
+        if (settings.theme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', settings.theme);
+      }, [settings.theme]);
+
+      useEffect(() => {
+        if (!auth) { setAuthLoading(false); return; }
+        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 6000);
+
+        const unsubscribe = auth.onAuthStateChanged((curr) => {
+          clearTimeout(safetyTimer);
+          if (curr) {
+            setUser(curr);
+            localStorage.setItem('last_user_email', curr.email);
+            localStorage.setItem('last_user_name', curr.displayName || curr.email);
+            if (navigator.onLine && db && !sessionStorage.getItem('survey_log_done')) {
+              db.ref('survey_data/login_logs').push({ name: curr.displayName || curr.email, email: curr.email, action: "تسجيل الدخول للنظام", date: new Date().toLocaleString('ar-EG'), timestamp: Date.now() });
+              sessionStorage.setItem('survey_log_done', 'true');
+            }
+          } else {
+            const savedEmail = localStorage.getItem('last_user_email');
+            if (savedEmail && !navigator.onLine) setUser({ email: savedEmail, displayName: localStorage.getItem('last_user_name') || savedEmail });
+            else setUser(null);
+          }
+          setAuthLoading(false);
+        });
+        return () => { clearTimeout(safetyTimer); unsubscribe(); };
+      }, []);
+
+      useEffect(() => {
+        if (!db) return;
+        const ref = db.ref('survey_data');
+        const handleData = (snap) => {
+          const d = snap.val() || {};
+          if (d.operations) { const arr = toArr(d.operations).reverse(); setOperations(arr); offlineStorage.set('operations', arr); }
+          if (d.transactions) { const arr = toArr(d.transactions).reverse(); setTransactions(arr); offlineStorage.set('transactions', arr); }
+          if (d.payments) { const arr = toArr(d.payments).reverse(); setPayments(arr); offlineStorage.set('payments', arr); }
+          if (d.login_logs) { const arr = toArr(d.login_logs).reverse(); setLoginLogs(arr); offlineStorage.set('login_logs', arr); }
+          if (d.settings) {
+            setSettings(prev => {
+              const updated = {
+                ...prev,
+                engineers: toArr(d.settings.engineers).length ? toArr(d.settings.engineers) : prev.engineers,
+                opTypes: toArr(d.settings.opTypes).length ? toArr(d.settings.opTypes) : prev.opTypes,
+                roles: d.settings.roles || prev.roles,
+                logo: d.settings.logo || prev.logo
+              };
+              offlineStorage.set('settings', updated);
+              return updated;
+            });
+          }
+        };
+        ref.on('value', handleData);
+        return () => { ref.off('value', handleData); };
+      }, []);
+
+      useEffect(() => { if (extractClient) loadClientOpsIntoExtract(extractClient, extractSite); else setExtractItems([]); }, [extractClient, extractSite, operations]);
+
+      // 4. Action Handlers (Functions)
       function showToast(message, type="success") {
         setToast({ show: true, message, type });
         setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
@@ -360,6 +431,11 @@
       }
 
       function handlePhoneLoginClick() { showToast("لتسجيل الدخول برقم الهاتف يجب تفعيل reCAPTCHA من لوحة تحكم Firebase أولاً.", "error"); }
+
+      function handleLogout() { 
+        auth.signOut(); 
+        setDrawerOpen(false); 
+      }
 
       function handleOpTypeChange(selectedType) {
         setNewOp(prev => {
@@ -480,66 +556,38 @@
       const handleAddEmptyExtractRow = () => setExtractItems([...extractItems, { id: Date.now(), date: todayDate, desc: "بند أعمال مساحية", qty: 1, unitPrice: 1000, rate: 100 }]);
       const handleRemoveExtractRow = (id) => setExtractItems(extractItems.filter(item => item.id !== id));
 
-      // Effects
-      useEffect(() => {
-        const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) offlineStorage.syncQueue(db); };
-        const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
-        window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
-        return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
-      }, []);
+      const exportToExcel = () => {
+        if (typeof XLSX === 'undefined') { showToast("المكتبة غير متوفرة حالياً", "error"); return; }
+        const wb = XLSX.utils.book_new();
+        const wsOps = XLSX.utils.json_to_sheet(operations); XLSX.utils.book_append_sheet(wb, wsOps, "الأعمال_والمقايسات");
+        const wsTx = XLSX.utils.json_to_sheet(transactions); XLSX.utils.book_append_sheet(wb, wsTx, "الخزينة");
+        const wsPayments = XLSX.utils.json_to_sheet(payments); XLSX.utils.book_append_sheet(wb, wsPayments, "التحصيلات");
+        XLSX.writeFile(wb, `Survey_ERP_${todayDate}.xlsx`); 
+        showToast("تم تصدير ملف الإكسيل! 📥");
+      };
 
-      useEffect(() => {
-        if (!auth) { setAuthLoading(false); return; }
-        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 6000);
+      const exportJsonBackup = () => {
+        const fullBackup = { operations, transactions, payments, login_logs: loginLogs, settings, exportDate: new Date().toISOString() };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup, null, 2));
+        const downloadAnchor = document.createElement('a'); downloadAnchor.setAttribute("href", dataStr); downloadAnchor.setAttribute("download", `Survey_FullBackup_${todayDate}.json`);
+        document.body.appendChild(downloadAnchor); downloadAnchor.click(); downloadAnchor.remove();
+        showToast("تم تحميل النسخة الاحتياطية (JSON)! 💾");
+      };
 
-        const unsubscribe = auth.onAuthStateChanged((curr) => {
-          clearTimeout(safetyTimer);
-          if (curr) {
-            setUser(curr);
-            localStorage.setItem('last_user_email', curr.email);
-            localStorage.setItem('last_user_name', curr.displayName || curr.email);
-            if (navigator.onLine && db && !sessionStorage.getItem('survey_log_done')) {
-              db.ref('survey_data/login_logs').push({ name: curr.displayName || curr.email, email: curr.email, action: "تسجيل الدخول للنظام", date: new Date().toLocaleString('ar-EG'), timestamp: Date.now() });
-              sessionStorage.setItem('survey_log_done', 'true');
-            }
-          } else {
-            const savedEmail = localStorage.getItem('last_user_email');
-            if (savedEmail && !navigator.onLine) setUser({ email: savedEmail, displayName: localStorage.getItem('last_user_name') || savedEmail });
-            else setUser(null);
-          }
-          setAuthLoading(false);
-        });
-        return () => { clearTimeout(safetyTimer); unsubscribe(); };
-      }, []);
-
-      useEffect(() => {
-        if (!db) return;
-        const ref = db.ref('survey_data');
-        const handleData = (snap) => {
-          const d = snap.val() || {};
-          if (d.operations) { const arr = toArr(d.operations).reverse(); setOperations(arr); offlineStorage.set('operations', arr); }
-          if (d.transactions) { const arr = toArr(d.transactions).reverse(); setTransactions(arr); offlineStorage.set('transactions', arr); }
-          if (d.payments) { const arr = toArr(d.payments).reverse(); setPayments(arr); offlineStorage.set('payments', arr); }
-          if (d.login_logs) { const arr = toArr(d.login_logs).reverse(); setLoginLogs(arr); offlineStorage.set('login_logs', arr); }
-          if (d.settings) {
-            setSettings(prev => {
-              const updated = {
-                ...prev,
-                engineers: toArr(d.settings.engineers).length ? toArr(d.settings.engineers) : prev.engineers,
-                opTypes: toArr(d.settings.opTypes).length ? toArr(d.settings.opTypes) : prev.opTypes,
-                roles: d.settings.roles || prev.roles,
-                logo: d.settings.logo || prev.logo
-              };
-              offlineStorage.set('settings', updated);
-              return updated;
-            });
-          }
-        };
-        ref.on('value', handleData);
-        return () => { ref.off('value', handleData); };
-      }, []);
-
-      useEffect(() => { if (extractClient) loadClientOpsIntoExtract(extractClient, extractSite); else setExtractItems([]); }, [extractClient, extractSite, operations]);
+      const handleSaveRole = (e) => {
+        e.preventDefault();
+        if (!isAdmin) return;
+        const cleanEmail = newRoleInput.email.trim().toLowerCase();
+        if (!cleanEmail) return;
+        const key = cleanEmail.replace(/\./g, '_');
+        
+        const newRoles = { ...(settings.roles || {}), [key]: newRoleInput.role };
+        const updatedSettings = { ...settings, roles: newRoles };
+        setSettings(updatedSettings);
+        saveListSafely('settings', 'settings', updatedSettings);
+        setNewRoleInput({ email: "", role: "engineer" });
+        showToast(`تم تعيين الصلاحية للمستخدم بنجاح!`);
+      };
 
       // Calculations used for UI
       const extractTotalWork = extractItems.reduce((sum, item) => sum + (parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100)), 0);
@@ -586,9 +634,8 @@
       ], [isSuperAdminExact]);
 
 
-      // 5. الشاشات المبدئية والتحميل (Early Returns)
+      // 5. الشاشات المبدئية والتحميل (Early Returns) MUST BE AFTER ALL HOOKS
       
-      // أ) شاشة التحميل التفاعلية (الدراجة - Bicycle Loader)
       if (authLoading) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
@@ -625,7 +672,6 @@
         );
       }
 
-      // ب) شاشة تسجيل الدخول المقسمة (Animated Login Form)
       if (!user) {
         return (
           <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 md:p-8 transition-colors duration-500">
@@ -702,31 +748,23 @@
 
               {/* الجانب الأيسر (الرسمة التفاعلية للمساحة) */}
               <div className="w-full md:w-1/2 bg-gradient-to-br from-indigo-500 to-purple-600 p-8 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px]">
-                {/* دوائر خلفية جمالية */}
                 <div className="absolute top-[-50px] right-[-50px] w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
                 <div className="absolute bottom-[-50px] left-[-50px] w-60 h-60 bg-indigo-900/20 rounded-full blur-3xl"></div>
                 
                 <h3 className="text-white font-black text-xl mb-8 z-10 text-center drop-shadow-md">نظام إدارة متكامل</h3>
                 
-                {/* جهاز توتال ستيشن متحرك (Animated Total Station SVG) */}
                 <div className="relative z-10 float-anim w-48 h-48 flex items-center justify-center">
                   <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl">
-                    {/* الحامل الثلاثي (Tripod) */}
                     <path d="M100 130 L70 190" stroke="#cbd5e1" strokeWidth="6" strokeLinecap="round" />
                     <path d="M100 130 L130 190" stroke="#cbd5e1" strokeWidth="6" strokeLinecap="round" />
                     <path d="M100 130 L100 190" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" />
-                    {/* قاعدة الجهاز */}
                     <rect x="75" y="120" width="50" height="10" rx="4" fill="#334155" />
                     <rect x="85" y="110" width="30" height="10" fill="#475569" />
-                    {/* جسم الجهاز الرئيسي */}
                     <path d="M70 70 C70 50, 130 50, 130 70 L125 110 L75 110 Z" fill="#e2e8f0" />
-                    {/* العدسة / الشاشة */}
                     <circle cx="100" cy="85" r="18" fill="#1e293b" />
                     <circle cx="100" cy="85" r="10" fill="#38bdf8" className="opacity-80" />
-                    {/* أزرار وتفاصيل */}
                     <rect x="80" y="75" width="6" height="20" rx="2" fill="#94a3b8" />
                     <circle cx="120" cy="95" r="4" fill="#fbbf24" />
-                    {/* إشعاع الليزر (Laser Scan Animation) */}
                     <path d="M100 85 L20 40" stroke="#38bdf8" strokeWidth="3" strokeDasharray="5,5" className="laser-anim" />
                     <path d="M100 85 L180 40" stroke="#38bdf8" strokeWidth="3" strokeDasharray="5,5" className="laser-anim" />
                   </svg>
@@ -742,14 +780,12 @@
         );
       }
 
-      // 6. باقي الكود ومحتوى النظام الفعلي (ERP Dashboard)
+      // 6. Main Content App Render
       return (
-        <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0">
-          
+        <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
           {!isOnline && (
             <div className="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
-              <span>📡</span>
-              <span>أنت تعمل الآن في وضع عدم الاتصال (بدون إنترنت). يتم حفظ جميع العمليات محلياً على جهازك وسوف ترفع تلقائياً عند توفر الشبكة.</span>
+              <span>📡</span><span>أنت تعمل الآن في وضع عدم الاتصال (بدون إنترنت). يتم حفظ جميع العمليات محلياً على جهازك وسوف ترفع تلقائياً عند توفر الشبكة.</span>
             </div>
           )}
 
@@ -759,29 +795,15 @@
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-sm font-black text-indigo-700 dark:text-indigo-400">مكتب مساحة</h1>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs text-white ${userRoleKey === 'superadmin' ? 'bg-amber-500' : userRoleKey === 'executive' || userRoleKey === 'pm' ? 'bg-indigo-600' : userRoleKey === 'admin' ? 'bg-amber-500' : 'bg-emerald-600'}`}>
-                    {roleText}
-                  </span>
+                  <span className="bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs">{roleText}</span>
                 </div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">
-                  {user?.email || "غير مسجل"}
-                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">{user.email}</div>
               </div>
             </div>
-
             <div className="flex items-center gap-2">
-              <button onClick={() => {
-                const next = settings.theme === 'dark' ? 'light' : 'dark';
-                setSettings({...settings, theme: next});
-              }} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">
-                ☀️/🌙
-              </button>
-              <a href="/index.html" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition">
-                <span>🏗️</span> <span className="hidden sm:inline">الإنشاءات</span>
-              </a>
-              <button onClick={()=>setDrawerOpen(true)} className="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">
-                ☰
-              </button>
+              <button onClick={() => { const next = settings.theme === 'dark' ? 'light' : 'dark'; setSettings({...settings, theme: next}); }} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
+              <a href="index.html" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition"><span>🏗️</span> <span className="hidden sm:inline">الإنشاءات</span></a>
+              <button onClick={()=>setDrawerOpen(true)} className="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">☰</button>
             </div>
           </header>
 
@@ -806,10 +828,7 @@
                 <div className="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-4 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-                      <div>
-                        <span className="font-black text-sm">أقسام مكتب مساحة</span>
-                        <span className="block text-[10px] text-indigo-400 font-bold mt-1">{roleText}</span>
-                      </div>
+                      <div><span className="font-black text-sm">أقسام مكتب مساحة</span><span className="block text-[10px] text-indigo-400 font-bold mt-1">{roleText}</span></div>
                       <button onClick={()=>setDrawerOpen(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
                     </div>
                     <nav className="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">
@@ -1039,7 +1058,7 @@
 
               {activeTab === 'engineers' && (
                 <div className="space-y-4 font-bold">
-                  <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-3">
+                  <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs flex flex-col sm:flex-row gap-3">
                     <div className="w-full sm:w-1/2">
                       <label className="mb-1 block">اختر المهندس لعرض كشف حسابه:</label>
                       <select value={extractEngineer} onChange={e=>setExtractEngineer(e.target.value)} className="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-indigo-700 dark:text-indigo-400">
@@ -1071,7 +1090,7 @@
                     const filteredTotal = calcDue(filteredOps);
 
                     return (
-                      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-4">
+                      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs space-y-4">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b dark:border-slate-700 pb-3">
                           <div>
                             <h3 className="text-sm font-black text-slate-900 dark:text-white">حساب: {extractEngineer}</h3>
@@ -1301,15 +1320,15 @@
               )}
 
               {activeTab === 'office' && (
-                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border dark:border-slate-700 shadow-xs text-center font-bold space-y-4">
-                  <h3 className="text-base text-indigo-700 dark:text-indigo-400">أرباح المكتب المجمعة</h3>
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs text-center font-bold space-y-4">
+                  <h3 className="text-base">أرباح المكتب المجمعة</h3>
                   <div className="text-3xl font-black text-emerald-600">{Math.round(totalOffice).toLocaleString()} ج.م</div>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                    <div className="p-3 border dark:border-slate-600 rounded-2xl bg-amber-50 dark:bg-slate-700 text-amber-900 dark:text-amber-100">في سبيل الله (10%)<br/><strong className="text-base mt-1 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
-                    <div className="p-3 border dark:border-slate-600 rounded-2xl bg-blue-50 dark:bg-slate-700 text-blue-900 dark:text-blue-100">م. أحمد نبيل (10%)<br/><strong className="text-base mt-1 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
-                    <div className="p-3 border dark:border-slate-600 rounded-2xl">م. أسامة<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
-                    <div className="p-3 border dark:border-slate-600 rounded-2xl">م. أيمن<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
-                    <div className="p-3 border dark:border-slate-600 rounded-2xl">م. علاء<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl bg-amber-50 dark:bg-slate-700 text-amber-900 dark:text-amber-100">في سبيل الله (10%)<br/><strong className="text-base mt-1 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl bg-blue-50 dark:bg-slate-700 text-blue-900 dark:text-blue-100">م. أحمد نبيل (10%)<br/><strong className="text-base mt-1 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl">م. أسامة<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl">م. أيمن<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl">م. علاء<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
                   </div>
                 </div>
               )}
@@ -1360,21 +1379,9 @@
                   {isSuperAdminExact && (
                     <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
                       <h3 className="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للمساحة</h3>
-                      <form onSubmit={(e) => {
-                        e.preventDefault();
-                        const emailInput = window.prompt("أدخل البريد الإلكتروني للمستخدم:");
-                        if (!emailInput || !emailInput.trim()) return;
-                        const roleInput = e.target.elements.roleSelect.value;
-                        const cleanEmail = emailInput.trim().toLowerCase();
-                        const key = cleanEmail.replace(/\./g, '_');
-                        
-                        const newRoles = { ...(settings.roles || {}), [key]: roleInput };
-                        const updatedSettings = { ...settings, roles: newRoles };
-                        setSettings(updatedSettings);
-                        saveListSafely('settings', 'settings', updatedSettings);
-                        showToast(`تم تعيين الصلاحية للمستخدم بنجاح!`);
-                      }} className="flex gap-2">
-                        <select name="roleSelect" className="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold w-full text-xs">
+                      <form onSubmit={handleSaveRole} className="flex gap-2">
+                        <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} className="flex-1 border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
+                        <select name="roleSelect" value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold w-1/3 text-xs">
                           <option value="engineer">👷 مهندس معتمد</option>
                           <option value="pm">💼 مدير مشاريع</option>
                           <option value="executive">💼 المدير التنفيذي</option>
