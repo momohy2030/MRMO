@@ -78,7 +78,7 @@
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-    /* Bike Loading Animation */
+    /* حركات دراجة التحميل (Bike Loader) */
     .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
     .bike-svg { width: 100%; height: 100%; overflow: visible; }
     .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
@@ -86,13 +86,13 @@
     .body-bounce { animation: bounce 0.6s ease-in-out infinite alternate; }
     @keyframes spin { 100% { transform: rotate(360deg); } }
     @keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-4px); } }
-    .loading-text { font-family: 'Courier New', Courier, monospace; font-weight: bold; letter-spacing: 2px; color: #f59e0b; font-size: 1.2rem; margin-top: 15px; text-align: center; }
+    .loading-text { font-family: 'Courier New', Courier, monospace; font-weight: bold; letter-spacing: 2px; color: #6366f1; font-size: 1.2rem; margin-top: 15px; text-align: center; }
     .loading-text::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
     @keyframes dots { 0%, 20% { content: ''; } 40% { content: '.'; } 60% { content: '..'; } 80%, 100% { content: '...'; } }
   </style>
 
 </head>
-<body className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -170,14 +170,14 @@
         if (chart1Ref.current) {
           chart1Instance.current = new Chart(chart1Ref.current, {
             type: 'bar',
-            data: { labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'], datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#f59e0b', '#f43f5e', '#10b981'], borderRadius: 8 }] },
+            data: { labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'], datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#4f46e5', '#f43f5e', '#10b981'], borderRadius: 8 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
           });
         }
         if (chart2Ref.current) {
           chart2Instance.current = new Chart(chart2Ref.current, {
             type: 'doughnut',
-            data: { labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'], datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#f59e0b', '#10b981', '#6366f1', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }] },
+            data: { labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'], datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10, family: 'Cairo' } } } } }
           });
         }
@@ -258,6 +258,7 @@
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
       const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
 
+
       // ==========================================
       // 2. الحسابات الأساسية والصلاحيات (MEMOS)
       // ==========================================
@@ -306,11 +307,11 @@
 
 
       // ==========================================
-      // 3. الخطافات والاتصال (USE EFFECTS)
+      // 3. الخطافات (USE EFFECTS)
       // ==========================================
       useEffect(() => {
-        const handleOnline = () => { setIsOnline(true); showToast("تم الاتصال بالإنترنت والمزامنة 🟢"); if (db) constructionStorage.syncQueue(db); };
-        const handleOffline = () => { setIsOnline(false); showToast("تم التحويل للعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
+        const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) constructionStorage.syncQueue(db); };
+        const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
         window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
         return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
       }, []);
@@ -323,7 +324,7 @@
 
       useEffect(() => {
         if (!auth) { setAuthLoading(false); return; }
-        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 6000); // 6 ثواني حد أقصى
+        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 6000); // 6 ثواني كحد أقصى للتحميل
 
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           clearTimeout(safetyTimer);
@@ -334,7 +335,12 @@
               auth.signOut(); setUser(null); setAuthLoading(false); return;
             }
             setAccessDeniedMessage("");
-            setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", email: currentUser.email || currentUser.phoneNumber || "", identifier });
+            setUser({ 
+              uid: currentUser.uid, 
+              name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق",
+              email: currentUser.email || currentUser.phoneNumber || "",
+              identifier 
+            });
             localStorage.setItem('last_const_user_email', identifier);
             localStorage.setItem('last_const_user_name', currentUser.displayName || identifier);
           } else {
@@ -426,6 +432,8 @@
         if (navigator.onLine && db) db.ref('login_logs').push(logEntry);
       };
 
+      const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
       const handleEmailLogin = (e) => {
         e.preventDefault();
         if (!loginEmail || !loginPassword) return;
@@ -475,7 +483,8 @@
       const deleteItem = (path, id, list) => {
         if (!isAdmin && !isAccountant) { showToast("الحذف مصرح للإدارة والمحاسب فقط 🔒", "error"); return; }
         if (window.confirm("تأكيد الحذف نهائياً؟")) {
-          const newList = list.filter(item => item.id !== id); saveSafeConstructionData(path, path, newList);
+          const newList = list.filter(item => item.id !== id);
+          saveSafeConstructionData(path, path, newList);
           if (path === 'expenses') setExpenses(newList); if (path === 'extracts') setExtracts(newList); if (path === 'payments') setPayments(newList); 
           if (path === 'projects') setProjects(newList); if (path === 'advances') setAdvances(newList); if (path === 'supplier_payments') setSupplierPayments(newList);
           showToast("تم الحذف بنجاح! 🗑️");
@@ -507,6 +516,7 @@
           path = 'projects'; const updatedItem = { ...data, budget: parseNum(data.budget) };
           list = projects.map(item => item.id === data.id ? updatedItem : item); setProjects(list);
         }
+
         if (path) saveSafeConstructionData(path, path, list);
         setEditItemData(null); showToast("تم حفظ التعديلات بنجاح! ✏️");
       };
@@ -541,7 +551,120 @@
 
 
       // ==========================================
-      // 5. الحسابات الخاصة بالعرض في الشاشات
+      // 5. شاشات التحميل المبدئية (EARLY RETURNS)
+      // ==========================================
+      
+      if (authLoading) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
+            <div className="bike-container">
+              <svg className="bike-svg" viewBox="0 0 100 100" fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <g className="body-bounce">
+                  <polyline points="30,60 45,35 75,35 60,60 30,60" />
+                  <line x1="45" y1="35" x2="40" y2="25" />
+                  <line x1="35" y1="25" x2="45" y2="25" />
+                  <line x1="75" y1="35" x2="70" y2="20" />
+                  <path d="M70,20 Q80,15 85,25" />
+                </g>
+                <g transform="translate(30, 60)">
+                  <circle cx="0" cy="0" r="15" className="wheel" />
+                  <circle cx="0" cy="0" r="2" fill="#4f46e5" />
+                  <line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" />
+                  <line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" />
+                </g>
+                <g transform="translate(75, 60)">
+                  <circle cx="0" cy="0" r="15" className="wheel" />
+                  <circle cx="0" cy="0" r="2" fill="#4f46e5" />
+                  <line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" />
+                  <line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" />
+                </g>
+                <g transform="translate(60, 60)" className="pedal">
+                  <circle cx="0" cy="0" r="4" fill="#4f46e5" />
+                  <line x1="0" y1="-8" x2="0" y2="8" strokeWidth="2" />
+                </g>
+              </svg>
+            </div>
+            <div className="loading-text text-indigo-500">Loading</div>
+            <div className="text-[10px] text-slate-500 font-bold mt-2 font-cairo">جاري تأمين وربط الاتصال...</div>
+          </div>
+        );
+      }
+
+      if (!user) {
+        return (
+          <div className={`min-h-screen flex flex-col md:flex-row items-center justify-center px-4 transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
+            <div className="relative flex flex-col items-center mb-10 md:mb-0 md:ml-16 z-20">
+              <div className={`w-40 h-20 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
+              <div className={`w-3 h-32 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
+              <div className={`w-24 h-4 rounded-t-lg transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
+              <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-16 left-1/2 ml-8 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة النظام">
+                <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-16' : 'h-10'}`}></div>
+                <div className="w-4 h-4 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
+              </div>
+            </div>
+
+            <div className={`relative transition-all duration-1000 transform ${isLampOn ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95 pointer-events-none'}`}>
+              {isLampOn && <div className="absolute -inset-4 bg-amber-400/10 blur-2xl rounded-[3rem] z-0"></div>}
+              
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center relative z-10">
+                <div className="w-14 h-14 bg-white/20 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl shadow-inner">🏗️</div>
+                <h2 className="text-xl font-black text-white">مكتب مساحة</h2>
+                <p className="text-slate-300 text-[11px] mt-1 mb-4 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
+                
+                <div className="flex bg-slate-900/50 p-1 rounded-xl mb-5 border border-white/10">
+                  <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2 rounded-lg shadow-md text-xs">
+                    🏗️ الإنشاءات
+                  </button>
+                  <a href="survey.html" className="flex-1 text-slate-400 hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
+                    📐 المساحة
+                  </a>
+                </div>
+
+                {accessDeniedMessage ? (
+                  <div className="space-y-3">
+                    <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-xs font-bold leading-relaxed">⚠️ {accessDeniedMessage}</div>
+                  </div>
+                ) : (
+                  <>
+                    <form onSubmit={handleEmailLogin} className="space-y-3 mb-4">
+                      <div className="relative">
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">✉️</span>
+                        <input type="email" placeholder="البريد الإلكتروني..." value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
+                      </div>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">🔒</span>
+                        <input type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
+                      </div>
+                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-2.5 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all text-xs">
+                        تسجيل الدخول
+                      </button>
+                    </form>
+
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="h-px bg-white/20 flex-1"></div>
+                      <span className="text-white/50 text-[10px] font-bold">أو بواسطة</span>
+                      <div className="h-px bg-white/20 flex-1"></div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
+                      </button>
+                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
+                        📱 هاتف
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+
+      // ==========================================
+      // 6. العمليات الحسابية لباقي الشاشات
       // ==========================================
       const currentProj = projects.find(p => cleanId(p?.id) === cleanId(selectedProjId)) || projects[0] || {};
       const projExpenses = expenses.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
@@ -619,162 +742,30 @@
 
 
       // ==========================================
-      // 6. شاشات التحميل والدخول المبدئية (EARLY RETURNS)
-      // ==========================================
-      
-      // أ) دراجة التحميل (Loading Spinner)
-      if (authLoading) {
-        return (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
-            <div className="bike-container">
-              <svg className="bike-svg" viewBox="0 0 100 100" fill="none" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <g className="body-bounce">
-                  <polyline points="30,60 45,35 75,35 60,60 30,60" />
-                  <line x1="45" y1="35" x2="40" y2="25" />
-                  <line x1="35" y1="25" x2="45" y2="25" />
-                  <line x1="75" y1="35" x2="70" y2="20" />
-                  <path d="M70,20 Q80,15 85,25" />
-                </g>
-                <g transform="translate(30, 60)">
-                  <circle cx="0" cy="0" r="15" className="wheel" />
-                  <circle cx="0" cy="0" r="2" fill="#f59e0b" />
-                  <line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" />
-                  <line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" />
-                </g>
-                <g transform="translate(75, 60)">
-                  <circle cx="0" cy="0" r="15" className="wheel" />
-                  <circle cx="0" cy="0" r="2" fill="#f59e0b" />
-                  <line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" />
-                  <line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" />
-                </g>
-                <g transform="translate(60, 60)" className="pedal">
-                  <circle cx="0" cy="0" r="4" fill="#f59e0b" />
-                  <line x1="0" y1="-8" x2="0" y2="8" strokeWidth="2" />
-                </g>
-              </svg>
-            </div>
-            <div className="loading-text text-amber-500">Loading</div>
-            <div className="text-[10px] text-slate-500 font-bold mt-2 font-cairo">جاري تأمين وربط الاتصال...</div>
-          </div>
-        );
-      }
-
-      // ب) شاشة الدخول المضيئة المنقسمة (Lamp Login UI with Toggles)
-      if (!user) {
-        return (
-          <div className={`min-h-screen flex flex-col md:flex-row items-center justify-center px-4 transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
-            <div className="relative flex flex-col items-center mb-10 md:mb-0 md:ml-16 z-20">
-              <div className={`w-40 h-20 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
-              <div className={`w-3 h-32 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-              <div className={`w-24 h-4 rounded-t-lg transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-              <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-16 left-1/2 ml-8 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة النظام">
-                <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-16' : 'h-10'}`}></div>
-                <div className="w-4 h-4 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
-              </div>
-            </div>
-
-            <div className={`relative transition-all duration-1000 transform ${isLampOn ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95 pointer-events-none'}`}>
-              {isLampOn && <div className="absolute -inset-4 bg-amber-400/10 blur-2xl rounded-[3rem] z-0"></div>}
-              
-              <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center relative z-10">
-                <div className="w-14 h-14 bg-white/20 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl shadow-inner">🏗️</div>
-                <h2 className="text-xl font-black text-white">مكتب مساحة</h2>
-                <p className="text-slate-300 text-[11px] mt-1 mb-4 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
-                
-                {/* 🔴 أزرار التبديل السريعة 🔴 */}
-                <div className="flex bg-slate-900/50 p-1 rounded-xl mb-5 border border-white/10">
-                  <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2 rounded-lg shadow-md text-xs">
-                    🏗️ الإنشاءات
-                  </button>
-                  <a href="survey.html" className="flex-1 text-slate-400 hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
-                    📐 المساحة
-                  </a>
-                </div>
-
-                {accessDeniedMessage ? (
-                  <div className="space-y-3">
-                    <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-xs font-bold leading-relaxed">
-                      ⚠️ {accessDeniedMessage}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <form onSubmit={handleEmailLogin} className="space-y-4">
-                      <div>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">✉️</span>
-                          <input 
-                            type="email" placeholder="البريد الإلكتروني..." value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
-                            className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">🔒</span>
-                          <input 
-                            type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)}
-                            className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
-                          />
-                        </div>
-                      </div>
-                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3.5 rounded-xl shadow-md transition-all text-sm mt-2">
-                        تسجيل الدخول للنظام
-                      </button>
-                    </form>
-
-                    <div className="flex items-center gap-3 my-6">
-                      <div className="h-px bg-white/20 flex-1"></div>
-                      <span className="text-white/50 text-[10px] font-bold">أو بواسطة</span>
-                      <div className="h-px bg-white/20 flex-1"></div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
-                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
-                      </button>
-                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
-                        📱 هاتف
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-
-      // ==========================================
-      // 7. الواجهة الرئيسية للإنشاءات (Main Application Render)
+      // 7. الشاشة الرئيسية للنظام (DASHBOARD HTML)
       // ==========================================
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
-          
           {!isOnline && (
             <div className="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
-              <span>📡</span><span>أنت متصل محلياً بدون إنترنت. يتم حفظ السجلات بالجهاز وترفع فور عودة الشبكة.</span>
+              <span>📡</span><span>أنت تعمل الآن في وضع عدم الاتصال (بدون إنترنت). يتم حفظ جميع العمليات محلياً على جهازك وسوف ترفع تلقائياً عند توفر الشبكة.</span>
             </div>
           )}
 
           <header className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div className="flex items-center gap-2">
-              <span className="text-2xl p-1 bg-amber-50 dark:bg-amber-900/30 rounded-xl">🏗️</span>
+              <span className="text-2xl p-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl">📐</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-sm font-black text-slate-900 dark:text-white">مكتب مساحة</h1>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs text-white ${userRoleKey === 'superadmin' ? 'bg-amber-500 text-slate-900' : userRoleKey === 'executive' || userRoleKey === 'pm' ? 'bg-indigo-600' : userRoleKey === 'accountant' ? 'bg-emerald-600' : userRoleKey === 'admin' ? 'bg-amber-500 text-slate-900' : 'bg-blue-600'}`}>
-                    {userRoleTitle}
-                  </span>
+                  <h1 className="text-sm font-black text-indigo-700 dark:text-indigo-400">مكتب مساحة</h1>
+                  <span className="bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs">{roleText}</span>
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">{user.email}</div>
               </div>
             </div>
-
             <div className="flex items-center gap-2">
               <button onClick={toggleTheme} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
-              <a href="survey.html" className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition"><span>📐</span> <span className="hidden sm:inline">قطاع المساحة</span></a>
+              <a href="index.html" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition"><span>🏗️</span> <span className="hidden sm:inline">الإنشاءات</span></a>
               <button onClick={()=>setDrawerOpen(true)} className="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">☰</button>
             </div>
           </header>
@@ -783,7 +774,7 @@
             <aside className="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col justify-between shrink-0 border-l border-slate-800 print-hidden">
               <div className="p-3 overflow-y-auto space-y-1 text-xs font-bold custom-scroll">
                 {navTabs.map(t => (
-                  <button key={t.id} onClick={() => setActiveTab(t.id)} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl transition ${activeTab===t.id ? 'bg-amber-500 text-slate-900 shadow' : 'hover:bg-slate-800'}`}>
+                  <button key={t.id} onClick={() => setActiveTab(t.id)} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl transition ${activeTab===t.id ? 'bg-indigo-600 text-white shadow' : 'hover:bg-slate-800'}`}>
                     <span className="text-base">{t.icon}</span> <span>{t.label}</span>
                   </button>
                 ))}
@@ -800,12 +791,12 @@
                 <div className="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-4 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-                      <div><span className="font-black text-sm">أقسام الإنشاءات</span><span className="block text-[10px] text-amber-400 font-bold mt-1">{userRoleTitle}</span></div>
+                      <div><span className="font-black text-sm">أقسام مكتب مساحة</span><span className="block text-[10px] text-indigo-400 font-bold mt-1">{roleText}</span></div>
                       <button onClick={()=>setDrawerOpen(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
                     </div>
                     <nav className="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">
                       {navTabs.map(t => (
-                        <button key={t.id} onClick={() => { setActiveTab(t.id); setDrawerOpen(false); }} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl ${activeTab===t.id ? 'bg-amber-500 text-slate-900 font-black' : 'text-slate-300 hover:bg-slate-800'}`}>
+                        <button key={t.id} onClick={() => { setActiveTab(t.id); setDrawerOpen(false); }} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl ${activeTab===t.id ? 'bg-indigo-600 text-white font-black' : 'text-slate-300 hover:bg-slate-800'}`}>
                           <span>{t.icon}</span> <span>{t.label}</span>
                         </button>
                       ))}
@@ -821,495 +812,504 @@
 
             <main className="flex-1 overflow-y-auto p-3.5 sm:p-5 text-xs max-w-7xl mx-auto w-full custom-scroll">
               
-              {activeTab === 'dashboard' && isAdmin && (
+              {activeTab === 'dashboard' && (
                 <div className="space-y-4">
-                  {projBudget > 0 && (
-                    <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-xs text-xs">
-                      <div className="flex justify-between items-center mb-1.5 font-bold">
-                        <span className="text-slate-600 dark:text-slate-300">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span>
-                        <span className={budgetConsumedPercent > 90 ? "text-rose-600" : "text-amber-600 dark:text-amber-400"}>{budgetConsumedPercent}% مستهلك</span>
-                      </div>
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                        <div className={`h-2 rounded-full transition-all duration-500 ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-amber-500"}`} style={{ width: `${budgetConsumedPercent}%` }}></div>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                    <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي المستخلصات</span><strong className="text-indigo-600 dark:text-indigo-400 text-sm sm:text-base font-black">{totalWorkNet.toLocaleString()} ج.م</strong></div>
-                    <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي التحصيلات</span><strong className="text-emerald-600 text-sm sm:text-base font-black">{totalReceived.toLocaleString()} ج.م</strong></div>
-                    <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي المصروفات</span><strong className="text-rose-600 text-sm sm:text-base font-black">{totalCost.toLocaleString()} ج.م</strong></div>
-                    <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3 sm:p-4 rounded-2xl shadow-xs"><span className="text-amber-900 dark:text-amber-200 font-bold block text-[10px]">سيولة الخزينة</span><strong className="text-amber-700 dark:text-amber-400 text-base sm:text-lg font-black">{centralCashRemaining.toLocaleString()} ج.م</strong></div>
+                    <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي الأعمال</span><strong className="text-indigo-600 dark:text-indigo-400 text-sm sm:text-base font-black">{operations.reduce((s,o)=>s+parseNum(o?.agreedAmount),0).toLocaleString()} ج.م</strong></div>
+                    <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي التحصيلات</span><strong className="text-emerald-600 text-sm sm:text-base font-black">{payments.reduce((s,p)=>s+parseNum(p?.amount),0).toLocaleString()} ج.م</strong></div>
+                    <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">مصاريف التشغيل</span><strong className="text-rose-600 text-sm sm:text-base font-black">{operations.reduce((s,o)=>s+parseNum(o?.laborCost)+parseNum(o?.carCost),0).toLocaleString()} ج.م</strong></div>
+                    <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 p-3 sm:p-4 rounded-2xl shadow-xs"><span className="text-indigo-900 dark:text-indigo-200 font-bold block text-[10px]">سيولة الخزينة</span><strong className="text-indigo-700 dark:text-indigo-300 text-base sm:text-lg font-black">{cumNet.toLocaleString()} ج.م</strong></div>
                   </div>
-                  <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
+                  <DashboardCharts operations={operations} />
                 </div>
               )}
 
-              {activeTab === "my_custody" && !isAdmin && (
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-700 shadow-xs space-y-4 text-xs">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-700">
-                    <div>
-                      <h2 className="text-base font-black text-slate-900 dark:text-white">💼 متابعة عهدتي الشخصية</h2>
-                      <p className="text-slate-500 text-[11px] mt-0.5">متابعة المبالغ المستلمة والمنصرفة والرصيد المتبقي معك.</p>
+              {activeTab === 'clients_list' && (
+                <div className="space-y-4 font-bold">
+                  <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700">
+                    <h3 className="text-sm font-black mb-3">👥 دليل العملاء والمزارع المسجلة:</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {clientNames.map(c => {
+                        const ops = operations.filter(o => (o?.clientName||'').trim() === c);
+                        const pays = payments.filter(p => (p?.clientName||'').trim() === c);
+                        const totalBilled = ops.reduce((s,o)=>s+parseNum(o?.agreedAmount),0);
+                        const totalPaid = pays.reduce((s,p)=>s+parseNum(p?.amount),0) + ops.reduce((s,o)=>s+parseNum(o?.paidNow),0);
+                        const due = totalBilled - totalPaid;
+                        return (
+                          <div key={c} className="p-4 rounded-2xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 space-y-2">
+                            <div className="flex justify-between items-start">
+                              <h4 className="font-black text-sm text-slate-900 dark:text-white">{c}</h4>
+                              <span className="text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 px-2 py-0.5 rounded-lg">{ops.length} طلعات</span>
+                            </div>
+                            <div className="text-[11px] space-y-0.5 text-slate-600 dark:text-slate-400">
+                              <div>إجمالي الحساب: <strong>{totalBilled.toLocaleString()} ج.م</strong></div>
+                              <div>المسدد: <strong className="text-emerald-600">{totalPaid.toLocaleString()} ج.م</strong></div>
+                              <div>المتبقي: <strong className={due>0?'text-rose-600':'text-slate-700'}>{due.toLocaleString()} ج.م</strong></div>
+                            </div>
+                            <div className="flex gap-2 pt-2 border-t dark:border-slate-700">
+                              <button onClick={()=>{ setExtractClient(c); setActiveTab('extracts'); }} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 rounded-xl text-[11px]">📑 مستخلص</button>
+                              <button onClick={()=>{ setStatementClient(c); setActiveTab('statement'); }} className="flex-1 bg-slate-800 hover:bg-black text-white py-1.5 rounded-xl text-[11px]">📊 كشف تفصيلي</button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="w-full sm:w-60">
-                      <select value={myEmpName} onChange={(e) => { setMyEmpName(e.target.value); localStorage.setItem('myEmpName', e.target.value); }} className="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 font-bold p-2.5 rounded-xl outline-none">
-                        <option value="">اختر اسمك...</option>
-                        {settings.employees.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'operations' && (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-2 justify-between items-stretch sm:items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border dark:border-slate-700 shadow-xs">
+                    <div className="flex gap-2 items-center">
+                      <label className="font-bold whitespace-nowrap text-xs">عرض شهر:</label>
+                      <input type="month" value={opsFilterMonth} onChange={e=>setOpsFilterMonth(e.target.value)} className="border p-2 rounded-xl dark:bg-slate-700 font-bold text-xs" />
+                    </div>
+                    <button onClick={()=>{ setEditingOp(null); setNewOp({ ...initialOpState }); setOpModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 shadow-sm text-xs">
+                      ➕ تسجيل طلعة جديدة
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {operations.filter(o => (!opsFilterMonth || (o?.date||'').startsWith(opsFilterMonth))).map(o => (
+                      <div key={o.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-2 relative">
+                        <div className="flex justify-between items-start">
+                          <div><h3 className="font-black text-sm text-slate-900 dark:text-white">{o.clientName}</h3><span className="text-[11px] font-bold text-amber-700 dark:text-amber-400">📍 {o.siteLocation || 'الموقع العام'}</span></div>
+                          <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-300">{o.date}</span>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-xl text-xs space-y-1">
+                          <div className="flex justify-between font-bold"><span>نوع العمل:</span><span className="text-indigo-600 dark:text-indigo-400">{o.opType}</span></div>
+                          {o.workDescription && <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold">📝 {o.workDescription}</p>}
+                          {o.isFaddan && <div className="text-[10px] text-amber-800 dark:text-amber-300 font-bold">🌾 حساب بالفدان: {o.faddanQty} فدان × {o.faddanPrice} ج.م</div>}
+                          {o.isSketch && <div className="text-[10px] text-blue-800 dark:text-blue-300 font-bold">📐 كروكيات: {o.sketchesCount} كروكي</div>}
+                          <div className="grid grid-cols-2 gap-1 text-[10px] pt-1 border-t dark:border-slate-600">
+                            <span>🚗 سيارة: <strong>{parseNum(o.carCost)}</strong></span>
+                            <span>👷 عمالة: <strong>{parseNum(o.laborCost)}</strong></span>
+                            <span className="col-span-2">👷 أتعاب المهندس: <strong className="text-emerald-600">{parseNum(o.engFee)} ج.م</strong> {o.hasSecondEngineer && <span className="text-[9px] text-slate-500">(موزعة بين {o.engineer} و {o.secondEngineer})</span>}</span>
+                            <span className="col-span-2">🛰 حصة الجهاز: <strong className={parseNum(o.deviceFee)>0 ? "text-purple-600" : "text-slate-400"}>{parseNum(o.deviceFee)} ج.م</strong></span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t dark:border-slate-700 font-bold text-xs">
+                          <div><span className="text-slate-400 text-[10px] block">المبلغ المتفق عليه:</span><strong className="text-sm font-black text-slate-900 dark:text-white">{parseNum(o.agreedAmount).toLocaleString()} ج.م</strong></div>
+                          <div className="flex items-center gap-1">
+                            <button onClick={()=>{ 
+                              setEditingOp(o); 
+                              setNewOp({...initialOpState, ...o, agreedAmount: o.agreedAmount||"", faddanQty: o.faddanQty||1, faddanPrice: o.faddanPrice||250, sketchesCount: o.sketchesCount||1, engCalcMethod: o.engCalcMethod||"auto", engCustomPercent: o.engCustomPercent||80, engCustomFixedAmount: o.engCustomFixedAmount||1500, hasSecondEngineer: o.hasSecondEngineer||false, secondEngineer: o.secondEngineer||"م أيمن"}); 
+                              setOpModalOpen(true); 
+                            }} className="bg-indigo-50 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 p-2 rounded-xl hover:bg-indigo-100">✏️</button>
+                            {isAdmin && <button onClick={()=>deleteItem('operations', o.id, operations, setOperations, 'طلعة')} className="bg-rose-50 dark:bg-slate-700 text-rose-600 p-2 rounded-xl hover:bg-rose-100">🗑️</button>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'vault' && (
+                <div className="space-y-4 font-bold">
+                  <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-3">
+                    <div className="flex items-center gap-2">
+                      <label>تصفية شهر:</label>
+                      <input type="month" value={vaultMonth} onChange={e=>setVaultMonth(e.target.value)} className="border p-2 rounded-xl dark:bg-slate-700 text-xs"/>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600">
+                        <span className="block text-indigo-700 dark:text-indigo-300 mb-1">حركة الشهر ({vaultMonth}):</span>
+                        <div className="grid grid-cols-3 gap-1 text-center">
+                          <div><span className="text-[9px] text-slate-500">وارد</span><strong className="text-emerald-600 block">{mIn.toLocaleString()}</strong></div>
+                          <div><span className="text-[9px] text-slate-500">صادر</span><strong className="text-rose-600 block">{mOut.toLocaleString()}</strong></div>
+                          <div><span className="text-[9px] text-indigo-600">صافي</span><strong className="text-indigo-600 block">{mNet.toLocaleString()}</strong></div>
+                        </div>
+                      </div>
+                      <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/40 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                        <span className="block text-indigo-900 dark:text-indigo-200 mb-1">التراكمي حتى ({vaultMonth}):</span>
+                        <div className="grid grid-cols-3 gap-1 text-center">
+                          <div><span className="text-[9px] text-slate-500">وارد</span><strong className="text-emerald-700 block">{cumIn.toLocaleString()}</strong></div>
+                          <div><span className="text-[9px] text-slate-500">منصرف</span><strong className="text-rose-700 block">{cumOut.toLocaleString()}</strong></div>
+                          <div><span className="text-[9px] text-indigo-800">الصافي باليد</span><strong className="text-indigo-700 dark:text-indigo-300 block">{cumNet.toLocaleString()}</strong></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleAddTransaction} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs space-y-3">
+                    <h3 className="text-xs font-black text-indigo-700 dark:text-indigo-400">💵 تسجيل حركة بالخزينة (وارد / صادر):</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                      <div><label className="block text-[11px] mb-1">النوع:</label><select value={newTx.type} onChange={e=>setNewTx({...newTx, type: e.target.value})} className="w-full border p-2 rounded-xl dark:bg-slate-700"><option value="income">📥 وارد (إيداع)</option><option value="expense">📤 صادر (منصرف)</option></select></div>
+                      <div><label className="block text-[11px] mb-1">التاريخ:</label><input type="date" value={newTx.date} onChange={e=>setNewTx({...newTx, date: e.target.value})} className="w-full border p-2 rounded-xl dark:bg-slate-700" required/></div>
+                      <div><label className="block text-[11px] mb-1">البند / التصنيف:</label><input type="text" value={newTx.category} onChange={e=>setNewTx({...newTx, category: e.target.value})} placeholder="مصاريف، إيراد عام..." className="w-full border p-2 rounded-xl dark:bg-slate-700" required/></div>
+                      <div><label className="block text-[11px] mb-1">المبلغ (ج.م):</label><input type="number" step="any" value={newTx.amount} onChange={e=>setNewTx({...newTx, amount: e.target.value})} placeholder="0.00" className="w-full border p-2 rounded-xl dark:bg-slate-700 text-emerald-600 font-black" required/></div>
+                      <div><label className="block text-[11px] mb-1">الجهة / الملاحظات:</label><input type="text" value={newTx.notes} onChange={e=>setNewTx({...newTx, notes: e.target.value})} placeholder="ملاحظات..." className="w-full border p-2 rounded-xl dark:bg-slate-700"/></div>
+                    </div>
+                    <button type="submit" className="w-full bg-slate-800 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold shadow-xs">حفظ الحركة في الخزينة</button>
+                  </form>
+
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto custom-scroll">
+                    <table className="w-full text-right"><thead className="bg-slate-100 dark:bg-slate-700"><tr><th className="p-2">التاريخ</th><th className="p-2">النوع والبند</th><th className="p-2.5">الملاحظات</th><th className="p-2 text-center">المبلغ</th>{isAdmin && <th className="p-2 text-center">إجراء</th>}</tr></thead>
+                    <tbody>
+                      {monthlyTx.map(t=>(
+                        <tr key={t.id} className="border-b dark:border-slate-700">
+                          <td className="p-2 whitespace-nowrap text-slate-500 font-mono">{t.date}</td>
+                          <td className="p-2"><span className={t.type==='income'?'text-emerald-600 font-bold':'text-rose-600 font-bold'}>{t.type==='income'?'📥 وارد: ':'📤 صادر: '} {t.category}</span></td>
+                          <td className="p-2 text-slate-400">{t.notes || t.clientOrEntity || '-'}</td>
+                          <td className="p-2 font-black text-center">{parseNum(t.amount).toLocaleString()} ج.م</td>
+                          {isAdmin && <td className="p-2 text-center"><button onClick={()=>deleteItem('transactions',t.id,transactions,setTransactions,'حركة خزينة')} className="text-rose-600 p-1">🗑️</button></td>}
+                        </tr>
+                      ))}
+                    </tbody></table>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'payments' && (
+                <div className="space-y-4 font-bold">
+                  <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border dark:border-slate-700">
+                    <span className="text-xs">سجل دفعات العملاء:</span>
+                    <button onClick={()=>setPayModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-black shadow-xs">➕ إضافة دفعة جديدة</button>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto custom-scroll">
+                    <table className="w-full text-right"><thead className="bg-slate-100 dark:bg-slate-700"><tr><th className="p-2.5">التاريخ</th><th className="p-2.5">العميل</th><th className="p-2.5">الموقع</th><th className="p-2.5">الملاحظات</th><th className="p-2.5 text-center">المبلغ المسدد</th>{isAdmin&&<th className="p-2.5 text-center">إجراء</th>}</tr></thead>
+                    <tbody>
+                      {payments.map(p=><tr key={p.id} className="border-b dark:border-slate-700">
+                        <td className="p-2.5 whitespace-nowrap text-slate-500 font-mono">{p.date}</td>
+                        <td className="p-2.5 font-black text-slate-900 dark:text-white">{p.clientName}</td>
+                        <td className="p-2.5 text-amber-700">{p.siteLocation||'عام'}</td>
+                        <td className="p-2.5 text-slate-600 dark:text-slate-400">{p.notes || '-'}</td>
+                        <td className="p-2.5 text-center text-emerald-600 font-black">{parseNum(p.amount).toLocaleString()} ج.م</td>
+                        {isAdmin&&<td className="p-2.5 text-center"><button onClick={()=>deleteItem('payments',p.id,payments,setPayments,'دفعة')} className="text-rose-600 p-1">🗑️</button></td>}
+                      </tr>)}
+                    </tbody></table>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'rtk' && (
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs text-center font-bold space-y-4">
+                  <h3 className="text-base text-indigo-700 dark:text-indigo-400">إيرادات جهاز RTK المجمعة</h3>
+                  <div className="text-3xl font-black">{totalRtk.toLocaleString()} ج.م</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="p-3 border dark:border-slate-600 rounded-2xl bg-indigo-50 dark:bg-slate-700">م. مندور (50%)<br/><strong className="text-base text-indigo-900 dark:text-indigo-300 mt-1 block">{(totalRtk*0.5).toLocaleString()}</strong></div>
+                    <div className="p-3 border dark:border-slate-600 rounded-2xl">م. أسامة<br/><strong className="text-base mt-1 block">{((totalRtk*0.5)/3).toLocaleString()}</strong></div>
+                    <div className="p-3 border dark:border-slate-600 rounded-2xl">م. أيمن<br/><strong className="text-base mt-1 block">{((totalRtk*0.5)/3).toLocaleString()}</strong></div>
+                    <div className="p-3 border dark:border-slate-600 rounded-2xl">م. علاء<br/><strong className="text-base mt-1 block">{((totalRtk*0.5)/3).toLocaleString()}</strong></div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'expenses' && (
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 overflow-x-auto font-bold space-y-3 custom-scroll">
+                  <h3 className="text-sm font-black">🚗 تفصيل مصاريف العمالة والسيارات لكل عملية:</h3>
+                  <table className="w-full text-right border dark:border-slate-700"><thead className="bg-slate-100 dark:bg-slate-700"><tr><th className="p-2 border dark:border-slate-600">التاريخ</th><th className="p-2 border dark:border-slate-600">العميل</th><th className="p-2 border dark:border-slate-600">الموقع</th><th className="p-2 border dark:border-slate-600 text-center text-amber-600">مصاريف عمالة</th><th className="p-2 border dark:border-slate-600 text-center text-blue-600">مصاريف سيارة</th><th className="p-2 border dark:border-slate-600 text-center text-rose-500">إجمالي المصروف</th></tr></thead>
+                  <tbody>
+                    {operations.map(o=>{
+                      const l = parseNum(o?.laborCost); const c = parseNum(o?.carCost); const t = l + c;
+                      return (
+                        <tr key={o.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                          <td className="p-2 border dark:border-slate-700 whitespace-nowrap">{o.date}</td>
+                          <td className="p-2 border dark:border-slate-700 whitespace-nowrap font-bold">{o.clientName}</td>
+                          <td className="p-2 border dark:border-slate-700 text-amber-600 whitespace-nowrap">{o.siteLocation}</td>
+                          <td className="p-2 border dark:border-slate-700 text-center text-amber-600">{l.toLocaleString()}</td>
+                          <td className="p-2 border dark:border-slate-700 text-center text-blue-500">{c.toLocaleString()}</td>
+                          <td className="p-2 border dark:border-slate-700 text-center font-bold text-rose-500">{t.toLocaleString()} ج.م</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody></table>
+                </div>
+              )}
+
+              {activeTab === 'engineers' && (
+                <div className="space-y-4 font-bold">
+                  <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs flex flex-col sm:flex-row gap-3">
+                    <div className="w-full sm:w-1/2">
+                      <label className="mb-1 block">اختر المهندس لعرض كشف حسابه:</label>
+                      <select value={extractEngineer} onChange={e=>setExtractEngineer(e.target.value)} className="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-indigo-700 dark:text-indigo-400">
+                        {toArr(settings.engineers).map(e=><option key={e} value={e}>{e}</option>)}
+                      </select>
+                    </div>
+                    <div className="w-full sm:w-1/2">
+                      <label className="mb-1 block">تصفية نوع الشغل:</label>
+                      <select value={engineerOpTypeFilter} onChange={e=>setEngineerOpTypeFilter(e.target.value)} className="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-slate-800 dark:text-slate-200">
+                        <option value="ALL">🔍 كل أنواع الشغل (الإجمالي)</option>
+                        {toArr(settings.opTypes).map(t=><option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                   </div>
-                  {myEmpName ? (() => {
-                    const myStats = getCustodyStats(myEmpName);
+
+                  {extractEngineer && (() => {
+                    const allEngOps = operations.filter(o => o?.engineer === extractEngineer || (o?.hasSecondEngineer && o?.secondEngineer === extractEngineer));
+                    const isRtkOp = (type) => { const t = String(type || '').toUpperCase(); return t.includes('RTK') || t.includes('مهندس يوم + جهاز نصف يوم'); };
+                    const rtkOps = allEngOps.filter(o => isRtkOp(o.opType));
+                    const otherOps = allEngOps.filter(o => !isRtkOp(o.opType));
+
+                    const calcDue = (opsList) => opsList.reduce((s, o) => {
+                      if (o?.hasSecondEngineer && (o?.engineer === extractEngineer || o?.secondEngineer === extractEngineer)) return s + (parseNum(o?.engFee) / 2);
+                      return s + parseNum(o?.engFee);
+                    }, 0);
+
+                    const rtkTotal = calcDue(rtkOps); const otherTotal = calcDue(otherOps); const grandTotal = rtkTotal + otherTotal;
+                    const filteredOps = engineerOpTypeFilter === 'ALL' ? allEngOps : allEngOps.filter(o => o?.opType === engineerOpTypeFilter);
+                    const filteredTotal = calcDue(filteredOps);
+
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 p-4 rounded-2xl text-center">
-                          <span className="text-[11px] text-emerald-800 font-bold block mb-1">إجمالي المستلم</span><span className="text-xl font-black text-emerald-600">{myStats.received.toLocaleString()} ج.م</span>
-                        </div>
-                        <div className="bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 p-4 rounded-2xl text-center">
-                          <span className="text-[11px] text-rose-800 font-bold block mb-1">إجمالي المنصرف</span><span className="text-xl font-black text-rose-600">{myStats.spent.toLocaleString()} ج.م</span>
-                        </div>
-                        <div className="bg-indigo-600 text-white p-4 rounded-2xl text-center shadow-xs">
-                          <span className="text-[11px] text-indigo-100 font-bold block mb-1">الرصيد المتبقي معك</span><span className="text-2xl font-black">{myStats.balance.toLocaleString()} ج.م</span>
-                        </div>
-                      </div>
-                    );
-                  })() : <div className="text-center p-6 text-slate-400 font-bold">يرجى اختيار اسمك لعرض الرصيد التفاعلي.</div>}
-                </div>
-              )}
-
-              {activeTab === "projects" && (
-                <div className="space-y-3.5">
-                  {(isAdmin || isAccountant) && (
-                    <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
-                      <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">📁 إضافة مشروع جديد</h3>
-                      <form onSubmit={(e) => {
-                        e.preventDefault(); if (!newProj.id || !newProj.name) return;
-                        const clean = cleanId(newProj.id);
-                        const projectToAdd = { ...newProj, id: clean, budget: parseNum(newProj.budget), createdBy: user?.name || 'مستخدم' };
-                        const updatedProjects = [...projects, projectToAdd];
-                        setProjects(updatedProjects); saveSafeConstructionData('projects', 'projects', updatedProjects);
-                        setSelectedProjId(clean); setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
-                        showToast(`تمت إضافة المشروع بنجاح!`);
-                      }} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
-                        <div><label className="block font-bold mb-1">كود المشروع</label><input type="text" value={newProj.id} onChange={e=>setNewProj({...newProj, id: e.target.value})} className="w-full border dark:border-slate-700 rounded-xl p-2 font-mono dark:bg-slate-800 font-bold" required /></div>
-                        <div><label className="block font-bold mb-1">اسم المالك</label><input type="text" value={newProj.name} onChange={e=>setNewProj({...newProj, name: e.target.value})} className="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" required /></div>
-                        <div><label className="block font-bold mb-1">المكتب الاستشاري</label><input type="text" value={newProj.consultant} onChange={e=>setNewProj({...newProj, consultant: e.target.value})} className="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" /></div>
-                        <div><label className="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} className="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" /></div>
-                        <div><label className="block font-bold mb-1">الميزانية التقديرية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} className="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" /></div>
-                        <div><button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-2.5 rounded-xl shadow-xs transition">حفظ المشروع</button></div>
-                      </form>
-                    </div>
-                  )}
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
-                    <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black">
-                          <th className="p-3">الكود</th><th className="p-3">المالك</th><th className="p-3">الاستشاري</th><th className="p-3">الموقع</th><th className="p-3">الميزانية</th><th className="p-3">الحالة</th>{isAdmin && <th className="p-3 text-center">إجراءات</th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y dark:divide-slate-700 font-semibold">
-                        {projects.map(p => (
-                          <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 font-bold text-amber-600 font-mono">{p.id}</td>
-                            <td className="p-3 font-bold text-slate-900 dark:text-white">{p.name}</td>
-                            <td className="p-3 text-slate-500">{p.consultant || '-'}</td>
-                            <td className="p-3 text-slate-500">{p.location || '-'}</td>
-                            <td className="p-3 font-mono font-bold">{isAdmin || isAccountant ? `${parseNum(p.budget).toLocaleString()} ج.م` : '🔒 محجوب'}</td>
-                            <td className="p-3"><span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold">{p.status || 'جاري'}</span></td>
-                            {isAdmin && (
-                              <td className="p-3 text-center">
-                                <div className="inline-flex items-center gap-1.5">
-                                  <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
-                                  <button onClick={()=>deleteItem('projects', p.id, projects)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
-                                </div>
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "add_data" && (
-                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
-                  <h3 className="font-black text-sm text-slate-900 dark:text-white mb-4 pb-2 border-b dark:border-slate-700 flex items-center gap-2"><span>💸</span> تسجيل فاتورة ومصروف جديد</h3>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if(parseNum(newExp.unitPrice) <= 0 || parseNum(newExp.quantity) <= 0) return;
-                    if(newExp.paymentMethod === 'خصم من العهدة' && !newExp.custodyEmployee) { showToast("يرجى اختيار اسم صاحب العهدة", "error"); return; }
-                    const totalAmt = parseNum(newExp.quantity) * parseNum(newExp.unitPrice);
-                    const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newExp, quantity: parseNum(newExp.quantity), unitPrice: parseNum(newExp.unitPrice), amount: totalAmt, createdBy: user?.name || 'مستخدم' };
-                    const updated = [newItem, ...expenses]; setExpenses(updated); saveSafeConstructionData('expenses', 'expenses', updated);
-                    setNewExp({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", billStatus: "مدفوعة", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: myEmpName || "", receiptImg: "" });
-                    showToast("تم حفظ الفاتورة بنجاح! ✅");
-                  }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div><label className="block font-bold mb-1">التاريخ</label><input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required/></div>
-                    <div><label className="block font-bold mb-1">البند الرئيسي</label>
-                      <div className="flex gap-1"><select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required><option value="">اختر...</option>{settings.mainCategories.map(c => <option key={c}>{c}</option>)}</select>{isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} className="px-2.5 bg-slate-200 dark:bg-slate-600 rounded-xl font-bold">+</button>}</div>
-                    </div>
-                    <div><label className="block font-bold mb-1">البند الفرعي</label>
-                      <div className="flex gap-1"><select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required><option value="">اختر...</option>{settings.subCategories.map(c => <option key={c}>{c}</option>)}</select>{isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} className="px-2.5 bg-slate-200 dark:bg-slate-600 rounded-xl font-bold">+</button>}</div>
-                    </div>
-                    <div><label className="block font-bold mb-1">نوع التكلفة</label>
-                      <div className="flex gap-1"><select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold"><option value="">اختر...</option>{settings.costTypes.map(c => <option key={c}>{c}</option>)}</select>{isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} className="px-2.5 bg-slate-200 dark:bg-slate-600 rounded-xl font-bold">+</button>}</div>
-                    </div>
-                    <div><label className="block font-bold mb-1">المورد / الجهة</label>
-                      <div className="flex gap-1"><select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold"><option value="">اختر...</option>{settings.suppliers.map(c => <option key={c}>{c}</option>)}</select>{isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} className="px-2.5 bg-slate-200 dark:bg-slate-600 rounded-xl font-bold">+</button>}</div>
-                    </div>
-                    <div><label className="block font-bold mb-1">طريقة السداد</label><select value={newExp.paymentMethod} onChange={e=>setNewExp({...newExp, paymentMethod: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 font-bold dark:bg-slate-700"><option value="خصم من العهدة">خصم من العهدة (موقع)</option><option value="كاش">كاش من الخزينة</option><option value="تحويل بنكي">تحويل بنكي</option><option value="شيك">شيك</option></select></div>
-                    <div><label className="block font-bold mb-1">حالة الفاتورة</label><select value={newExp.billStatus} onChange={e=>setNewExp({...newExp, billStatus: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl font-bold dark:bg-slate-700"><option value="مدفوعة">مسددة فوراً</option><option value="آجلة">آجلة (مديونية مورد)</option></select></div>
-                    {newExp.paymentMethod === 'خصم من العهدة' && (
-                      <div><label className="block font-bold mb-1 text-rose-600">صاحب العهدة:</label><select value={newExp.custodyEmployee || ""} onChange={e=>setNewExp({...newExp, custodyEmployee: e.target.value})} className="w-full border border-rose-300 dark:border-rose-900/60 bg-rose-50/50 dark:bg-slate-700 rounded-xl p-2.5 font-bold" required><option value="">اختر الموظف...</option>{settings.employees.map(c => <option key={c}>{c}</option>)}</select></div>
-                    )}
-                    <div><label className="block font-bold mb-1">الكمية</label><input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required/></div>
-                    <div><label className="block font-bold mb-1">سعر الوحدة</label><input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required/></div>
-                    <div className="sm:col-span-2"><label className="block font-bold mb-1">البيان / الوصف</label><input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="تفاصيل الفاتورة وإذن الاستلام..." className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 outline-none"/></div>
-                    <div className="sm:col-span-2"><label className="block font-bold mb-1">📸 إرفاق صورة الفاتورة</label><input type="file" accept="image/*" onChange={handleReceiptUpload} className="w-full text-xs border border-dashed dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/></div>
-                    <div className="sm:col-span-2 bg-amber-50 dark:bg-amber-950/30 p-3 rounded-2xl flex justify-between items-center font-bold"><span>إجمالي الفاتورة:</span><span className="text-sm font-black text-amber-700 dark:text-amber-400">{(parseNum(newExp.quantity) * parseNum(newExp.unitPrice)).toLocaleString()} ج.م</span></div>
-                    <div className="sm:col-span-4 mt-2"><button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-3 rounded-2xl shadow-sm transition">حفظ وتسجيل الفاتورة</button></div>
-                  </form>
-                </div>
-              )}
-
-              {activeTab === "expenses" && (
-                <div className="space-y-3">
-                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-2.5 text-xs">
-                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} className="border dark:border-slate-600 rounded-xl p-2 bg-slate-50 dark:bg-slate-700 font-bold"><option value="">كل البنود الرئيسية</option>{settings.mainCategories.map(c => <option key={c}>{c}</option>)}</select>
-                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} className="border dark:border-slate-600 rounded-xl p-2 bg-slate-50 dark:bg-slate-700 font-bold"><option value="">كل البنود الفرعية</option>{settings.subCategories.map(c => <option key={c}>{c}</option>)}</select>
-                    <div className="sm:mr-auto flex items-center justify-between font-bold bg-amber-50 dark:bg-amber-950/40 px-3 py-2 rounded-xl text-amber-900 dark:text-amber-300"><span>الإجمالي:</span><span className="font-black mr-2"><span className="pdf-num">{filteredSearchTotal.toLocaleString('en-US')}</span> ج.م</span></div>
-                  </div>
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
-                    <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black">
-                          <th className="p-3">التاريخ</th><th className="p-3">البند</th><th className="p-3">البيان</th><th className="p-3">المورد</th><th className="p-3 text-center">الكمية</th><th className="p-3 text-center">السعر</th><th className="p-3 text-center">الإجمالي</th><th className="p-3">السداد</th><th className="p-3 text-center">الفاتورة</th><th className="p-3 text-center">إشعار</th>{canEditOrDelete && <th className="p-3 text-center">إجراءات</th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y dark:divide-slate-700 font-semibold">
-                        {filteredSearchExpenses.length === 0 ? (<tr><td colSpan={canEditOrDelete ? 11 : 10} className="text-center p-6 text-slate-400">لا توجد سجلات مسجلة</td></tr>) : (
-                          filteredSearchExpenses.map((e) => (
-                            <tr key={e.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50 transition">
-                              <td className="p-3 text-slate-500 font-mono text-[11px]">{e.date}</td>
-                              <td className="p-3 font-bold text-slate-900 dark:text-white">{e.mainCategory} - {e.subCategory}</td>
-                              <td className="p-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">{e.description || '-'}</td>
-                              <td className="p-3 text-slate-600 dark:text-slate-400">{e.supplier || '-'}</td>
-                              <td className="p-3 text-center">{parseNum(e.quantity)}</td>
-                              <td className="p-3 text-center font-mono">{parseNum(e.unitPrice).toLocaleString()}</td>
-                              <td className="p-3 text-center font-black text-rose-600 font-mono">{parseNum(e.amount).toLocaleString()}</td>
-                              <td className="p-3"><span className="text-[10px] bg-slate-100 dark:bg-slate-600 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-300">{e.paymentMethod}</span></td>
-                              <td className="p-3 text-center">{e.receiptImg ? (<button onClick={()=>setActiveInvoiceModal(e.receiptImg)} className="text-indigo-600 hover:underline font-bold text-[11px]">معاينة</button>) : <span className="text-slate-400">-</span>}</td>
-                              <td className="p-3 text-center"><button onClick={() => { const msg = `🏢 *إشعار فاتورة توريد*\n🏗️ *المشروع:* ${currentProj.name}\n📌 *البند:* ${e.mainCategory} - ${e.subCategory}\n💰 *المبلغ:* ${parseNum(e.amount).toLocaleString()} ج.م\n🗓 *التاريخ:* ${e.date}`; window.open(`https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank'); }} className="text-emerald-600 hover:text-emerald-700 text-xs">📲</button></td>
-                              {canEditOrDelete && (
-                                <td className="p-3 text-center">
-                                  <div className="inline-flex items-center gap-1.5">
-                                    <button onClick={() => setEditItemData({ type: 'expense', data: { ...e } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
-                                    {isAdmin && (<button onClick={() => deleteItem('expenses', e.id, expenses)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>)}
-                                  </div>
-                                </td>
-                              )}
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "advances" && (
-                <div className="space-y-4">
-                  <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
-                    <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">💵 تسليم عهدة وسلفة جديدة</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
-                      const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newAdv, amount: parseNum(newAdv.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...advances]; setAdvances(updated); saveSafeConstructionData('advances', 'advances', updated);
-                      setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" }); showToast("تم تسجيل العهدة بنجاح! 💵");
-                    }} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-                      <input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required><option value="">اختر الموظف...</option>{settings.employees.map(c => <option key={c}>{c}</option>)}</select>
-                      <input type="number" step="any" value={newAdv.amount} onChange={e=>setNewAdv({...newAdv, amount: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-black text-emerald-600" placeholder="المبلغ..." required/>
-                      <input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="البيان..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700"/>
-                      <button type="submit" className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ العهدة</button>
-                    </form>
-                  </div>
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
-                    <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">التاريخ</th><th className="p-3">الموظف</th><th className="p-3 text-center">المبلغ</th><th className="p-3">البيان</th>{canEditOrDelete && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
-                      <tbody className="divide-y dark:divide-slate-700 font-semibold">
-                        {projAdvances.map(a => (
-                          <tr key={a.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td>
-                            <td className="p-3 font-bold text-slate-900 dark:text-white">{a.employeeName}</td>
-                            <td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
-                            <td className="p-3 text-slate-500">{a.notes || '-'}</td>
-                            {canEditOrDelete && (
-                              <td className="p-3 text-center">
-                                <div className="inline-flex items-center gap-1.5">
-                                  <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
-                                  {isAdmin && <button onClick={() => deleteItem('advances', a.id, advances)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>}
-                                </div>
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "payments" && (isAdmin || isAccountant) && (
-                <div className="space-y-4">
-                  <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
-                    <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">💰 تسجيل تحصيل ودفعة من العميل</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const targetProj = cleanId(selectedProjId);
-                      const newItem = { id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...payments];
-                      setPayments(updated); saveSafeConstructionData('payments', 'payments', updated);
-                      setNewPay({ date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: "" }); showToast("تم تسجيل الدفعة بنجاح! 💵");
-                    }} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      <input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <input type="number" step="any" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} placeholder="المبلغ..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-black text-emerald-600" required/>
-                      <input type="text" value={newPay.notes} onChange={e=>setNewPay({...newPay, notes: e.target.value})} placeholder="بيان الدفعة..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700"/>
-                      <button type="submit" className="sm:col-span-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ التحصيل</button>
-                    </form>
-                  </div>
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
-                    <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">التاريخ</th><th className="p-3">المشروع</th><th className="p-3 text-center">المبلغ</th><th className="p-3">البيان</th>{isAdmin && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
-                      <tbody className="divide-y dark:divide-slate-700 font-semibold">
-                        {projPayments.map(p => (
-                          <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 text-slate-500 font-mono text-[11px]">{p.date}</td><td className="p-3 font-bold text-indigo-600">{p.projectId}</td><td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td><td className="p-3 text-slate-500">{p.notes || '-'}</td>
-                            {isAdmin && (
-                              <td className="p-3 text-center">
-                                <div className="inline-flex items-center gap-1.5">
-                                  <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
-                                  <button onClick={()=>deleteItem('payments', p.id, payments)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
-                                </div>
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "suppliers" && (isAdmin || isAccountant) && (
-                <div className="space-y-4">
-                  <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="font-black text-sm text-slate-900 dark:text-white">🚚 سداد دفعة نقدية لمورد</h3>
-                      <div className="flex gap-1.5">
-                        <button onClick={()=>setSuppScope("project")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "project" ? "bg-amber-500 text-slate-900" : "bg-slate-100 dark:bg-slate-700"}`}>المشروع الحالي</button>
-                        <button onClick={()=>setSuppScope("company")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "company" ? "bg-amber-500 text-slate-900" : "bg-slate-100 dark:bg-slate-700"}`}>كل المشاريع</button>
-                      </div>
-                    </div>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
-                      const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newSuppPay, amount: parseNum(newSuppPay.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...supplierPayments];
-                      setSupplierPayments(updated); saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
-                      setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" }); showToast("تم تسجيل الدفعة للمورد بنجاح! 🚚");
-                    }} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-                      <input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <select value={newSuppPay.supplier} onChange={e=>setNewSuppPay({...newSuppPay, supplier: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required><option value="">اختر المورد...</option>{settings.suppliers.map(c => <option key={c}>{c}</option>)}</select>
-                      <input type="number" step="any" value={newSuppPay.amount} onChange={e=>setNewSuppPay({...newSuppPay, amount: e.target.value})} placeholder="المبلغ..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-black text-emerald-600" required/>
-                      <input type="text" value={newSuppPay.notes} onChange={e=>setNewSuppPay({...newSuppPay, notes: e.target.value})} placeholder="البيان أو رقم الشيك..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700"/>
-                      <button type="submit" className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">قيد الدفعة للمورد</button>
-                    </form>
-                  </div>
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
-                    <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">المورد</th><th className="p-3 text-center">إجمالي المسحوبات</th><th className="p-3 text-center text-amber-600">فواتير آجلة</th><th className="p-3 text-center text-emerald-600">المسدد له</th><th className="p-3 text-center">الرصيد النهائي</th><th className="p-3 text-center">كشف الحساب</th></tr></thead>
-                      <tbody className="divide-y dark:divide-slate-700 font-semibold">
-                        {suppliersLedger.map((s, i) => (
-                          <tr key={i} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 font-bold text-slate-900 dark:text-white">{s.name}</td>
-                            <td className="p-3 text-center font-mono">{s.totalPurchases.toLocaleString()}</td>
-                            <td className="p-3 text-center font-mono text-amber-600 font-bold">{s.creditPurchases.toLocaleString()}</td>
-                            <td className="p-3 text-center font-mono text-emerald-600 font-bold">{s.totalPaid.toLocaleString()}</td>
-                            <td className={`p-3 text-center font-mono font-black ${s.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{Math.abs(s.balance).toLocaleString()} ج.م</td>
-                            <td className="p-3 text-center"><button onClick={()=>setSelectedSupplierDetail(s.name)} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 hover:bg-indigo-100 px-3 py-1 rounded-lg font-bold text-[11px]">📑 عرض كشف</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "statement" && isAdmin && (
-                <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs space-y-4">
-                  <div className="flex justify-between items-center pb-3 border-b dark:border-slate-700 print-hidden">
-                    <h3 className="font-black text-sm text-slate-900 dark:text-white">📑 كشف حساب وموقف مالي متكامل للمشروع</h3>
-                    <button onClick={() => window.print()} className="bg-slate-900 dark:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold">🖨️ طباعة عادية</button>
-                  </div>
-                  
-                  <div id="statement-pdf-target" className="p-2 bg-white text-slate-800 print-area space-y-5">
-                    <div className="border-b-2 border-slate-900 pb-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h1 className="text-2xl font-black text-slate-950 tracking-tight">مكتب مساحة</h1>
-                          <h2 className="text-base font-extrabold text-indigo-700 mt-0.5">الموقف المالي لمشروع: {currentProj.name}</h2>
-                          <div className="flex items-center gap-2 text-xs text-slate-500 font-bold mt-2">
-                            <span>كود المشروع: <strong className="text-slate-900 font-mono">#{currentProj.id}</strong></span><span>•</span><span>التاريخ: <span className="font-mono text-slate-700">{todayDate}</span></span>
-                          </div>
-                        </div>
-                        {settings.logo && <img src={settings.logo} className="h-14 object-contain rounded-lg border p-1" />}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
-                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">المستخلصات: <strong className="block text-indigo-600 text-sm mt-1"><span className="pdf-num">{totalWorkNet.toLocaleString('en-US')}</span> ج.م</strong></div>
-                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">التحصيلات: <strong className="block text-emerald-600 text-sm mt-1"><span className="pdf-num">{totalReceived.toLocaleString('en-US')}</span> ج.م</strong></div>
-                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">المصروفات: <strong className="block text-rose-600 text-sm mt-1"><span className="pdf-num">{totalCost.toLocaleString('en-US')}</span> ج.م</strong></div>
-                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">السيولة الحرة: <strong className="block text-indigo-700 text-sm mt-1"><span className="pdf-num">{centralCashRemaining.toLocaleString('en-US')}</span> ج.م</strong></div>
-                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">الأرباح: <strong className="block text-emerald-700 text-sm mt-1"><span className="pdf-num">{netProfit.toLocaleString('en-US')}</span> ج.م</strong></div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <h4 className="font-bold text-slate-700 mb-1.5 border-b pb-1">1. المستخلصات المعتمدة</h4>
-                        <table className="w-full text-right border" style={{ tableLayout: 'fixed' }}>
-                          <thead><tr className="bg-slate-100"><th className="p-1.5 border w-24">التاريخ</th><th className="p-1.5 border">المستخلص</th><th className="p-1.5 border text-center w-24">الصافي</th></tr></thead>
-                          <tbody>{projExtracts.map(ex => <tr key={ex.id}><td className="p-1.5 border whitespace-nowrap"><span className="pdf-num text-[11px]">{ex.date}</span></td><td className="p-1.5 border font-bold">{ex.extractNo}</td><td className="p-1.5 border text-center font-bold text-indigo-700"><span className="pdf-num">{parseNum(ex.net).toLocaleString('en-US')}</span></td></tr>)}</tbody>
-                        </table>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-700 mb-1.5 border-b pb-1">2. التحصيلات المستلمة</h4>
-                        <table className="w-full text-right border" style={{ tableLayout: 'fixed' }}>
-                          <thead><tr className="bg-slate-100"><th className="p-1.5 border w-24">التاريخ</th><th className="p-1.5 border">البيان</th><th className="p-1.5 border text-center w-24">المبلغ</th></tr></thead>
-                          <tbody>{projPayments.map(p => <tr key={p.id}><td className="p-1.5 border whitespace-nowrap"><span className="pdf-num text-[11px]">{p.date}</span></td><td className="p-1.5 border">{p.notes || 'تحصيل'}</td><td className="p-1.5 border text-center font-bold text-emerald-600"><span className="pdf-num">{parseNum(p.amount).toLocaleString('en-US')}</span></td></tr>)}</tbody>
-                        </table>
-                      </div>
-                    </div>
-                    <div className="flex justify-end pt-4 print-hidden">
-                      <button onClick={() => {
-                        const statementMsg = `🏢 *مكتب مساحة*\n📑 *الموقف المالي لمشروع:* ${currentProj.name}\n----------------------------------\n📄 *المستخلصات:* ${totalWorkNet.toLocaleString()} ج.م\n📥 *التحصيلات:* ${totalReceived.toLocaleString()} ج.م\n📤 *المصروفات:* ${totalCost.toLocaleString()} ج.م\n🏦 *السيولة الحرة:* ${centralCashRemaining.toLocaleString()} ج.م\n📈 *الأرباح:* ${netProfit.toLocaleString()} ج.م\n----------------------------------\n🗓 *تاريخ التقرير:* ${todayDate}`;
-                        generatePdfAndOpenWhatsApp('statement-pdf-target', `كشف_حساب_${currentProj.id}.pdf`, statementMsg);
-                      }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-1.5 transition">📲 إرسال PDF للأدمن</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "extracts" && (isAdmin || isAccountant) && (
-                <div className="space-y-4">
-                  <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs print-hidden">
-                    <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">📄 اعتماد مستخلص أعمال جديد</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const totalWork = parseNum(newExt.quantity) * parseNum(newExt.unitPrice); const net = totalWork - parseNum(newExt.deductions);
-                      const targetProj = cleanId(selectedProjId);
-                      const newItem = { id: Date.now(), projectId: targetProj, ...newExt, quantity: parseNum(newExt.quantity), unitPrice: parseNum(newExt.unitPrice), totalWork, deductions: parseNum(newExt.deductions), net, createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...extracts]; setExtracts(updated); saveSafeConstructionData('extracts', 'extracts', updated);
-                      setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""}); showToast("تم اعتماد المستخلص وحفظه!");
-                    }} className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} placeholder="رقم المستخلص..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <div className="sm:col-span-2"><input type="text" value={newExt.workDescription} onChange={e=>setNewExt({...newExt, workDescription: e.target.value})} placeholder="توصيف الأعمال..." className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/></div>
-                      <input type="number" step="any" value={newExt.quantity} onChange={e=>setNewExt({...newExt, quantity: e.target.value})} placeholder="الكمية..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <input type="number" step="any" value={newExt.unitPrice} onChange={e=>setNewExt({...newExt, unitPrice: e.target.value})} placeholder="الفئة..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <input type="number" step="any" value={newExt.deductions} onChange={e=>setNewExt({...newExt, deductions: e.target.value})} placeholder="الاستقطاعات..." className="sm:col-span-2 border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold text-rose-500"/>
-                      <button type="submit" className="sm:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ المستخلص</button>
-                    </form>
-                  </div>
-
-                  <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm print-area text-slate-800 space-y-5">
-                    <div className="flex justify-between items-start border-b pb-3 print-hidden">
-                      <h3 className="font-black text-sm text-slate-900">📄 معاينة وطباعة المستخلصات</h3>
-                      <button onClick={() => window.print()} className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold">🖨️ طباعة</button>
-                    </div>
-                    
-                    <div id="extract-pdf-target" className="p-2 bg-white">
-                      <div className="border-b-2 border-slate-900 pb-4 mb-4">
-                        <div className="flex justify-between items-start">
+                      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border shadow-xs space-y-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b dark:border-slate-700 pb-3">
                           <div>
-                            <h1 className="text-2xl font-black text-slate-950 tracking-tight">مكتب مساحة</h1>
-                            <h2 className="text-base font-extrabold text-indigo-700 mt-0.5">مستخلص أعمال جارية - إنشاءات</h2>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 font-bold mt-2"><span>كود المشروع: <strong className="text-slate-900 font-mono">#{currentProj.id}</strong></span><span>•</span><span>التاريخ: <span className="font-mono text-slate-700">{todayDate}</span></span></div>
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white">حساب: {extractEngineer}</h3>
+                            {engineerOpTypeFilter !== 'ALL' && <span className="text-xs text-indigo-600 dark:text-indigo-400 block mt-0.5">تصفية نوع شغل: {engineerOpTypeFilter}</span>}
                           </div>
-                          {settings.logo ? <img src={settings.logo} className="h-16 object-contain rounded-xl border p-1" /> : <div className="text-3xl">🏗️</div>}
+                          <div className="bg-indigo-600 text-white px-4 py-1.5 rounded-xl font-black text-sm shadow-xs">
+                            {engineerOpTypeFilter === 'ALL' ? `الإجمالي الكلي المستحق: ${grandTotal.toLocaleString()} ج.م` : `مستحق (${engineerOpTypeFilter}): ${filteredTotal.toLocaleString()} ج.م`}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-xl mt-3 text-[11px] border border-slate-200">
-                          <div><strong>العميل المالك:</strong> {currentProj.name}</div><div><strong>الموقع:</strong> {currentProj.location || '-'}</div><div className="sm:col-span-2"><strong>الاستشاري:</strong> {currentProj.consultant || '-'}</div>
-                        </div>
-                      </div>
 
-                      <div className="overflow-x-auto custom-scroll">
-                        <table className="w-full text-right border-collapse text-xs border border-slate-300" style={{ tableLayout: 'fixed' }}>
-                          <thead>
-                            <tr className="bg-slate-100 text-slate-700 font-black">
-                              <th className="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>التاريخ</th><th className="p-2 border border-slate-300" style={{ width: '15%' }}>رقم المستخلص</th><th className="p-2 border border-slate-300" style={{ width: '28%' }}>بيان الأعمال</th><th className="p-2 border border-slate-300 text-center" style={{ width: '10%' }}>الكمية</th><th className="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>الفئة</th><th className="p-2 border border-slate-300 text-center" style={{ width: '11%' }}>الاستقطاعات</th><th className="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>الصافي</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200 font-bold">
-                            {projExtracts.length === 0 ? <tr><td colSpan="7" className="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
-                            projExtracts.map((ex) => (
-                              <tr key={ex.id}>
-                                <td className="p-2 border border-slate-300 text-center whitespace-nowrap"><span className="pdf-num text-[11px] text-slate-500">{ex.date}</span></td><td className="p-2 border border-slate-300 font-bold text-slate-900">{ex.extractNo}</td><td className="p-2 border border-slate-300 text-slate-700">{ex.workDescription}</td><td className="p-2 border border-slate-300 text-center"><span className="pdf-num">{parseNum(ex.quantity).toLocaleString('en-US')}</span></td><td className="p-2 border border-slate-300 text-center"><span className="pdf-num">{parseNum(ex.unitPrice).toLocaleString('en-US')}</span></td><td className="p-2 border border-slate-300 text-center text-rose-600"><span className="pdf-num">{parseNum(ex.deductions).toLocaleString('en-US')}</span></td><td className="p-2 border border-slate-300 text-center font-black text-indigo-700"><span className="pdf-num">{parseNum(ex.net).toLocaleString('en-US')}</span></td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="bg-slate-800 text-white font-bold">
-                              <td className="p-2.5 text-left border border-slate-800" colSpan="6">إجمالي الصافي المعتمد:</td><td className="p-2.5 text-center text-sm border border-slate-800"><span className="pdf-num text-white">{totalWorkNet.toLocaleString('en-US')}</span></td>
-                            </tr>
-                          </tfoot>
-                        </table>
+                        {engineerOpTypeFilter === 'ALL' ? (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="bg-purple-50 dark:bg-slate-700/50 border border-purple-200 dark:border-slate-600 p-3 rounded-xl flex justify-between items-center">
+                                <div><span className="text-[11px] text-purple-800 dark:text-purple-300 font-bold block">🛰️ إجمالي أتعاب RTK</span><span className="text-[10px] text-slate-500 block mt-0.5">{rtkOps.length} طلعات</span></div>
+                                <strong className="text-lg text-purple-700 dark:text-purple-400 font-black">{rtkTotal.toLocaleString()} ج.م</strong>
+                              </div>
+                              <div className="bg-amber-50 dark:bg-slate-700/50 border border-amber-200 dark:border-slate-600 p-3 rounded-xl flex justify-between items-center">
+                                <div><span className="text-[11px] text-amber-800 dark:text-amber-300 font-bold block">📐 إجمالي أتعاب أخرى</span><span className="text-[10px] text-slate-500 block mt-0.5">{otherOps.length} أعمال مسجلة</span></div>
+                                <strong className="text-lg text-amber-700 dark:text-amber-400 font-black">{otherTotal.toLocaleString()} ج.م</strong>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-xs text-purple-800 dark:text-purple-300 mb-2">🛰️ سجل طلعات جهاز RTK</h4>
+                              <div className="overflow-x-auto custom-scroll border dark:border-slate-700 rounded-xl">
+                                <table className="w-full text-right"><thead className="bg-slate-100 dark:bg-slate-700"><tr><th className="p-2 border-b dark:border-slate-600">التاريخ</th><th className="p-2 border-b dark:border-slate-600">العميل والموقع</th><th className="p-2 border-b dark:border-slate-600 text-center text-purple-500">الأتعاب</th></tr></thead>
+                                <tbody>{rtkOps.map(o=><tr key={o.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"><td className="p-2 border-b dark:border-slate-700 whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td><td className="p-2 border-b dark:border-slate-700"><span className="text-slate-900 dark:text-white">{o.clientName}</span> <span className="text-[10px] text-amber-600">({o.siteLocation})</span> - {o.opType} {o.hasSecondEngineer && <span className="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}</td><td className="p-2 border-b dark:border-slate-700 text-center font-black text-purple-500 font-mono">{o?.hasSecondEngineer ? (parseNum(o.engFee)/2).toLocaleString() : parseNum(o.engFee).toLocaleString()}</td></tr>)}{rtkOps.length === 0 && <tr><td colSpan="3" className="text-center p-4 text-slate-400 text-[11px]">لا توجد طلعات مسجلة</td></tr>}</tbody></table>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-xs text-amber-800 dark:text-amber-300 mb-2 mt-4">📐 سجل الأعمال المساحية الأخرى</h4>
+                              <div className="overflow-x-auto custom-scroll border dark:border-slate-700 rounded-xl">
+                                <table className="w-full text-right"><thead className="bg-slate-100 dark:bg-slate-700"><tr><th className="p-2 border-b dark:border-slate-600">التاريخ</th><th className="p-2 border-b dark:border-slate-600">العميل والموقع</th><th className="p-2 border-b dark:border-slate-600 text-center text-amber-600">الأتعاب</th></tr></thead>
+                                <tbody>{otherOps.map(o=><tr key={o.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"><td className="p-2 border-b dark:border-slate-700 whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td><td className="p-2 border-b dark:border-slate-700"><span className="text-slate-900 dark:text-white">{o.clientName}</span> <span className="text-[10px] text-amber-600">({o.siteLocation})</span> - {o.opType} <span className="block text-[10px] text-slate-500 mt-0.5">{o.workDescription}</span> {o.hasSecondEngineer && <span className="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}</td><td className="p-2 border-b dark:border-slate-700 text-center font-black text-amber-600 font-mono">{o?.hasSecondEngineer ? (parseNum(o.engFee)/2).toLocaleString() : parseNum(o.engFee).toLocaleString()}</td></tr>)}{otherOps.length === 0 && <tr><td colSpan="3" className="text-center p-4 text-slate-400 text-[11px]">لا توجد أعمال مسجلة</td></tr>}</tbody></table>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div>
+                            <div className="bg-indigo-50 dark:bg-slate-700/50 border border-indigo-200 dark:border-slate-600 p-3 rounded-xl mb-3 flex justify-between items-center">
+                              <div><span className="text-xs text-indigo-900 dark:text-indigo-300 font-bold block">📋 إجمالي أتعاب: {engineerOpTypeFilter}</span><span className="text-[10px] text-slate-500 block mt-0.5">{filteredOps.length} طلعات مسجلة بهذا النوع</span></div>
+                              <strong className="text-xl text-indigo-700 dark:text-indigo-300 font-black">{filteredTotal.toLocaleString()} ج.م</strong>
+                            </div>
+                            <div className="overflow-x-auto custom-scroll border dark:border-slate-700 rounded-xl">
+                              <table className="w-full text-right"><thead className="bg-slate-100 dark:bg-slate-700"><tr><th className="p-2 border-b dark:border-slate-600">التاريخ</th><th className="p-2 border-b dark:border-slate-600">العميل والموقع</th><th className="p-2 border-b dark:border-slate-600">البيان</th><th className="p-2 border-b dark:border-slate-600 text-center text-indigo-500">الأتعاب</th></tr></thead>
+                              <tbody>{filteredOps.map(o=><tr key={o.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"><td className="p-2 border-b dark:border-slate-700 whitespace-nowrap text-slate-500 text-[11px] font-mono">{o.date}</td><td className="p-2 border-b dark:border-slate-700"><span className="text-slate-900 dark:text-white">{o.clientName}</span> <span className="text-[10px] text-amber-600">({o.siteLocation})</span> {o.hasSecondEngineer && <span className="block text-[9px] text-slate-400 mt-1">مشتركة مع: {o.engineer === extractEngineer ? o.secondEngineer : o.engineer}</span>}</td><td className="p-2 border-b dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[11px]">{o.workDescription || '-'}</td><td className="p-2 border-b dark:border-slate-700 text-center font-black text-indigo-500 font-mono">{o?.hasSecondEngineer ? (parseNum(o.engFee)/2).toLocaleString() : parseNum(o.engFee).toLocaleString()}</td></tr>)}{filteredOps.length === 0 && <tr><td colSpan="4" className="text-center p-4 text-slate-400 text-[11px]">لا توجد طلعات مسجلة</td></tr>}</tbody></table>
+                            </div>
+                          </div>
+                        )}
                       </div>
+                    )
+                  })()}
+                </div>
+              )}
 
-                      <div className="grid grid-cols-3 gap-6 text-center mt-12 pt-6 border-t border-slate-300 print-break-inside font-bold text-xs">
-                        <div><p className="text-slate-500 mb-8">مهندس التنفيذ</p><p className="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع: ....................</p></div>
-                        <div><p className="text-slate-500 mb-8">استشاري المشروع</p><p className="border-t border-dotted border-slate-400 pt-1 text-slate-800">الختم: ....................</p></div>
-                        <div><p className="text-slate-500 mb-8">الإدارة العامة</p><p className="border-t border-dotted border-slate-400 pt-1 text-slate-800">التوقيع: ....................</p></div>
-                      </div>
+              {activeTab === 'extracts' && (
+                <div className="space-y-4 font-bold">
+                  <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs print-hidden flex flex-col sm:flex-row gap-3 items-center">
+                    <div className="w-full sm:w-1/3">
+                      <label className="block mb-1">اختر العميل:</label>
+                      <select value={extractClient} onChange={e=>setExtractClient(e.target.value)} className="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-black text-xs">
+                        <option value="">-- اضغط لاختيار العميل --</option>
+                        {clientNames.map(c=><option key={c}>{c}</option>)}
+                      </select>
                     </div>
-
-                    <div className="flex justify-end pt-4 print-hidden">
-                      <button onClick={() => {
-                        const extSummaryMsg = `🏢 *مكتب مساحة*\n📄 *مستخلص أعمال للعميل:* ${currentProj.name}\n💰 *الصافي الإجمالي:* ${totalWorkNet.toLocaleString()} ج.م\n🗓️ *التاريخ:* ${todayDate}`;
-                        generatePdfAndOpenWhatsApp('extract-pdf-target', `مستخلص_مجمع_${currentProj.id}.pdf`, extSummaryMsg);
-                      }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-1.5 transition">
-                        📲 إرسال PDF (معزول الأرقام)
+                    <div className="w-full sm:w-1/3">
+                      <label className="block mb-1">الموقع بالمزرعة (اختياري):</label>
+                      <input list="sites-list" value={extractSite} onChange={e=>setExtractSite(e.target.value)} placeholder="الموقع العام، المحمية..." className="w-full border p-2.5 rounded-xl dark:bg-slate-700 font-bold text-xs"/>
+                      <datalist id="sites-list">{siteLocationsList.map(s=><option key={s} value={s}/>)}</datalist>
+                    </div>
+                    <div className="w-full sm:w-1/3 flex items-end">
+                      <button onClick={()=>loadClientOpsIntoExtract(extractClient, extractSite)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1.5">
+                        📥 سحب أعمال العميل
                       </button>
                     </div>
                   </div>
+
+                  {extractClient ? (
+                    <div>
+                      <div id="printable-area" dir="rtl" className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm print-area text-slate-800 space-y-5">
+                        <div className="border-b-2 border-slate-900 pb-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h1 className="text-2xl font-black text-slate-950 tracking-tight">مكتب مساحة</h1>
+                              <h2 className="text-base font-extrabold text-indigo-700 mt-0.5">مستخلص أعمال مساحية</h2>
+                              <div className="flex items-center gap-2 text-xs text-slate-500 font-bold mt-2">
+                                <span>رقم المستخلص: <strong className="text-slate-900 font-mono">#{extractNumber}</strong></span><span>•</span><span>التاريخ: <span className="font-mono text-slate-700">{todayDate}</span></span>
+                              </div>
+                            </div>
+                            <div className="text-left flex items-center gap-3">
+                              {settings.logo ? <img src={settings.logo} className="h-16 object-contain rounded-xl border p-1" /> : <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl font-black">📐</div>}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl mt-3 text-xs border border-slate-200">
+                            <div><span className="text-slate-400 block text-[10px]">العميل / المالك:</span><strong className="text-slate-900 text-sm font-black">{extractClient}</strong></div>
+                            <div><span className="text-slate-400 block text-[10px]">موقع الأعمال:</span><strong className="text-amber-700 text-sm font-bold">{extractSite || 'الموقع العام'}</strong></div>
+                            <div><span className="text-slate-400 block text-[10px]">المهندس المشرف:</span><strong className="text-slate-900 text-sm font-bold">{extractEngineer}</strong></div>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-right border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+                            <thead>
+                              <tr className="bg-slate-100 text-slate-700 border-b border-slate-300 font-black">
+                                <th className="p-2.5 text-center" style={{ width: '6%' }}>م</th><th className="p-2.5 text-center" style={{ width: '15%' }}>التاريخ</th><th className="p-2.5" style={{ width: '37%' }}>بيان الأعمال</th><th className="p-2.5 text-center" style={{ width: '10%' }}>الكمية</th><th className="p-2.5 text-center" style={{ width: '14%' }}>الفئة</th><th className="p-2.5 text-center" style={{ width: '8%' }}>النسبة</th><th className="p-2.5 text-center" style={{ width: '16%' }}>الصافي</th><th className="p-2 text-center print-hidden" style={{ width: '4%' }}></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 font-bold">
+                              {extractItems.map((item, idx) => {
+                                const net = parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100);
+                                return (
+                                  <tr key={item.id} className="hover:bg-slate-50/60">
+                                    <td className="p-2.5 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                    <td className="p-2.5 text-center text-slate-600 font-mono text-[11px] whitespace-nowrap">{item.date || '-'}</td>
+                                    <td className="p-2.5 font-bold text-slate-900"><input type="text" value={item.desc} onChange={e=>setExtractItems(extractItems.map(it=>it.id===item.id?{...it, desc: e.target.value}:it))} className="w-full bg-transparent font-bold outline-none"/></td>
+                                    <td className="p-2 text-center"><input type="number" step="any" value={item.qty} onChange={e=>setExtractItems(extractItems.map(it=>it.id===item.id?{...it, qty: e.target.value}:it))} className="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none font-mono"/></td>
+                                    <td className="p-2 text-center"><input type="number" step="any" value={item.unitPrice} onChange={e=>setExtractItems(extractItems.map(it=>it.id===item.id?{...it, unitPrice: e.target.value}:it))} className="w-20 text-center bg-slate-50 border border-slate-200 rounded-lg p-1 font-bold outline-none font-mono"/></td>
+                                    <td className="p-2 text-center">
+                                      <select value={item.rate} onChange={e=>setExtractItems(extractItems.map(it=>it.id===item.id?{...it, rate: e.target.value}:it))} className="border border-slate-200 rounded-lg p-1 font-bold bg-white text-center outline-none"><option value="100">%100</option><option value="90">%90</option><option value="50">%50</option></select>
+                                    </td>
+                                    <td className="p-2.5 text-center font-black text-indigo-700 whitespace-nowrap"><span className="pdf-num text-xs">{net.toLocaleString('en-US')}</span> <span className="text-[10px] text-slate-500 font-normal">ج.م</span></td>
+                                    <td className="p-2.5 text-center print-hidden"><button onClick={()=>handleRemoveExtractRow(item.id)} className="text-rose-500 hover:text-rose-700 font-bold p-1">✕</button></td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className="print-hidden pt-1"><button onClick={handleAddEmptyExtractRow} className="text-xs font-bold text-indigo-600 hover:text-indigo-800">➕ إضافة بند يدوي إضافي</button></div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200">
+                          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center"><span className="text-[11px] text-slate-500 font-bold block mb-1">إجمالي الأعمال المنجزة</span><strong className="text-base font-black text-slate-900"><span className="pdf-num text-lg">{extractTotalWork.toLocaleString('en-US')}</span> ج.م</strong></div>
+                          <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-center"><span className="text-[11px] text-emerald-800 font-bold block mb-1">المسدد من العميل حتى تاريخه</span><strong className="text-base font-black text-emerald-700"><span className="pdf-num text-lg">{clientTotalPaid.toLocaleString('en-US')}</span> ج.م</strong></div>
+                          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-center"><span className="text-[11px] text-rose-800 font-bold block mb-1">المتبقي المستحق المطلوب سداده</span><strong className="text-base font-black text-rose-600"><span className="pdf-num text-xl">{extractRemainingBalance.toLocaleString('en-US')}</span> ج.م</strong></div>
+                        </div>
+
+                        <div className="pt-6 flex justify-between items-end border-t border-slate-200 text-xs font-bold text-slate-600">
+                          <div><span>المهندس المشرف:</span><strong className="block text-sm text-slate-900 mt-1">{extractEngineer}</strong></div>
+                          <div className="text-center"><span>الاعتماد والختم:</span><span className="block mt-3 text-slate-300">............................................</span></div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row justify-end gap-2.5 pt-4 print-hidden">
+                        <button onClick={()=>window.print()} className="bg-slate-800 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-1.5 transition">🖨️ طباعة المستخلص</button>
+                        <button onClick={()=>{
+                          const summaryMessage = `🏢 *مكتب مساحة*\n📄 *مستخلص أعمال مساحية للعميل:* ${extractClient}\n${extractSite ? `📍 *الموقع:* ${extractSite}\n` : ''}----------------------------------\n📊 *إجمالي الأعمال:* ${extractTotalWork.toLocaleString()} ج.م\n📥 *المسدد:* ${clientTotalPaid.toLocaleString()} ج.م\n⚠ *المتبقي المستحق:* ${extractRemainingBalance.toLocaleString()} ج.م\n👷 *المهندس المشرف:* ${extractEngineer}\n----------------------------------\n🗓 *التاريخ:* ${todayDate}`;
+                          exportCleanPdfAndWhatsApp('printable-area', `مستخلص_${extractClient}.pdf`, summaryMessage);
+                        }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-sm transition"><span>📲</span> إرسال المستخلص عبر واتساب</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl text-center text-slate-400 font-bold border border-dashed dark:border-slate-700">يرجى اختيار العميل من القائمة العلوية ثم الضغط على "سحب أعمال العميل"</div>
+                  )}
                 </div>
               )}
 
-              {activeTab === "audit_log" && isSuperAdminExact && (
-                <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs space-y-3">
-                  <h3 className="font-black text-sm text-slate-900 dark:text-white">🛡 سجل الدخول والنشاط</h3>
-                  <div className="overflow-x-auto custom-scroll">
-                    <table className="w-full text-right whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-500 border-b dark:border-slate-600 font-black"><th className="p-2.5">المستخدم</th><th className="p-2.5">الرتبة</th><th className="p-2.5">المعرف</th><th className="p-2.5">الجهاز</th><th className="p-2.5">التاريخ والوقت</th></tr></thead>
-                      <tbody className="divide-y dark:divide-slate-700 font-bold">{loginLogs.map((log, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50">
-                          <td className="p-2.5 font-bold text-slate-900 dark:text-white">{log.name}</td>
-                          <td className="p-2.5"><span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg text-[10px]">{log.role}</span></td>
-                          <td className="p-2.5 text-slate-400 font-mono text-[11px]">{log.identifier}</td>
-                          <td className="p-2.5 text-slate-500">{log.device}</td>
-                          <td className="p-2.5 text-slate-400 font-mono text-[11px]">{log.formattedDate}</td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
+              {activeTab === 'statement' && isAdmin && (
+                <div className="space-y-4 font-bold">
+                  <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-3 items-center print-hidden">
+                    <div className="w-full sm:w-1/2">
+                      <label className="block mb-1">اختر العميل لعرض كشف الحساب التحليلي للشركاء:</label>
+                      <select value={statementClient} onChange={e=>setStatementClient(e.target.value)} className="w-full border p-2.5 rounded-xl dark:bg-slate-700 text-xs">
+                        <option value="">-- اختر العميل --</option>
+                        {clientNames.map(c=><option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    {statementClient && (
+                      <div className="w-full sm:w-1/2 flex justify-end gap-2 items-end">
+                        <button onClick={()=>window.print()} className="bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs">🖨 طباعة كشف الشركاء</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {statementClient && (() => {
+                    const cOps = operations.filter(o => (o?.clientName||'').trim() === statementClient.trim());
+                    const cPays = payments.filter(p => (p?.clientName||'').trim() === statementClient.trim());
+                    const tBilled = cOps.reduce((s,o)=>s+parseNum(o?.agreedAmount),0);
+                    const tLabor = cOps.reduce((s,o)=>s+parseNum(o?.laborCost),0);
+                    const tCar = cOps.reduce((s,o)=>s+parseNum(o?.carCost),0);
+                    const tRtk = cOps.reduce((s,o)=>s+parseNum(o?.deviceFee),0);
+                    const tEng = cOps.reduce((s,o)=>s+parseNum(o?.engFee),0);
+                    const tOffice = cOps.reduce((s,o)=>s+parseNum(o?.officeFee),0);
+                    const tPaid = cPays.reduce((s,p)=>s+parseNum(p?.amount),0) + cOps.reduce((s,o)=>s+parseNum(o?.paidNow),0);
+                    const netDue = tBilled - tPaid;
+
+                    return (
+                      <div id="printable-area" className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 print-area text-slate-900">
+                        <div className="flex justify-between items-start border-b pb-3">
+                          <div><h3 className="text-base font-black text-slate-900">📊 كشف حساب تحليلي تفصيلي للشركاء</h3><div className="text-xs text-slate-500 font-bold mt-1"><span>العميل: <strong className="text-indigo-700">{statementClient}</strong></span><span> • التاريخ: {todayDate}</span></div></div>
+                          {settings.logo && <img src={settings.logo} className="h-14 object-contain rounded-lg border p-1" />}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-xs">
+                          <div className="p-2.5 bg-slate-50 rounded-xl border">إجمالي العمل: <strong className="block text-indigo-700 font-black text-sm"><span className="pdf-num">{tBilled.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-amber-50 rounded-xl border">عمالة: <strong className="block text-amber-700 font-black text-sm"><span className="pdf-num">{tLabor.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-blue-50 rounded-xl border">سيارة: <strong className="block text-blue-700 font-black text-sm"><span className="pdf-num">{tCar.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-purple-50 rounded-xl border">نصيب RTK: <strong className="block text-purple-700 font-black text-sm"><span className="pdf-num">{tRtk.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-emerald-50 rounded-xl border">أتعاب المهندسين: <strong className="block text-emerald-700 font-black text-sm"><span className="pdf-num">{tEng.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-rose-50 rounded-xl border">المتبقي على العميل: <strong className="block text-rose-700 font-black text-sm"><span className="pdf-num">{netDue.toLocaleString('en-US')}</span></strong></div>
+                        </div>
+                        <div className="overflow-x-auto custom-scroll">
+                          <table className="w-full text-right border text-xs" style={{ tableLayout: 'fixed' }}>
+                            <thead className="bg-slate-100">
+                              <tr><th className="p-2 border w-24">التاريخ</th><th className="p-2 border">العمل والموقع</th><th className="p-2 border text-center w-20">المبلغ</th><th className="p-2 border text-center text-amber-700 w-16">عمالة</th><th className="p-2 border text-center text-blue-700 w-16">سيارة</th><th className="p-2 border text-center text-purple-700 w-20">حصة RTK</th><th className="p-2 border text-center text-emerald-700 w-24">أتعاب المهندس</th><th className="p-2 border text-center text-indigo-700 w-24">صافي المكتب</th><th className="p-2 border text-center text-emerald-600 w-24">المحصل فورا</th></tr>
+                            </thead>
+                            <tbody>
+                              {cOps.map(o => (
+                                <tr key={o.id} className="border-b">
+                                  <td className="p-2 border whitespace-nowrap text-slate-500 font-mono">{o.date}</td>
+                                  <td className="p-2 border font-bold">{o.opType} ({o.workDescription || '-'}) <span className="text-amber-700 text-[10px]">[{o.siteLocation||'عام'}]</span></td>
+                                  <td className="p-2 border text-center font-bold text-indigo-600"><span className="pdf-num">{parseNum(o.agreedAmount).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-amber-700"><span className="pdf-num">{parseNum(o.laborCost).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-blue-700"><span className="pdf-num">{parseNum(o.carCost).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-purple-700"><span className="pdf-num">{parseNum(o.deviceFee).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-emerald-700"><span className="pdf-num">{parseNum(o.engFee).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-indigo-700"><span className="pdf-num">{parseNum(o.officeFee).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-emerald-600 font-bold"><span className="pdf-num">{parseNum(o.paidNow).toLocaleString('en-US')}</span></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {activeTab === 'office' && (
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs text-center font-bold space-y-4">
+                  <h3 className="text-base">أرباح المكتب المجمعة</h3>
+                  <div className="text-3xl font-black text-emerald-600">{Math.round(totalOffice).toLocaleString()} ج.م</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    <div className="p-3 border rounded-2xl bg-amber-50 dark:bg-slate-700 text-amber-900 dark:text-amber-100">في سبيل الله (10%)<br/><strong className="text-base mt-1 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl bg-blue-50 dark:bg-slate-700 text-blue-900 dark:text-blue-100">م. أحمد نبيل (10%)<br/><strong className="text-base mt-1 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl">م. أسامة<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl">م. أيمن<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl">م. علاء<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
                   </div>
                 </div>
               )}
 
-              {activeTab === "settings" && isAdmin && (
+              {activeTab === 'logs' && isSuperAdminExact && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto p-4 space-y-3 font-bold custom-scroll">
+                  <h3 className="text-sm font-black text-indigo-700 dark:text-indigo-400">🛡 سجل نشاطات وحركات المستخدمين (خاص بمدير النظام):</h3>
+                  <table className="w-full text-right"><thead className="bg-slate-100 dark:bg-slate-700"><tr><th className="p-2">الوقت</th><th className="p-2">المستخدم</th><th className="p-2">البريد</th><th className="p-2.5">النشاط والإجراء المنفذ</th></tr></thead>
+                  <tbody>{loginLogs.map((l,i)=><tr key={i} className="border-b dark:border-slate-700">
+                    <td className="p-2 whitespace-nowrap text-slate-500 font-mono text-[11px]">{l.date}</td>
+                    <td className="p-2">{l.name}</td>
+                    <td className="p-2 text-slate-400 font-mono text-[11px]">{l.email}</td>
+                    <td className="p-2 text-indigo-600 dark:text-indigo-400 font-black">{l.action || 'زيارة وتسجيل الدخول'}</td>
+                  </tr>)}</tbody></table>
+                </div>
+              )}
+
+              {activeTab === 'settings' && isAdmin && (
                 <div className="space-y-4 text-xs font-bold">
                   <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
                     <h3 className="text-sm font-black text-slate-900 dark:text-white">💾 النسخ الاحتياطي والترحيل</h3>
@@ -1330,7 +1330,9 @@
                       const f = e.target.files[0]; if(!f) return;
                       const r = new FileReader(); r.onload = (evt) => {
                         const newSettings = { ...settings, logo: evt.target.result };
-                        setSettings(newSettings); saveSafeConstructionData('settings', 'settings', newSettings);
+                        setSettings(newSettings);
+                        saveListSafely('settings', 'settings', newSettings);
+                        logActivity('تحديث شعار المكتب');
                         showToast("تم تحديث الشعار!");
                       }; r.readAsDataURL(f);
                     }} className="w-full p-2 border dark:border-slate-600 rounded-xl dark:bg-slate-700"/>
@@ -1339,12 +1341,11 @@
 
                   {isSuperAdminExact && (
                     <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
-                      <h3 className="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للإنشاءات</h3>
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للمساحة</h3>
                       <form onSubmit={handleSaveRole} className="flex gap-2">
                         <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} className="flex-1 border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                        <select value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold w-1/3 text-xs">
-                          <option value="engineer">👷 مهندس موقع</option>
-                          <option value="accountant">💼 محاسب</option>
+                        <select name="roleSelect" value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold w-1/3 text-xs">
+                          <option value="engineer">👷 مهندس معتمد</option>
                           <option value="pm">💼 مدير مشاريع</option>
                           <option value="executive">💼 المدير التنفيذي</option>
                           <option value="admin">👑 إدارة عامة</option>
@@ -1363,76 +1364,169 @@
                   )}
                 </div>
               )}
+
             </main>
           </div>
 
-          {selectedSupplierDetail && (
-            <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 w-full max-w-2xl shadow-2xl border dark:border-slate-800 text-xs max-h-[85vh] flex flex-col justify-between">
-                <div className="flex justify-between items-center border-b dark:border-slate-800 pb-3 mb-3">
-                  <h3 className="font-black text-sm text-slate-900 dark:text-white">كشف حساب: {selectedSupplierDetail}</h3>
-                  <button onClick={()=>setSelectedSupplierDetail(null)} className="text-slate-400 text-lg">✕</button>
+          {opModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
+              <div className="relative bg-white dark:bg-slate-800 w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50 max-h-[90vh] overflow-y-auto custom-scroll">
+                <div className="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                  <h3 className="font-black text-sm">{editingOp ? '✏️ تعديل طلعة مسجلة' : '➕ تسجيل طلعة يومية جديدة'}</h3>
+                  <button onClick={()=>setOpModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
                 </div>
-                <div className="overflow-y-auto max-h-[55vh] space-y-3 custom-scroll">
-                  <table className="w-full text-right border-collapse whitespace-nowrap">
-                    <thead><tr className="bg-slate-50 dark:bg-slate-800 border-b font-black"><th className="p-2">التاريخ</th><th className="p-2">البند</th><th className="p-2 text-center">المبلغ</th><th className="p-2">الحالة</th></tr></thead>
-                    <tbody className="divide-y dark:divide-slate-800 font-bold">
-                      {expenses.filter(e => (e.supplier || '').trim() === selectedSupplierDetail).map(e => (
-                        <tr key={e.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                          <td className="p-2 text-slate-400 font-mono">{e.date}</td><td className="p-2">{e.mainCategory} - {e.subCategory}</td><td className="p-2 text-center text-rose-600 font-mono font-black">{parseNum(e.amount).toLocaleString()}</td><td className="p-2">{e.billStatus || 'مدفوعة'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="pt-3 border-t dark:border-slate-800 flex justify-end">
-                  <button onClick={()=>setSelectedSupplierDetail(null)} className="bg-slate-800 text-white px-5 py-2 rounded-xl font-bold">إغلاق</button>
-                </div>
+                <form onSubmit={handleSaveOperation} className="space-y-3 text-xs font-bold">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>التاريخ <input type="date" value={newOp.date} onChange={e=>setNewOp({...newOp, date: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                    <div>اسم العميل <input type="text" value={newOp.clientName} onChange={e=>setNewOp({...newOp, clientName: e.target.value})} placeholder="الواحة البحرية..." className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>الموقع بالمزرعة <input type="text" value={newOp.siteLocation} onChange={e=>setNewOp({...newOp, siteLocation: e.target.value})} placeholder="المحمية، خط 2400..." className="w-full border border-amber-200 dark:border-amber-900 p-2.5 rounded-xl mt-1 bg-amber-50 dark:bg-amber-950/40" required/></div>
+                    <div>نوع العمل 
+                      <div className="flex gap-1 mt-1">
+                        <select value={newOp.opType} onChange={e=>handleOpTypeChange(e.target.value)} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700">
+                          {toArr(settings.opTypes).map(o=><option key={o} value={o}>{o}</option>)}
+                        </select>
+                        <button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} className="bg-slate-200 dark:bg-slate-600 px-2.5 rounded-xl font-black">+</button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>المهندس المشرف
+                    <div className="flex gap-1 mt-1">
+                      <select value={newOp.engineer} onChange={e=>setNewOp(prev=>({...prev, engineer: e.target.value}))} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700">
+                        {toArr(settings.engineers).map(e=><option key={e} value={e}>{e}</option>)}
+                      </select>
+                      <button type="button" onClick={()=>updateSettingArray('engineers','مهندس')} className="bg-slate-200 dark:bg-slate-600 px-2.5 rounded-xl font-black">+</button>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl border dark:border-slate-600 space-y-2 col-span-1 sm:col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-indigo-700 dark:text-indigo-400">
+                      <input type="checkbox" checked={newOp.hasSecondEngineer} onChange={e => setNewOp(prev => ({ ...prev, hasSecondEngineer: e.target.checked }))} className="w-4 h-4 rounded text-indigo-600" />
+                      👥 طلعة مشتركة (مهندسين اثنين بالتساوي)
+                    </label>
+                    {newOp.hasSecondEngineer && (
+                      <div>
+                        <label className="block text-[11px] mb-1 font-bold">المهندس الشريك الثاني:</label>
+                        <select value={newOp.secondEngineer} onChange={e => setNewOp(prev => ({ ...prev, secondEngineer: e.target.value }))} className="w-full border dark:border-slate-500 p-2 rounded-xl dark:bg-slate-600 font-bold">
+                          {toArr(settings.engineers).map(e => <option key={e} value={e}>{e}</option>)}
+                        </select>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">يتم تقسيم إجمالي أتعاب الطلعة مناصفة (50% لكل مهندس) في كشوف الحساب.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>بيان الأعمال (الوصف الذي سيوضع في المستخلص) <input type="text" value={newOp.workDescription} onChange={e=>setNewOp({...newOp, workDescription: e.target.value})} placeholder="تخطيط 80 فدان موقع المحمية..." className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  
+                  <div className="flex gap-4 py-1">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={newOp.isFaddan} onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({...prev, isFaddan: checked, isSketch: checked ? false : prev.isSketch, agreedAmount: checked ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : prev.agreedAmount}));
+                        }} className="w-4 h-4 rounded text-amber-600" /> 🌾 حساب بالفدان
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={newOp.isSketch} onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({...prev, isSketch: checked, isFaddan: checked ? false : prev.isFaddan}));
+                        }} className="w-4 h-4 rounded text-blue-600" /> 📐 كروكيات
+                    </label>
+                  </div>
+
+                  {newOp.isFaddan && (
+                    <div className="grid grid-cols-2 gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800">
+                      <div>عدد الأفدنة: <input type="number" step="any" value={newOp.faddanQty} onChange={e=>{
+                            const q = e.target.value;
+                            setNewOp(prev => ({...prev, faddanQty: q, agreedAmount: parseNum(q) * parseNum(prev.faddanPrice)}));
+                          }} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700 mt-1" /></div>
+                      <div>سعر الفدان (الفئة): <input type="number" step="any" value={newOp.faddanPrice} onChange={e=>{
+                            const p = e.target.value;
+                            setNewOp(prev => ({...prev, faddanPrice: p, agreedAmount: parseNum(prev.faddanQty) * parseNum(p)}));
+                          }} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700 mt-1" /></div>
+                    </div>
+                  )}
+
+                  {newOp.isSketch && (
+                    <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800">
+                      عدد الكروكيات: <input type="number" value={newOp.sketchesCount} onChange={e=>setNewOp({...newOp, sketchesCount: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700 mt-1" />
+                    </div>
+                  )}
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1">
+                    <label className="block text-amber-900 dark:text-amber-300 font-black">💰 المبلغ النهائي المتفق عليه مع العميل (آلي مع إمكانية التعديل الحر):</label>
+                    <input type="number" step="any" value={newOp.agreedAmount} onChange={e=>setNewOp({...newOp, agreedAmount: e.target.value})} placeholder="أدخل المبلغ المتفق عليه..." className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 bg-white text-indigo-700 dark:text-indigo-300 font-black text-sm" required />
+                    <span className="text-[10px] text-amber-800 dark:text-amber-400 block">يُحسب تلقائياً من الفدان أو نوع العمل، ويمكنك تغييره يدوياً في أي وقت.</span>
+                  </div>
+
+                  <div className="p-3 bg-indigo-50 dark:bg-slate-700/60 rounded-2xl border border-indigo-200 dark:border-slate-600 space-y-2">
+                    <label className="block text-indigo-900 dark:text-indigo-300 font-black text-[11px]">⚙️ طريقة احتساب أتعاب المهندس في هذه العملية:</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'auto'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'auto' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>⚡ تلقائي</button>
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'engDay_devHalf'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'engDay_devHalf' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>🛰 مهندس يوم + جهاز 1/2</button>
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent80'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent80' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>🎯 نسبة 80% مهندس</button>
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent70'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent70' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>🎯 نسبة 70% مهندس</button>
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'customFixed'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'customFixed' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>💵 مبلغ مقطوع ثابت</button>
+                    </div>
+                    {newOp.engCalcMethod === 'customFixed' && (
+                      <div className="pt-1"><label className="block text-[10px] text-slate-600 dark:text-slate-300 mb-1">أدخل مبلغ أتعاب المهندس المقطوع (ج.م):</label><input type="number" step="any" value={newOp.engCustomFixedAmount} onChange={e=>setNewOp({...newOp, engCustomFixedAmount: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-800 bg-white font-bold text-emerald-600" /></div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/></div>
+                    <div>مصاريف سيارة <input type="number" value={newOp.carCost} onChange={e=>setNewOp({...newOp, carCost: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/></div>
+                  </div>
+
+                  <div>المحصل فوراً في الموقع (إن وجد) <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/></div>
+
+                  <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
+                    <div className="flex justify-between"><span>👷 أتعاب المهندس: <strong>{(livePreview.engFee || 0).toLocaleString()} ج.م</strong></span><span>🛰 حصة الجهاز: <strong>{(livePreview.deviceFee || 0).toLocaleString()} ج.م</strong></span></div>
+                    <div className="flex justify-between text-rose-600 dark:text-rose-400 pt-1 border-t border-emerald-200 dark:border-emerald-800/50 mt-1"><span>🚗 مصاريف (عمالة+سيارة): <strong>{(liveExpenses.totalExp || 0).toLocaleString()} ج.م</strong></span><span>🏢 صافي المكتب: <strong>{(livePreview.officeFee || 0).toLocaleString()} ج.م</strong></span></div>
+                  </div>
+                  <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">{editingOp ? 'حفظ التعديلات' : 'حفظ الطلعة اليومية'}</button>
+                </form>
               </div>
             </div>
           )}
 
-          {editItemData && canEditOrDelete && (
-            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 text-xs">
-                <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 mb-3">
-                  <h3 className="font-black text-sm text-slate-900 dark:text-white">تعديل السجل</h3>
-                  <button onClick={() => setEditItemData(null)} className="text-slate-400 text-lg">✕</button>
+          {payModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setPayModalOpen(false)}></div>
+              <div className="relative bg-white dark:bg-slate-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50">
+                <div className="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                  <h3 className="font-black text-sm">💰 تسجيل دفعة مسددة من العميل</h3>
+                  <button onClick={()=>setPayModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
                 </div>
-                <form onSubmit={handleSaveEditedItem} className="space-y-3">
-                  {editItemData.type === 'expense' && (
-                    <>
-                      <div><label className="block font-bold mb-1">البيان</label><input type="text" value={editItemData.data.description || ''} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, description: e.target.value}})} className="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800"/></div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div><label className="block font-bold mb-1">الكمية</label><input type="number" step="any" value={editItemData.data.quantity} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, quantity: e.target.value}})} className="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/></div>
-                        <div><label className="block font-bold mb-1">السعر</label><input type="number" step="any" value={editItemData.data.unitPrice} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, unitPrice: e.target.value}})} className="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/></div>
-                      </div>
-                    </>
-                  )}
-                  {editItemData.type === 'advance' && (
-                    <div><label className="block font-bold mb-1">المبلغ</label><input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} className="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold text-emerald-600" required/></div>
-                  )}
-                  {editItemData.type === 'payment' && (
-                    <div><label className="block font-bold mb-1">المبلغ</label><input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} className="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold text-emerald-600" required/></div>
-                  )}
-                  {editItemData.type === 'supp_payment' && (
-                    <div><label className="block font-bold mb-1">المبلغ المسدد</label><input type="number" step="any" value={editItemData.data.amount} onChange={e=>setEditItemData({...editItemData, data: {...editItemData.data, amount: e.target.value}})} className="w-full border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold text-emerald-600" required/></div>
-                  )}
-                  <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-2xl shadow-xs transition mt-3">تأكيد وحفظ</button>
+                <form onSubmit={handleAddPayment} className="space-y-3 text-xs font-bold">
+                  <div>التاريخ <input type="date" value={newPayment.date} onChange={e=>setNewPayment({...newPayment, date: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  <div>العميل 
+                    <select value={newPayment.clientName} onChange={e=>setNewPayment({...newPayment, clientName: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required>
+                      <option value="">-- اختر العميل --</option>
+                      {clientNames.map(c=><option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>المبلغ المسدد <input type="number" value={newPayment.amount} onChange={e=>setNewPayment({...newPayment, amount: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1 text-emerald-600 font-black text-sm" required/></div>
+                  <div>البيان / الملاحظات <input type="text" value={newPayment.notes} onChange={e=>setNewPayment({...newPayment, notes: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1"/></div>
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">قيد الدفعة في الحساب</button>
                 </form>
               </div>
             </div>
           )}
 
           <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg print-hidden">
-            <button onClick={()=>setActiveTab('dashboard')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">📊</span><span className="text-[9px] mt-0.5">الرئيسية</span></button>
-            <button onClick={()=>setActiveTab('projects')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='projects'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">📁</span><span className="text-[9px] mt-0.5">المشاريع</span></button>
-            <button onClick={()=>setActiveTab('add_data')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='add_data'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">➕</span><span className="text-[9px] mt-0.5">فاتورة</span></button>
-            <button onClick={()=>setActiveTab('expenses')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='expenses'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">💸</span><span className="text-[9px] mt-0.5">المصاريف</span></button>
+            <button onClick={()=>setActiveTab('dashboard')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span className="text-base">📊</span><span className="text-[9px] mt-0.5">الرئيسية</span></button>
+            <button onClick={()=>setActiveTab('extracts')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='extracts'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span className="text-base">📄</span><span className="text-[9px] mt-0.5">المستخلص</span></button>
+            <button onClick={()=>setActiveTab('operations')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='operations'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span className="text-base">📐</span><span className="text-[9px] mt-0.5">الطلعات</span></button>
+            <button onClick={()=>setActiveTab('vault')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='vault'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span className="text-base">💵</span><span className="text-[9px] mt-0.5">الخزينة</span></button>
             <button onClick={()=>setDrawerOpen(true)} className="flex flex-col items-center py-1 px-2 text-slate-500"><span className="text-base">☰</span><span className="text-[9px] mt-0.5">المزيد</span></button>
           </nav>
 
-          {toast.show && <div className="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-5 py-3 rounded-2xl text-xs z-50 shadow-2xl font-bold print-hidden toast-anim flex items-center gap-2"><span>{toast.type === 'error' ? '⚠️' : '✅'}</span><span>{toast.message}</span></div>}
+          {toast.show && <div className="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-5 py-3 rounded-2xl text-xs z-50 shadow-2xl font-bold print-hidden toast-anim flex items-center gap-2">
+            <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
+            <span>{toast.message}</span>
+          </div>}
         </div>
       );
     }
