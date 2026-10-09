@@ -78,7 +78,7 @@
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-    /* Bike Loading Animation Styles */
+    /* Bike Loading Animation */
     .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
     .bike-svg { width: 100%; height: 100%; overflow: visible; }
     .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
@@ -86,13 +86,13 @@
     .body-bounce { animation: bounce 0.6s ease-in-out infinite alternate; }
     @keyframes spin { 100% { transform: rotate(360deg); } }
     @keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-4px); } }
-    .loading-text { font-family: 'Courier New', Courier, monospace; font-weight: bold; letter-spacing: 2px; color: #6366f1; font-size: 1.2rem; margin-top: 15px; text-align: center; }
+    .loading-text { font-family: 'Courier New', Courier, monospace; font-weight: bold; letter-spacing: 2px; color: #f59e0b; font-size: 1.2rem; margin-top: 15px; text-align: center; }
     .loading-text::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
     @keyframes dots { 0%, 20% { content: ''; } 40% { content: '.'; } 60% { content: '..'; } 80%, 100% { content: '...'; } }
   </style>
 
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200">
+<body className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -170,14 +170,14 @@
         if (chart1Ref.current) {
           chart1Instance.current = new Chart(chart1Ref.current, {
             type: 'bar',
-            data: { labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'], datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#4f46e5', '#f43f5e', '#10b981'], borderRadius: 8 }] },
+            data: { labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'], datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#f59e0b', '#f43f5e', '#10b981'], borderRadius: 8 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
           });
         }
         if (chart2Ref.current) {
           chart2Instance.current = new Chart(chart2Ref.current, {
             type: 'doughnut',
-            data: { labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'], datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }] },
+            data: { labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'], datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#f59e0b', '#10b981', '#6366f1', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10, family: 'Cairo' } } } } }
           });
         }
@@ -199,7 +199,9 @@
     }
 
     function App() {
-      // 1. تعريف المتغيرات والحالات (States)
+      // ==========================================
+      // 1. تعريف المتغيرات والحالات (STATE HOOKS)
+      // ==========================================
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
       const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
@@ -256,7 +258,9 @@
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
       const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
 
-      // 2. التحقق من الصلاحيات (Memos)
+      // ==========================================
+      // 2. الحسابات الأساسية والصلاحيات (MEMOS)
+      // ==========================================
       const currentUserEmail = (user?.email || user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
@@ -300,7 +304,10 @@
         return `cons-${next < 10 ? '0' + next : next}`;
       }, [projects]);
 
-      // 3. الخطافات (UseEffects)
+
+      // ==========================================
+      // 3. الخطافات والاتصال (USE EFFECTS)
+      // ==========================================
       useEffect(() => {
         const handleOnline = () => { setIsOnline(true); showToast("تم الاتصال بالإنترنت والمزامنة 🟢"); if (db) constructionStorage.syncQueue(db); };
         const handleOffline = () => { setIsOnline(false); showToast("تم التحويل للعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
@@ -316,7 +323,7 @@
 
       useEffect(() => {
         if (!auth) { setAuthLoading(false); return; }
-        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 6000);
+        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 6000); // 6 ثواني حد أقصى
 
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           clearTimeout(safetyTimer);
@@ -400,7 +407,10 @@
         }
       }, [myEmpName]);
 
-      // 4. دوال التحكم والواجهة (Handlers)
+
+      // ==========================================
+      // 4. الدوال والوظائف (HANDLERS)
+      // ==========================================
       const showToast = (message, type = "success") => { 
         setToast({ show: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3200); 
       };
@@ -529,7 +539,10 @@
         setNewRoleInput({ email: "", role: "engineer" }); showToast(`تم تعيين صلاحية (${newRoleInput.role}) بنجاح! 🛡️`);
       };
 
+
+      // ==========================================
       // 5. الحسابات الخاصة بالعرض في الشاشات
+      // ==========================================
       const currentProj = projects.find(p => cleanId(p?.id) === cleanId(selectedProjId)) || projects[0] || {};
       const projExpenses = expenses.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
       const projExtracts = extracts.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
@@ -604,14 +617,17 @@
         ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
       ];
 
-      // 6. شاشات التحميل والدخول (EARLY RETURNS)
+
+      // ==========================================
+      // 6. شاشات التحميل والدخول المبدئية (EARLY RETURNS)
+      // ==========================================
       
-      // أ) دراجة التحميل
+      // أ) دراجة التحميل (Loading Spinner)
       if (authLoading) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
             <div className="bike-container">
-              <svg className="bike-svg" viewBox="0 0 100 100" fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="bike-svg" viewBox="0 0 100 100" fill="none" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <g className="body-bounce">
                   <polyline points="30,60 45,35 75,35 60,60 30,60" />
                   <line x1="45" y1="35" x2="40" y2="25" />
@@ -621,54 +637,63 @@
                 </g>
                 <g transform="translate(30, 60)">
                   <circle cx="0" cy="0" r="15" className="wheel" />
-                  <circle cx="0" cy="0" r="2" fill="#4f46e5" />
+                  <circle cx="0" cy="0" r="2" fill="#f59e0b" />
                   <line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" />
                   <line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" />
                 </g>
                 <g transform="translate(75, 60)">
                   <circle cx="0" cy="0" r="15" className="wheel" />
-                  <circle cx="0" cy="0" r="2" fill="#4f46e5" />
+                  <circle cx="0" cy="0" r="2" fill="#f59e0b" />
                   <line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" />
                   <line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" />
                 </g>
                 <g transform="translate(60, 60)" className="pedal">
-                  <circle cx="0" cy="0" r="4" fill="#4f46e5" />
+                  <circle cx="0" cy="0" r="4" fill="#f59e0b" />
                   <line x1="0" y1="-8" x2="0" y2="8" strokeWidth="2" />
                 </g>
               </svg>
             </div>
-            <div className="loading-text text-indigo-500">Loading</div>
+            <div className="loading-text text-amber-500">Loading</div>
             <div className="text-[10px] text-slate-500 font-bold mt-2 font-cairo">جاري تأمين وربط الاتصال...</div>
           </div>
         );
       }
 
-      // ب) شاشة تسجيل الدخول المضيئة المنقسمة
+      // ب) شاشة الدخول المضيئة المنقسمة (Lamp Login UI with Toggles)
       if (!user) {
         return (
-          <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 md:p-8 transition-colors duration-500">
-            <div className="flex flex-col md:flex-row bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl overflow-hidden w-full max-w-5xl border border-slate-200 dark:border-slate-700 min-h-[500px]">
-              
-              {/* الجانب الأيمن (الفورم) */}
-              <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white dark:bg-slate-800 relative z-20">
-                <div className="mb-6 text-center md:text-right">
-                  <h2 className="text-3xl font-black text-slate-900 dark:text-white">مكتب مساحة</h2>
-                  <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-1">للأعمال الهندسية المتكاملة</p>
-                </div>
+          <div className={`min-h-screen flex flex-col md:flex-row items-center justify-center px-4 transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
+            <div className="relative flex flex-col items-center mb-10 md:mb-0 md:ml-16 z-20">
+              <div className={`w-40 h-20 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
+              <div className={`w-3 h-32 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
+              <div className={`w-24 h-4 rounded-t-lg transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
+              <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-16 left-1/2 ml-8 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة النظام">
+                <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-16' : 'h-10'}`}></div>
+                <div className="w-4 h-4 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
+              </div>
+            </div>
 
+            <div className={`relative transition-all duration-1000 transform ${isLampOn ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95 pointer-events-none'}`}>
+              {isLampOn && <div className="absolute -inset-4 bg-amber-400/10 blur-2xl rounded-[3rem] z-0"></div>}
+              
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center relative z-10">
+                <div className="w-14 h-14 bg-white/20 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl shadow-inner">🏗️</div>
+                <h2 className="text-xl font-black text-white">مكتب مساحة</h2>
+                <p className="text-slate-300 text-[11px] mt-1 mb-4 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
+                
                 {/* 🔴 أزرار التبديل السريعة 🔴 */}
-                <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl mb-6 border border-slate-200 dark:border-slate-700">
+                <div className="flex bg-slate-900/50 p-1 rounded-xl mb-5 border border-white/10">
                   <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2 rounded-lg shadow-md text-xs">
                     🏗️ الإنشاءات
                   </button>
-                  <a href="survey.html" className="flex-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
+                  <a href="survey.html" className="flex-1 text-slate-400 hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
                     📐 المساحة
                   </a>
                 </div>
 
                 {accessDeniedMessage ? (
-                  <div className="space-y-4">
-                    <div className="bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 p-4 rounded-2xl text-sm font-bold leading-relaxed">
+                  <div className="space-y-3">
+                    <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-xs font-bold leading-relaxed">
                       ⚠️ {accessDeniedMessage}
                     </div>
                   </div>
@@ -676,22 +701,20 @@
                   <>
                     <form onSubmit={handleEmailLogin} className="space-y-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">البريد الإلكتروني</label>
                         <div className="relative">
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">✉️</span>
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">✉️</span>
                           <input 
-                            type="email" placeholder="mail@example.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
+                            type="email" placeholder="البريد الإلكتروني..." value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
+                            className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">الرقم السري</label>
                         <div className="relative">
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">🔒</span>
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">🔒</span>
                           <input 
-                            type="password" placeholder="••••••••" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
+                            type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)}
+                            className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
                           />
                         </div>
                       </div>
@@ -701,49 +724,31 @@
                     </form>
 
                     <div className="flex items-center gap-3 my-6">
-                      <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div><span className="text-slate-400 text-xs font-bold">أو الدخول بواسطة</span><div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                      <div className="h-px bg-white/20 flex-1"></div>
+                      <span className="text-white/50 text-[10px] font-bold">أو بواسطة</span>
+                      <div className="h-px bg-white/20 flex-1"></div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold py-3 rounded-xl shadow-sm transition-all text-xs">
-                        <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
+                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
                       </button>
-                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-2 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-bold py-3 rounded-xl shadow-sm transition-all text-xs">
-                        📱 رقم الهاتف
+                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
+                        📱 هاتف
                       </button>
                     </div>
                   </>
                 )}
               </div>
-
-              {/* الجانب الأيسر (الرسمة التفاعلية للمساحة - الأباجورة) */}
-              <div className={`w-full md:w-1/2 p-8 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px] transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
-                {isLampOn && <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-amber-400/20 rounded-full blur-[80px]"></div>}
-                
-                <h3 className="text-white font-black text-xl mb-12 z-10 text-center drop-shadow-md">نظام الإنشاءات</h3>
-                
-                <div className="relative flex flex-col items-center z-20">
-                  <div className={`w-48 h-24 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
-                  <div className={`w-4 h-36 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-                  <div className={`w-32 h-5 rounded-t-xl transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-
-                  <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-20 left-1/2 ml-10 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة الأباجورة">
-                    <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-20' : 'h-12'}`}></div>
-                    <div className="w-5 h-5 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
-                  </div>
-                </div>
-
-                <p className="text-slate-300 font-bold text-xs mt-12 z-10 text-center bg-black/40 py-2 px-5 rounded-full backdrop-blur-sm border border-white/10">
-                  اسحب الخيط لإضاءة الشاشة 💡
-                </p>
-              </div>
-
             </div>
           </div>
         );
       }
 
+
+      // ==========================================
       // 7. الواجهة الرئيسية للإنشاءات (Main Application Render)
+      // ==========================================
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
           
@@ -759,7 +764,7 @@
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-sm font-black text-slate-900 dark:text-white">مكتب مساحة</h1>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs text-white ${userRoleKey === 'superadmin' ? 'bg-amber-500' : userRoleKey === 'executive' || userRoleKey === 'pm' ? 'bg-indigo-600' : userRoleKey === 'accountant' ? 'bg-emerald-600' : userRoleKey === 'admin' ? 'bg-amber-500' : 'bg-blue-600'}`}>
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs text-white ${userRoleKey === 'superadmin' ? 'bg-amber-500 text-slate-900' : userRoleKey === 'executive' || userRoleKey === 'pm' ? 'bg-indigo-600' : userRoleKey === 'accountant' ? 'bg-emerald-600' : userRoleKey === 'admin' ? 'bg-amber-500 text-slate-900' : 'bg-blue-600'}`}>
                     {userRoleTitle}
                   </span>
                 </div>
@@ -1019,7 +1024,8 @@
                   <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
                     <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">💵 تسليم عهدة وسلفة جديدة</h3>
                     <form onSubmit={(e) => {
-                      e.preventDefault(); if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
+                      e.preventDefault();
+                      if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
                       const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newAdv, amount: parseNum(newAdv.amount), createdBy: user?.name || 'مستخدم' };
                       const updated = [newItem, ...advances]; setAdvances(updated); saveSafeConstructionData('advances', 'advances', updated);
                       setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" }); showToast("تم تسجيل العهدة بنجاح! 💵");
@@ -1037,7 +1043,10 @@
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projAdvances.map(a => (
                           <tr key={a.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td><td className="p-3 font-bold text-slate-900 dark:text-white">{a.employeeName}</td><td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td><td className="p-3 text-slate-500">{a.notes || '-'}</td>
+                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td>
+                            <td className="p-3 font-bold text-slate-900 dark:text-white">{a.employeeName}</td>
+                            <td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
+                            <td className="p-3 text-slate-500">{a.notes || '-'}</td>
                             {canEditOrDelete && (
                               <td className="p-3 text-center">
                                 <div className="inline-flex items-center gap-1.5">
@@ -1074,13 +1083,13 @@
                   </div>
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-2.5">التاريخ</th><th className="p-2.5">المشروع</th><th className="p-2.5 text-center">المبلغ</th><th className="p-2.5">البيان</th>{isAdmin && <th className="p-2.5 text-center">إجراءات</th>}</tr></thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">التاريخ</th><th className="p-3">المشروع</th><th className="p-3 text-center">المبلغ</th><th className="p-3">البيان</th>{isAdmin && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projPayments.map(p => (
                           <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-2.5 whitespace-nowrap text-slate-500 font-mono">{p.date}</td><td className="p-2.5 font-bold text-indigo-600">{p.projectId}</td><td className="p-2.5 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td><td className="p-2.5 text-slate-500">{p.notes || '-'}</td>
+                            <td className="p-3 text-slate-500 font-mono text-[11px]">{p.date}</td><td className="p-3 font-bold text-indigo-600">{p.projectId}</td><td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td><td className="p-3 text-slate-500">{p.notes || '-'}</td>
                             {isAdmin && (
-                              <td className="p-2.5 text-center">
+                              <td className="p-3 text-center">
                                 <div className="inline-flex items-center gap-1.5">
                                   <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
                                   <button onClick={()=>deleteItem('payments', p.id, payments)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
@@ -1106,9 +1115,11 @@
                       </div>
                     </div>
                     <form onSubmit={(e) => {
-                      e.preventDefault(); if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
+                      e.preventDefault();
+                      if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
                       const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newSuppPay, amount: parseNum(newSuppPay.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...supplierPayments]; setSupplierPayments(updated); saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
+                      const updated = [newItem, ...supplierPayments];
+                      setSupplierPayments(updated); saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
                       setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" }); showToast("تم تسجيل الدفعة للمورد بنجاح! 🚚");
                     }} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                       <input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
@@ -1331,7 +1342,7 @@
                       <h3 className="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للإنشاءات</h3>
                       <form onSubmit={handleSaveRole} className="flex gap-2">
                         <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} className="flex-1 border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                        <select name="roleSelect" value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold w-1/3 text-xs">
+                        <select value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold w-1/3 text-xs">
                           <option value="engineer">👷 مهندس موقع</option>
                           <option value="accountant">💼 محاسب</option>
                           <option value="pm">💼 مدير مشاريع</option>
@@ -1413,7 +1424,7 @@
             </div>
           )}
 
-          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-lg z-40 px-2 py-1 flex justify-around items-center">
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg print-hidden">
             <button onClick={()=>setActiveTab('dashboard')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">📊</span><span className="text-[9px] mt-0.5">الرئيسية</span></button>
             <button onClick={()=>setActiveTab('projects')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='projects'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">📁</span><span className="text-[9px] mt-0.5">المشاريع</span></button>
             <button onClick={()=>setActiveTab('add_data')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='add_data'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">➕</span><span className="text-[9px] mt-0.5">فاتورة</span></button>
