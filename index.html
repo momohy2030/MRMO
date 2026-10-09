@@ -77,20 +77,7 @@
 
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-    /* Bike Loading Animation */
-    .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
-    .bike-svg { width: 100%; height: 100%; overflow: visible; }
-    .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
-    .pedal { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
-    .body-bounce { animation: bounce 0.6s ease-in-out infinite alternate; }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    @keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-4px); } }
-    .loading-text { font-family: 'Courier New', Courier, monospace; font-weight: bold; letter-spacing: 2px; color: #6366f1; font-size: 1.2rem; margin-top: 15px; text-align: center; }
-    .loading-text::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
-    @keyframes dots { 0%, 20% { content: ''; } 40% { content: '.'; } 60% { content: '..'; } 80%, 100% { content: '...'; } }
   </style>
-
 </head>
 <body className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200">
   <div id="root"></div>
@@ -199,14 +186,13 @@
     }
 
     function App() {
-      // 1. تعريف المتغيرات والحالات (States)
+      // 1. حالات التطبيق (States)
       const [user, setUser] = useState(null);
-      const [authLoading, setAuthLoading] = useState(true);
+      const [authLoading, setAuthLoading] = useState(false); // إلغاء التعليق بجعلها تبدأ false لتظهر شاشة الدخول فوراً بدون شاشة بيضاء معلقة
       const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
       const [isOnline, setIsOnline] = useState(navigator.onLine);
       const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
       
-      const [isLampOn, setIsLampOn] = useState(false);
       const [loginEmail, setLoginEmail] = useState("");
       const [loginPassword, setLoginPassword] = useState("");
 
@@ -256,7 +242,7 @@
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
       const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
 
-      // 2. التحقق من الصلاحيات (Memos)
+      // 2. الصلاحيات
       const currentUserEmail = (user?.email || user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
@@ -302,7 +288,7 @@
 
       // 3. الخطافات (UseEffects)
       useEffect(() => {
-        const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) constructionStorage.syncQueue(db); };
+        const handleOnline = () => { setIsOnline(true); showToast("تم الاتصال بالإنترنت والمزامنة 🟢"); if (db) constructionStorage.syncQueue(db); };
         const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
         window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
         return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
@@ -315,33 +301,22 @@
       }, [theme]);
 
       useEffect(() => {
-        if (!auth) { setAuthLoading(false); return; }
-        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 6000);
-
+        if (!auth) return;
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-          clearTimeout(safetyTimer);
           if (currentUser) {
             const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase().trim();
             if (BLOCKED_CONSTRUCTION_EMAILS.some(b => identifier.includes(b.toLowerCase()))) {
               setAccessDeniedMessage("عفواً، حسابك مصرح له بالدخول لقطاع المساحة فقط.");
-              auth.signOut(); setUser(null); setAuthLoading(false); return;
+              auth.signOut(); setUser(null); return;
             }
             setAccessDeniedMessage("");
             setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", email: currentUser.email || currentUser.phoneNumber || "", identifier });
             localStorage.setItem('last_const_user_email', identifier);
-            localStorage.setItem('last_const_user_name', currentUser.displayName || identifier);
           } else {
-            const savedEmail = localStorage.getItem('last_const_user_email');
-            if (savedEmail && !navigator.onLine) {
-              setUser({ identifier: savedEmail, email: savedEmail, name: localStorage.getItem('last_const_user_name') || savedEmail });
-            } else {
-              setUser(null);
-            }
+            setUser(null);
           }
-          setAuthLoading(false);
         });
-
-        return () => { clearTimeout(safetyTimer); unsubscribe(); };
+        return () => unsubscribe();
       }, []);
 
       useEffect(() => {
@@ -361,22 +336,6 @@
             if (data.supplier_payments) { const l = ensureArr(data.supplier_payments).reverse(); setSupplierPayments(l); constructionStorage.set('supplier_payments', l); }
             if (data.login_logs) { const l = ensureArr(data.login_logs).reverse(); setLoginLogs(l); constructionStorage.set('login_logs', l); }
             if (data.roles) { setUserRolesMap(data.roles); constructionStorage.set('roles', data.roles); }
-
-            const savedSettings = data.settings || {};
-            const finalSettings = {
-              mainCategories: ensureArr(savedSettings.mainCategories).length ? ensureArr(savedSettings.mainCategories) : initialSettings.mainCategories,
-              subCategories: ensureArr(savedSettings.subCategories).length ? ensureArr(savedSettings.subCategories) : initialSettings.subCategories,
-              costTypes: ensureArr(savedSettings.costTypes).length ? ensureArr(savedSettings.costTypes) : initialSettings.costTypes,
-              suppliers: ensureArr(savedSettings.suppliers).length ? ensureArr(savedSettings.suppliers) : initialSettings.suppliers,
-              employees: ensureArr(savedSettings.employees).length ? ensureArr(savedSettings.employees) : initialSettings.employees,
-              logo: savedSettings.logo || ""
-            };
-            setSettings(finalSettings); constructionStorage.set('settings', finalSettings);
-
-            setSelectedProjId(prev => {
-              if (prev && finalProjects.some(p => cleanId(p.id) === cleanId(prev))) return prev;
-              return finalProjects[0]?.id || "cons-01";
-            });
           } catch (err) { console.error(err); }
         };
         rootRef.on('value', handleValue);
@@ -392,15 +351,8 @@
       }, [user, userRoleTitle]);
 
       useEffect(() => { setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId })); }, [nextSuggestedProjectId]);
-      
-      useEffect(() => { 
-        if (myEmpName) {
-          if (!newExp.custodyEmployee) setNewExp(prev => ({ ...prev, custodyEmployee: myEmpName }));
-          if (!newAdv.employeeName) setNewAdv(prev => ({ ...prev, employeeName: myEmpName }));
-        }
-      }, [myEmpName]);
 
-      // 4. دوال التحكم والواجهة (Handlers)
+      // 4. الدوال والوظائف (Handlers)
       const showToast = (message, type = "success") => { 
         setToast({ show: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3200); 
       };
@@ -419,9 +371,7 @@
       const handleEmailLogin = (e) => {
         e.preventDefault();
         if (!loginEmail || !loginPassword) return;
-        setAuthLoading(true);
         auth.signInWithEmailAndPassword(loginEmail, loginPassword).catch(error => {
-          setAuthLoading(false);
           if (error.code === 'auth/user-not-found') showToast("البريد غير مسجل بالنظام", "error");
           else if (error.code === 'auth/wrong-password') showToast("كلمة المرور غير صحيحة", "error");
           else showToast("فشل تسجيل الدخول: " + error.message, "error");
@@ -429,8 +379,7 @@
       };
 
       const handleGoogleLogin = () => { 
-        setAuthLoading(true);
-        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch((error) => { setAuthLoading(false); showToast("تعذر الدخول: " + error.message, "error"); }); 
+        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch((error) => { showToast("تعذر الدخول: " + error.message, "error"); }); 
       };
 
       const handlePhoneLoginClick = () => { showToast("لتسجيل الدخول برقم الهاتف يجب تفعيل reCAPTCHA من لوحة تحكم Firebase أولاً.", "error"); };
@@ -606,10 +555,10 @@
 
 
       // ==========================================
-      // 6. شاشات التحميل والدخول المبكرة (EARLY RETURNS)
+      // 6. شاشات التحميل والدخول المبدئية (EARLY RETURNS)
       // ==========================================
       
-      // أ) دراجة التحميل (Bike Loading Animation)
+      // أ) دراجة التحميل
       if (authLoading) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
@@ -646,101 +595,75 @@
         );
       }
 
-      // ب) شاشة تسجيل الدخول المضيئة المنقسمة (Split Lamp Login)
+      // ب) شاشة تسجيل الدخول المضيئة (Lamp Login UI with Toggles)
       if (!user) {
         return (
-          <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 md:p-8 transition-colors duration-500">
-            <div className="flex flex-col md:flex-row bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl overflow-hidden w-full max-w-5xl border border-slate-200 dark:border-slate-700 min-h-[500px]">
-              
-              {/* الجانب الأيمن (الفورم) */}
-              <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white dark:bg-slate-800 relative z-20">
-                <div className="mb-6 text-center md:text-right">
-                  <h2 className="text-3xl font-black text-slate-900 dark:text-white">مكتب مساحة</h2>
-                  <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-1">للأعمال الهندسية المتكاملة</p>
-                </div>
+          <div className={`min-h-screen flex flex-col md:flex-row items-center justify-center px-4 transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
+            <div className="relative flex flex-col items-center mb-10 md:mb-0 md:ml-16 z-20">
+              <div className={`w-40 h-20 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
+              <div className={`w-3 h-32 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
+              <div className={`w-24 h-4 rounded-t-lg transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
+              <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-16 left-1/2 ml-8 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة النظام">
+                <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-16' : 'h-10'}`}></div>
+                <div className="w-4 h-4 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
+              </div>
+            </div>
 
+            <div className={`relative transition-all duration-1000 transform ${isLampOn ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95 pointer-events-none'}`}>
+              {isLampOn && <div className="absolute -inset-4 bg-amber-400/10 blur-2xl rounded-[3rem] z-0"></div>}
+              
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center relative z-10">
+                <div className="w-14 h-14 bg-white/20 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl shadow-inner">🏗️</div>
+                <h2 className="text-xl font-black text-white">مكتب مساحة</h2>
+                <p className="text-slate-300 text-[11px] mt-1 mb-4 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
+                
                 {/* 🔴 أزرار التبديل 🔴 */}
-                <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl mb-6 border border-slate-200 dark:border-slate-700">
+                <div className="flex bg-slate-900/50 p-1 rounded-xl mb-5 border border-white/10">
                   <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2 rounded-lg shadow-md text-xs">
                     🏗️ الإنشاءات
                   </button>
-                  <a href="survey.html" className="flex-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
+                  <a href="survey.html" className="flex-1 text-slate-400 hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
                     📐 المساحة
                   </a>
                 </div>
 
                 {accessDeniedMessage ? (
-                  <div className="space-y-4">
-                    <div className="bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 p-4 rounded-2xl text-sm font-bold leading-relaxed">
-                      ⚠️ {accessDeniedMessage}
-                    </div>
+                  <div className="space-y-3">
+                    <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-xs font-bold leading-relaxed">⚠️ {accessDeniedMessage}</div>
                   </div>
                 ) : (
                   <>
-                    <form onSubmit={handleEmailLogin} className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">البريد الإلكتروني</label>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">✉️</span>
-                          <input 
-                            type="email" placeholder="mail@example.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
-                          />
-                        </div>
+                    <form onSubmit={handleEmailLogin} className="space-y-3 mb-4">
+                      <div className="relative">
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">✉️</span>
+                        <input type="email" placeholder="البريد الإلكتروني..." value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">الرقم السري</label>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">🔒</span>
-                          <input 
-                            type="password" placeholder="••••••••" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
-                          />
-                        </div>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">🔒</span>
+                        <input type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
                       </div>
-                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3.5 rounded-xl shadow-md transition-all text-sm mt-2">
-                        تسجيل الدخول للنظام
+                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-2.5 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all text-xs">
+                        تسجيل الدخول
                       </button>
                     </form>
 
-                    <div className="flex items-center gap-3 my-6">
-                      <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div><span className="text-slate-400 text-xs font-bold">أو الدخول بواسطة</span><div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="h-px bg-white/20 flex-1"></div>
+                      <span className="text-white/50 text-[10px] font-bold">أو بواسطة</span>
+                      <div className="h-px bg-white/20 flex-1"></div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold py-3 rounded-xl shadow-sm transition-all text-xs">
-                        <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
                       </button>
-                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-2 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-bold py-3 rounded-xl shadow-sm transition-all text-xs">
-                        📱 رقم الهاتف
+                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
+                        📱 هاتف
                       </button>
                     </div>
                   </>
                 )}
               </div>
-
-              {/* الجانب الأيسر (الرسمة التفاعلية - الأباجورة) */}
-              <div className={`w-full md:w-1/2 p-8 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px] transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
-                {isLampOn && <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-amber-400/20 rounded-full blur-[80px]"></div>}
-                
-                <h3 className="text-white font-black text-xl mb-12 z-10 text-center drop-shadow-md">نظام الإنشاءات</h3>
-                
-                <div className="relative flex flex-col items-center z-20">
-                  <div className={`w-48 h-24 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
-                  <div className={`w-4 h-36 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-                  <div className={`w-32 h-5 rounded-t-xl transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-
-                  <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-20 left-1/2 ml-10 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة الأباجورة">
-                    <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-20' : 'h-12'}`}></div>
-                    <div className="w-5 h-5 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
-                  </div>
-                </div>
-
-                <p className="text-slate-300 font-bold text-xs mt-12 z-10 text-center bg-black/40 py-2 px-5 rounded-full backdrop-blur-sm border border-white/10">
-                  اسحب الخيط لإضاءة الشاشة 💡
-                </p>
-              </div>
-
             </div>
           </div>
         );
@@ -748,7 +671,7 @@
 
 
       // ==========================================
-      // 7. الواجهة الرئيسية للنظام (Main App Render)
+      // 7. الواجهة الرئيسية للنظام (Dashboard App Render)
       // ==========================================
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
@@ -764,17 +687,14 @@
               <span className="text-2xl p-1 bg-amber-50 dark:bg-amber-900/30 rounded-xl">🏗️</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-sm font-black text-indigo-700 dark:text-indigo-400">مكتب مساحة</h1>
+                  <h1 className="text-sm font-black text-slate-900 dark:text-white">مكتب مساحة</h1>
                   <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs text-white ${userRoleKey === 'superadmin' ? 'bg-amber-500' : userRoleKey === 'executive' || userRoleKey === 'pm' ? 'bg-indigo-600' : userRoleKey === 'accountant' ? 'bg-emerald-600' : userRoleKey === 'admin' ? 'bg-amber-500' : 'bg-blue-600'}`}>
                     {userRoleTitle}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">
-                  {user?.email || "غير مسجل"}
-                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">{user.email}</div>
               </div>
             </div>
-
             <div className="flex items-center gap-2">
               <button onClick={toggleTheme} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
               <a href="survey.html" className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition"><span>📐</span> <span className="hidden sm:inline">قطاع المساحة</span></a>
@@ -982,8 +902,7 @@
                   <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
                     <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">💵 تسليم عهدة وسلفة جديدة</h3>
                     <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
+                      e.preventDefault(); if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
                       const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newAdv, amount: parseNum(newAdv.amount), createdBy: user?.name || 'مستخدم' };
                       const updated = [newItem, ...advances]; setAdvances(updated); saveSafeConstructionData('advances', 'advances', updated);
                       setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" }); showToast("تم تسجيل العهدة بنجاح! 💵");
@@ -1001,10 +920,7 @@
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projAdvances.map(a => (
                           <tr key={a.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td>
-                            <td className="p-3 font-bold text-slate-900 dark:text-white">{a.employeeName}</td>
-                            <td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
-                            <td className="p-3 text-slate-500">{a.notes || '-'}</td>
+                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td><td className="p-3 font-bold text-slate-900 dark:text-white">{a.employeeName}</td><td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td><td className="p-3 text-slate-500">{a.notes || '-'}</td>
                             {canEditOrDelete && (
                               <td className="p-3 text-center">
                                 <div className="inline-flex items-center gap-1.5">
@@ -1039,7 +955,7 @@
                       <button type="submit" className="sm:col-span-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ التحصيل</button>
                     </form>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto custom-scroll text-xs">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
                       <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-2.5">التاريخ</th><th className="p-2.5">المشروع</th><th className="p-2.5 text-center">المبلغ</th><th className="p-2.5">البيان</th>{isAdmin && <th className="p-2.5 text-center">إجراءات</th>}</tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
@@ -1073,11 +989,9 @@
                       </div>
                     </div>
                     <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
+                      e.preventDefault(); if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
                       const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newSuppPay, amount: parseNum(newSuppPay.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...supplierPayments];
-                      setSupplierPayments(updated); saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
+                      const updated = [newItem, ...supplierPayments]; setSupplierPayments(updated); saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
                       setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" }); showToast("تم تسجيل الدفعة للمورد بنجاح! 🚚");
                     }} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                       <input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
@@ -1087,10 +1001,9 @@
                       <button type="submit" className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">قيد الدفعة للمورد</button>
                     </form>
                   </div>
-
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">المورد</th><th className="p-3 text-center">إجمالي المسحوبات</th><th className="p-3 text-center text-amber-600">فواتير آجلة</th><th className="p-3 text-center text-emerald-600">المسدد له</th><th className="p-3 text-center">الرصيد النهائي</th><th className="p-3 text-center">كشف الحساب</th></tr></thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">المورد</th><th className="p-3 text-center">إجمالي المسحوبات</th><th className="p-3 text-center text-amber-600">فواتير آجلة</th><th className="p-3 text-center text-emerald-600">المسدد له</th><th className="p-3 text-center">الرصيد النهائي</th><th className="p-3 text-center">كشف الحساب</th></tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {suppliersLedger.map((s, i) => (
                           <tr key={i} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
@@ -1165,7 +1078,7 @@
 
               {activeTab === "extracts" && (isAdmin || isAccountant) && (
                 <div className="space-y-4">
-                  <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs print-hidden">
+                  <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs print-hidden">
                     <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">📄 اعتماد مستخلص أعمال جديد</h3>
                     <form onSubmit={(e) => {
                       e.preventDefault();
@@ -1300,8 +1213,8 @@
                     <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
                       <h3 className="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للإنشاءات</h3>
                       <form onSubmit={handleSaveRole} className="flex gap-2">
-                        <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} className="flex-1 border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                        <select name="roleSelect" value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold w-1/3 text-xs">
+                        <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} className="flex-1 border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold" required/>
+                        <select name="roleSelect" value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold w-1/3 text-xs">
                           <option value="engineer">👷 مهندس موقع</option>
                           <option value="accountant">💼 محاسب</option>
                           <option value="pm">💼 مدير مشاريع</option>
