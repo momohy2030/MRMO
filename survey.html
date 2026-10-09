@@ -90,6 +90,7 @@
     @keyframes floating { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
     @keyframes laser-scan { 0% { opacity: 0.2; transform: scaleX(0.8); } 100% { opacity: 0.8; transform: scaleX(1.2); } }
   </style>
+
 </head>
 <body className="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 antialiased transition-colors duration-300">
   <div id="root"></div>
@@ -160,6 +161,35 @@
       }
     };
 
+    function exportCleanPdfAndWhatsApp(elementId, filename, textMessage) {
+      let targetPhone = window.prompt("أدخل رقم هاتف المستلم (أو اتركه فارغاً لاختيار المحادثة مباشرة في واتساب):", "");
+      if (targetPhone === null) return;
+      targetPhone = targetPhone.replace(/[^0-9]/g, '');
+      if (targetPhone.startsWith('01')) targetPhone = '20' + targetPhone.substring(1);
+
+      const element = document.getElementById(elementId);
+      if (!element || typeof html2pdf === 'undefined') {
+        const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+        window.open(url, '_blank');
+        return;
+      }
+
+      const prevWidth = element.style.width; const prevMaxWidth = element.style.maxWidth; const prevPadding = element.style.padding;
+      element.style.width = '800px'; element.style.maxWidth = '800px'; element.style.padding = '24px'; element.classList.add('pdf-render-mode');
+      const opt = { margin: [8, 8, 8, 8], filename: filename || 'مستخلص.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1200, scrollX: 0, scrollY: 0 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+      
+      html2pdf().set(opt).from(element).save().then(() => {
+        element.style.width = prevWidth; element.style.maxWidth = prevMaxWidth; element.style.padding = prevPadding; element.classList.remove('pdf-render-mode');
+        const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+        window.open(url, '_blank');
+      }).catch((err) => {
+        element.style.width = prevWidth; element.style.maxWidth = prevMaxWidth; element.style.padding = prevPadding; element.classList.remove('pdf-render-mode');
+        console.error(err);
+        const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}` : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+        window.open(url, '_blank');
+      });
+    }
+
     function DashboardCharts({ operations }) {
       const chart1Ref = useRef(null); const chart2Ref = useRef(null); const chart1Instance = useRef(null); const chart2Instance = useRef(null);
 
@@ -212,8 +242,9 @@
     function App() {
       // 1. States Initialization
       const [user, setUser] = useState(null);
-      const [authLoading, setAuthLoading] = useState(false);
+      const [authLoading, setAuthLoading] = useState(true);
       const [isOnline, setIsOnline] = useState(navigator.onLine);
+      
       const [loginEmail, setLoginEmail] = useState("");
       const [loginPassword, setLoginPassword] = useState("");
       const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
@@ -271,7 +302,7 @@
       const [extractItems, setExtractItems] = useState([]);
       const [statementClient, setStatementClient] = useState("");
 
-      // 2. Memos for Auth & Roles
+      // 2. Memos & Roles Logic
       const userEmail = (user?.email || localStorage.getItem('last_user_email') || "").trim().toLowerCase();
       const sanitizedEmailKey = userEmail.replace(/\./g, '_');
       
@@ -297,7 +328,74 @@
                        userRoleKey === 'pm' ? "💼 مدير مشاريع" :
                        userRoleKey === 'admin' ? "👑 إدارة" : "👷 مهندس معتمد";
 
-      // 3. Handlers & Functions
+      // 3. Side Effects (useEffect)
+      useEffect(() => {
+        const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) offlineStorage.syncQueue(db); };
+        const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
+        window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
+        return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
+      }, []);
+
+      useEffect(() => {
+        if (settings.theme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', settings.theme);
+      }, [settings.theme]);
+
+      useEffect(() => {
+        if (!auth) { setAuthLoading(false); return; }
+        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 6000);
+
+        const unsubscribe = auth.onAuthStateChanged((curr) => {
+          clearTimeout(safetyTimer);
+          if (curr) {
+            setUser(curr);
+            localStorage.setItem('last_user_email', curr.email);
+            localStorage.setItem('last_user_name', curr.displayName || curr.email);
+            if (navigator.onLine && db && !sessionStorage.getItem('survey_log_done')) {
+              db.ref('survey_data/login_logs').push({ name: curr.displayName || curr.email, email: curr.email, action: "تسجيل الدخول للنظام", date: new Date().toLocaleString('ar-EG'), timestamp: Date.now() });
+              sessionStorage.setItem('survey_log_done', 'true');
+            }
+          } else {
+            const savedEmail = localStorage.getItem('last_user_email');
+            if (savedEmail && !navigator.onLine) setUser({ email: savedEmail, displayName: localStorage.getItem('last_user_name') || savedEmail });
+            else setUser(null);
+          }
+          setAuthLoading(false);
+        });
+        return () => { clearTimeout(safetyTimer); unsubscribe(); };
+      }, []);
+
+      useEffect(() => {
+        if (!db) return;
+        const ref = db.ref('survey_data');
+        const handleData = (snap) => {
+          const d = snap.val() || {};
+          if (d.operations) { const arr = toArr(d.operations).reverse(); setOperations(arr); offlineStorage.set('operations', arr); }
+          if (d.transactions) { const arr = toArr(d.transactions).reverse(); setTransactions(arr); offlineStorage.set('transactions', arr); }
+          if (d.payments) { const arr = toArr(d.payments).reverse(); setPayments(arr); offlineStorage.set('payments', arr); }
+          if (d.login_logs) { const arr = toArr(d.login_logs).reverse(); setLoginLogs(arr); offlineStorage.set('login_logs', arr); }
+          if (d.settings) {
+            setSettings(prev => {
+              const updated = {
+                ...prev,
+                engineers: toArr(d.settings.engineers).length ? toArr(d.settings.engineers) : prev.engineers,
+                opTypes: toArr(d.settings.opTypes).length ? toArr(d.settings.opTypes) : prev.opTypes,
+                roles: d.settings.roles || prev.roles,
+                logo: d.settings.logo || prev.logo
+              };
+              offlineStorage.set('settings', updated);
+              return updated;
+            });
+          }
+        };
+        ref.on('value', handleData);
+        return () => { ref.off('value', handleData); };
+      }, []);
+
+      useEffect(() => { if (extractClient) loadClientOpsIntoExtract(extractClient, extractSite); else setExtractItems([]); }, [extractClient, extractSite, operations]);
+
+      // 4. Action Handlers (Functions)
       function showToast(message, type="success") {
         setToast({ show: true, message, type });
         setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
@@ -334,7 +432,10 @@
 
       function handlePhoneLoginClick() { showToast("لتسجيل الدخول برقم الهاتف يجب تفعيل reCAPTCHA من لوحة تحكم Firebase أولاً.", "error"); }
 
-      function handleLogout() { auth.signOut(); setDrawerOpen(false); }
+      function handleLogout() { 
+        auth.signOut(); 
+        setDrawerOpen(false); 
+      }
 
       function handleOpTypeChange(selectedType) {
         setNewOp(prev => {
@@ -446,13 +547,13 @@
           let itemQty = 1, itemPrice = parseNum(o?.agreedAmount), itemDesc = o?.workDescription ? o.workDescription : (o?.opType || 'عمل مساحي');
           if (o?.isFaddan) { itemQty = parseNum(o.faddanQty) || 1; itemPrice = parseNum(o.faddanPrice) || (parseNum(o.agreedAmount) / itemQty); itemDesc = `${itemDesc} (${itemQty} فدان)`; } 
           else if (o?.isSketch) { itemQty = parseNum(o.sketchesCount) || 1; itemPrice = parseNum(o.agreedAmount) / itemQty; itemDesc = `${itemDesc} (${itemQty} كروكي)`; }
-          return { id: o?.id || (Date.now() + idx), date: o?.date || todayDate, siteName: o?.siteLocation || "الموقع العام", desc: itemDesc, qty: itemQty, unitPrice: itemPrice, rate: 100 };
+          return { id: o?.id || (Date.now() + idx), date: o?.date || todayDate, desc: itemDesc, qty: itemQty, unitPrice: itemPrice, rate: 100 };
         });
         setExtractItems(loaded);
         if (loaded.length > 0) showToast(`تم تحميل ${loaded.length} أعمال بنجاح!`); else showToast("لا توجد أعمال مطابقة.", "error");
       }
 
-      const handleAddEmptyExtractRow = () => setExtractItems([...extractItems, { id: Date.now(), date: todayDate, siteName: extractSite || "الموقع العام", desc: "بند أعمال مساحية", qty: 1, unitPrice: 1000, rate: 100 }]);
+      const handleAddEmptyExtractRow = () => setExtractItems([...extractItems, { id: Date.now(), date: todayDate, desc: "بند أعمال مساحية", qty: 1, unitPrice: 1000, rate: 100 }]);
       const handleRemoveExtractRow = (id) => setExtractItems(extractItems.filter(item => item.id !== id));
 
       const exportToExcel = () => {
@@ -461,94 +562,34 @@
         const wsOps = XLSX.utils.json_to_sheet(operations); XLSX.utils.book_append_sheet(wb, wsOps, "الأعمال_والمقايسات");
         const wsTx = XLSX.utils.json_to_sheet(transactions); XLSX.utils.book_append_sheet(wb, wsTx, "الخزينة");
         const wsPayments = XLSX.utils.json_to_sheet(payments); XLSX.utils.book_append_sheet(wb, wsPayments, "التحصيلات");
-        XLSX.writeFile(wb, `Survey_ERP_${todayDate}.xlsx`); showToast("تم تصدير ملف الإكسيل! 📥");
+        XLSX.writeFile(wb, `Survey_ERP_${todayDate}.xlsx`); 
+        showToast("تم تصدير ملف الإكسيل! 📥");
       };
 
       const exportJsonBackup = () => {
         const fullBackup = { operations, transactions, payments, login_logs: loginLogs, settings, exportDate: new Date().toISOString() };
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup, null, 2));
         const downloadAnchor = document.createElement('a'); downloadAnchor.setAttribute("href", dataStr); downloadAnchor.setAttribute("download", `Survey_FullBackup_${todayDate}.json`);
-        document.body.appendChild(downloadAnchor); downloadAnchor.click(); downloadAnchor.remove(); showToast("تم تحميل النسخة الاحتياطية (JSON)! 💾");
+        document.body.appendChild(downloadAnchor); downloadAnchor.click(); downloadAnchor.remove();
+        showToast("تم تحميل النسخة الاحتياطية (JSON)! 💾");
       };
 
       const handleSaveRole = (e) => {
-        e.preventDefault(); if (!isAdmin) return;
-        const cleanEmail = newRoleInput.email.trim().toLowerCase(); if (!cleanEmail) return;
+        e.preventDefault();
+        if (!isAdmin) return;
+        const cleanEmail = newRoleInput.email.trim().toLowerCase();
+        if (!cleanEmail) return;
         const key = cleanEmail.replace(/\./g, '_');
-        const updated = { ...(settings.roles || {}), [key]: newRoleInput.role };
-        const newSettings = { ...settings, roles: updated };
-        setSettings(newSettings); saveListSafely('settings', 'settings', newSettings);
-        setNewRoleInput({ email: "", role: "engineer" }); showToast(`تم تعيين الصلاحية بنجاح!`);
+        
+        const newRoles = { ...(settings.roles || {}), [key]: newRoleInput.role };
+        const updatedSettings = { ...settings, roles: newRoles };
+        setSettings(updatedSettings);
+        saveListSafely('settings', 'settings', updatedSettings);
+        setNewRoleInput({ email: "", role: "engineer" });
+        showToast(`تم تعيين الصلاحية للمستخدم بنجاح!`);
       };
 
-      // 4. UseEffects للاتصال والمزامنة
-      useEffect(() => {
-        const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) offlineStorage.syncQueue(db); };
-        const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
-        window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
-        return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
-      }, []);
-
-      useEffect(() => {
-        if (settings.theme === 'dark') document.documentElement.classList.add('dark');
-        else document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', settings.theme);
-      }, [settings.theme]);
-
-      useEffect(() => {
-        if (!auth) { setAuthLoading(false); return; }
-        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 5000);
-
-        const unsubscribe = auth.onAuthStateChanged((curr) => {
-          clearTimeout(safetyTimer);
-          if (curr) {
-            setUser(curr);
-            localStorage.setItem('last_user_email', curr.email);
-            localStorage.setItem('last_user_name', curr.displayName || curr.email);
-            if (navigator.onLine && db && !sessionStorage.getItem('survey_log_done')) {
-              db.ref('survey_data/login_logs').push({ name: curr.displayName || curr.email, email: curr.email, action: "تسجيل الدخول للنظام", date: new Date().toLocaleString('ar-EG'), timestamp: Date.now() });
-              sessionStorage.setItem('survey_log_done', 'true');
-            }
-          } else {
-            const savedEmail = localStorage.getItem('last_user_email');
-            if (savedEmail && !navigator.onLine) setUser({ email: savedEmail, displayName: localStorage.getItem('last_user_name') || savedEmail });
-            else setUser(null);
-          }
-          setAuthLoading(false);
-        });
-        return () => { clearTimeout(safetyTimer); unsubscribe(); };
-      }, []);
-
-      useEffect(() => {
-        if (!db) return;
-        const ref = db.ref('survey_data');
-        const handleData = (snap) => {
-          const d = snap.val() || {};
-          if (d.operations) { const arr = toArr(d.operations).reverse(); setOperations(arr); offlineStorage.set('operations', arr); }
-          if (d.transactions) { const arr = toArr(d.transactions).reverse(); setTransactions(arr); offlineStorage.set('transactions', arr); }
-          if (d.payments) { const arr = toArr(d.payments).reverse(); setPayments(arr); offlineStorage.set('payments', arr); }
-          if (d.login_logs) { const arr = toArr(d.login_logs).reverse(); setLoginLogs(arr); offlineStorage.set('login_logs', arr); }
-          if (d.settings) {
-            setSettings(prev => {
-              const updated = {
-                ...prev,
-                engineers: toArr(d.settings.engineers).length ? toArr(d.settings.engineers) : prev.engineers,
-                opTypes: toArr(d.settings.opTypes).length ? toArr(d.settings.opTypes) : prev.opTypes,
-                roles: d.settings.roles || prev.roles,
-                logo: d.settings.logo || prev.logo
-              };
-              offlineStorage.set('settings', updated);
-              return updated;
-            });
-          }
-        };
-        ref.on('value', handleData);
-        return () => { ref.off('value', handleData); };
-      }, []);
-
-      useEffect(() => { if (extractClient) loadClientOpsIntoExtract(extractClient, extractSite); else setExtractItems([]); }, [extractClient, extractSite, operations]);
-
-      // 5. الحسابات الخاصة بالعرض في الشاشات
+      // Calculations used for UI
       const extractTotalWork = extractItems.reduce((sum, item) => sum + (parseNum(item.qty) * parseNum(item.unitPrice) * (parseNum(item.rate) / 100)), 0);
       const clientOpsForPayment = operations.filter(o => (o?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (o?.siteLocation||'').trim() === extractSite.trim()));
       const clientPaysForPayment = payments.filter(p => (p?.clientName||'').trim() === (extractClient||'').trim() && (!extractSite || (p?.siteLocation||'').trim() === extractSite.trim()));
@@ -593,9 +634,7 @@
       ], [isSuperAdminExact]);
 
 
-      // ==========================================
-      // 6. شاشات التحميل والدخول المبدئية (EARLY RETURNS)
-      // ==========================================
+      // 5. الشاشات المبدئية والتحميل (Early Returns) MUST BE AFTER ALL HOOKS
       
       if (authLoading) {
         return (
@@ -640,19 +679,9 @@
               
               {/* الجانب الأيمن (الفورم) */}
               <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white dark:bg-slate-800 relative z-20">
-                <div className="mb-6 text-center md:text-right">
+                <div className="mb-8 text-center md:text-right">
                   <h2 className="text-3xl font-black text-slate-900 dark:text-white">مكتب مساحة</h2>
                   <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-1">للأعمال الهندسية المتكاملة</p>
-                </div>
-
-                {/* 🔴 أزرار التبديل 🔴 */}
-                <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl mb-6 border border-slate-200 dark:border-slate-700">
-                  <a href="index.html" className="flex-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
-                    🏗️ الإنشاءات
-                  </a>
-                  <button className="flex-1 bg-indigo-600 text-white font-black py-2 rounded-lg shadow-md text-xs">
-                    📐 المساحة
-                  </button>
                 </div>
 
                 {accessDeniedMessage ? (
@@ -669,8 +698,12 @@
                         <div className="relative">
                           <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">✉️</span>
                           <input 
-                            type="email" placeholder="mail@example.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm font-bold" required
+                            type="email" 
+                            placeholder="mail@example.com" 
+                            value={loginEmail}
+                            onChange={e=>setLoginEmail(e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm font-bold"
+                            required
                           />
                         </div>
                       </div>
@@ -679,11 +712,16 @@
                         <div className="relative">
                           <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">🔒</span>
                           <input 
-                            type="password" placeholder="••••••••" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm font-bold" required
+                            type="password" 
+                            placeholder="••••••••" 
+                            value={loginPassword}
+                            onChange={e=>setLoginPassword(e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm font-bold"
+                            required
                           />
                         </div>
                       </div>
+                      
                       <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl shadow-md transition-all text-sm mt-2">
                         تسجيل الدخول للنظام
                       </button>
@@ -742,13 +780,9 @@
         );
       }
 
-
-      // ==========================================
-      // 7. واجهة النظام الرئيسية (Main Dashboard Render)
-      // ==========================================
+      // 6. Main Content App Render
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
-          
           {!isOnline && (
             <div className="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
               <span>📡</span><span>أنت تعمل الآن في وضع عدم الاتصال (بدون إنترنت). يتم حفظ جميع العمليات محلياً على جهازك وسوف ترفع تلقائياً عند توفر الشبكة.</span>
@@ -1230,6 +1264,58 @@
                       </div>
                     )}
                   </div>
+
+                  {statementClient && (() => {
+                    const cOps = operations.filter(o => (o?.clientName||'').trim() === statementClient.trim());
+                    const cPays = payments.filter(p => (p?.clientName||'').trim() === statementClient.trim());
+                    const tBilled = cOps.reduce((s,o)=>s+parseNum(o?.agreedAmount),0);
+                    const tLabor = cOps.reduce((s,o)=>s+parseNum(o?.laborCost),0);
+                    const tCar = cOps.reduce((s,o)=>s+parseNum(o?.carCost),0);
+                    const tRtk = cOps.reduce((s,o)=>s+parseNum(o?.deviceFee),0);
+                    const tEng = cOps.reduce((s,o)=>s+parseNum(o?.engFee),0);
+                    const tOffice = cOps.reduce((s,o)=>s+parseNum(o?.officeFee),0);
+                    const tPaid = cPays.reduce((s,p)=>s+parseNum(p?.amount),0) + cOps.reduce((s,o)=>s+parseNum(o?.paidNow),0);
+                    const netDue = tBilled - tPaid;
+
+                    return (
+                      <div id="printable-area" className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 print-area text-slate-900">
+                        <div className="flex justify-between items-start border-b pb-3">
+                          <div><h3 className="text-base font-black text-slate-900">📊 كشف حساب تحليلي تفصيلي للشركاء</h3><div className="text-xs text-slate-500 font-bold mt-1"><span>العميل: <strong className="text-indigo-700">{statementClient}</strong></span><span> • التاريخ: {todayDate}</span></div></div>
+                          {settings.logo && <img src={settings.logo} className="h-14 object-contain rounded-lg border p-1" />}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-xs">
+                          <div className="p-2.5 bg-slate-50 rounded-xl border">إجمالي العمل: <strong className="block text-indigo-700 font-black text-sm"><span className="pdf-num">{tBilled.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-amber-50 rounded-xl border">عمالة: <strong className="block text-amber-700 font-black text-sm"><span className="pdf-num">{tLabor.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-blue-50 rounded-xl border">سيارة: <strong className="block text-blue-700 font-black text-sm"><span className="pdf-num">{tCar.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-purple-50 rounded-xl border">نصيب RTK: <strong className="block text-purple-700 font-black text-sm"><span className="pdf-num">{tRtk.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-emerald-50 rounded-xl border">أتعاب المهندسين: <strong className="block text-emerald-700 font-black text-sm"><span className="pdf-num">{tEng.toLocaleString('en-US')}</span></strong></div>
+                          <div className="p-2.5 bg-rose-50 rounded-xl border">المتبقي على العميل: <strong className="block text-rose-700 font-black text-sm"><span className="pdf-num">{netDue.toLocaleString('en-US')}</span></strong></div>
+                        </div>
+                        <div className="overflow-x-auto custom-scroll">
+                          <table className="w-full text-right border text-xs" style={{ tableLayout: 'fixed' }}>
+                            <thead className="bg-slate-100">
+                              <tr><th className="p-2 border w-24">التاريخ</th><th className="p-2 border">العمل والموقع</th><th className="p-2 border text-center w-20">المبلغ</th><th className="p-2 border text-center text-amber-700 w-16">عمالة</th><th className="p-2 border text-center text-blue-700 w-16">سيارة</th><th className="p-2 border text-center text-purple-700 w-20">حصة RTK</th><th className="p-2 border text-center text-emerald-700 w-24">أتعاب المهندس</th><th className="p-2 border text-center text-indigo-700 w-24">صافي المكتب</th><th className="p-2 border text-center text-emerald-600 w-24">المحصل فورا</th></tr>
+                            </thead>
+                            <tbody>
+                              {cOps.map(o => (
+                                <tr key={o.id} className="border-b">
+                                  <td className="p-2 border whitespace-nowrap text-slate-500 font-mono">{o.date}</td>
+                                  <td className="p-2 border font-bold">{o.opType} ({o.workDescription || '-'}) <span className="text-amber-700 text-[10px]">[{o.siteLocation||'عام'}]</span></td>
+                                  <td className="p-2 border text-center font-bold text-indigo-600"><span className="pdf-num">{parseNum(o.agreedAmount).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-amber-700"><span className="pdf-num">{parseNum(o.laborCost).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-blue-700"><span className="pdf-num">{parseNum(o.carCost).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-purple-700"><span className="pdf-num">{parseNum(o.deviceFee).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-emerald-700"><span className="pdf-num">{parseNum(o.engFee).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-indigo-700"><span className="pdf-num">{parseNum(o.officeFee).toLocaleString('en-US')}</span></td>
+                                  <td className="p-2 border text-center text-emerald-600 font-bold"><span className="pdf-num">{parseNum(o.paidNow).toLocaleString('en-US')}</span></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -1237,6 +1323,13 @@
                 <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border shadow-xs text-center font-bold space-y-4">
                   <h3 className="text-base">أرباح المكتب المجمعة</h3>
                   <div className="text-3xl font-black text-emerald-600">{Math.round(totalOffice).toLocaleString()} ج.م</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    <div className="p-3 border rounded-2xl bg-amber-50 dark:bg-slate-700 text-amber-900 dark:text-amber-100">في سبيل الله (10%)<br/><strong className="text-base mt-1 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl bg-blue-50 dark:bg-slate-700 text-blue-900 dark:text-blue-100">م. أحمد نبيل (10%)<br/><strong className="text-base mt-1 block">{Math.round(totalOffice*0.1).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl">م. أسامة<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl">م. أيمن<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
+                    <div className="p-3 border rounded-2xl">م. علاء<br/><strong className="text-base mt-1 block">{Math.round((totalOffice*0.8)/3).toLocaleString()}</strong></div>
+                  </div>
                 </div>
               )}
 
@@ -1255,32 +1348,222 @@
 
               {activeTab === 'settings' && isAdmin && (
                 <div className="space-y-4 text-xs font-bold">
-                  <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+                  <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
                     <h3 className="text-sm font-black text-slate-900 dark:text-white">💾 النسخ الاحتياطي والترحيل</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <button onClick={exportJsonBackup} className="p-3 bg-slate-50 dark:bg-slate-700 rounded-2xl flex items-center justify-between hover:bg-slate-100 transition">
+                      <button onClick={exportJsonBackup} className="p-3 bg-slate-50 dark:bg-slate-700 rounded-2xl flex items-center justify-between hover:bg-slate-200 transition">
                         <span>تحميل نسخة شاملة (JSON)</span><span className="text-lg">💾</span>
                       </button>
-                      <button onClick={exportToExcel} className="p-3 bg-slate-50 dark:bg-slate-700 rounded-2xl flex items-center justify-between hover:bg-slate-100 transition">
+                      <button onClick={exportToExcel} className="p-3 bg-slate-50 dark:bg-slate-700 rounded-2xl flex items-center justify-between hover:bg-slate-200 transition">
                         <span>تصدير شيت إكسيل (Excel)</span><span className="text-lg">📊</span>
                       </button>
                     </div>
                   </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white">🖼 شعار الترويسة المعتمد:</h3>
+                    <input type="file" accept="image/*" onChange={(e)=>{
+                      if(!isAdmin) return;
+                      const f = e.target.files[0]; if(!f) return;
+                      const r = new FileReader(); r.onload = (evt) => {
+                        const newSettings = { ...settings, logo: evt.target.result };
+                        setSettings(newSettings);
+                        saveListSafely('settings', 'settings', newSettings);
+                        logActivity('تحديث شعار المكتب');
+                        showToast("تم تحديث الشعار!");
+                      }; r.readAsDataURL(f);
+                    }} className="w-full p-2 border dark:border-slate-600 rounded-xl dark:bg-slate-700"/>
+                    {settings.logo && <img src={settings.logo} className="h-16 object-contain mt-2 border dark:border-slate-600 p-2 rounded-xl bg-white" />}
+                  </div>
+
+                  {isSuperAdminExact && (
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للمساحة</h3>
+                      <form onSubmit={handleSaveRole} className="flex gap-2">
+                        <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} className="flex-1 border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
+                        <select name="roleSelect" value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold w-1/3 text-xs">
+                          <option value="engineer">👷 مهندس معتمد</option>
+                          <option value="pm">💼 مدير مشاريع</option>
+                          <option value="executive">💼 المدير التنفيذي</option>
+                          <option value="admin">👑 إدارة عامة</option>
+                        </select>
+                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 font-black text-xs">تعيين</button>
+                      </form>
+                    </div>
+                  )}
+
+                  {isSuperAdminExact && (
+                    <div className="pt-3 mt-4">
+                      <button onClick={()=>setActiveTab('logs')} className="w-full bg-amber-600 hover:bg-amber-500 text-white p-3 rounded-2xl text-xs font-black shadow-xs transition">
+                        🛡️ فتح سجل النشاطات والمراقبة
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
             </main>
           </div>
 
+          {opModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setOpModalOpen(false)}></div>
+              <div className="relative bg-white dark:bg-slate-800 w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50 max-h-[90vh] overflow-y-auto custom-scroll">
+                <div className="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                  <h3 className="font-black text-sm">{editingOp ? '✏️ تعديل طلعة مسجلة' : '➕ تسجيل طلعة يومية جديدة'}</h3>
+                  <button onClick={()=>setOpModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                </div>
+                <form onSubmit={handleSaveOperation} className="space-y-3 text-xs font-bold">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>التاريخ <input type="date" value={newOp.date} onChange={e=>setNewOp({...newOp, date: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                    <div>اسم العميل <input type="text" value={newOp.clientName} onChange={e=>setNewOp({...newOp, clientName: e.target.value})} placeholder="الواحة البحرية..." className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>الموقع بالمزرعة <input type="text" value={newOp.siteLocation} onChange={e=>setNewOp({...newOp, siteLocation: e.target.value})} placeholder="المحمية، خط 2400..." className="w-full border border-amber-200 dark:border-amber-900 p-2.5 rounded-xl mt-1 bg-amber-50 dark:bg-amber-950/40" required/></div>
+                    <div>نوع العمل 
+                      <div className="flex gap-1 mt-1">
+                        <select value={newOp.opType} onChange={e=>handleOpTypeChange(e.target.value)} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700">
+                          {toArr(settings.opTypes).map(o=><option key={o} value={o}>{o}</option>)}
+                        </select>
+                        <button type="button" onClick={()=>updateSettingArray('opTypes','نوع عمل')} className="bg-slate-200 dark:bg-slate-600 px-2.5 rounded-xl font-black">+</button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>المهندس المشرف
+                    <div className="flex gap-1 mt-1">
+                      <select value={newOp.engineer} onChange={e=>setNewOp(prev=>({...prev, engineer: e.target.value}))} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700">
+                        {toArr(settings.engineers).map(e=><option key={e} value={e}>{e}</option>)}
+                      </select>
+                      <button type="button" onClick={()=>updateSettingArray('engineers','مهندس')} className="bg-slate-200 dark:bg-slate-600 px-2.5 rounded-xl font-black">+</button>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl border dark:border-slate-600 space-y-2 col-span-1 sm:col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-indigo-700 dark:text-indigo-400">
+                      <input type="checkbox" checked={newOp.hasSecondEngineer} onChange={e => setNewOp(prev => ({ ...prev, hasSecondEngineer: e.target.checked }))} className="w-4 h-4 rounded text-indigo-600" />
+                      👥 طلعة مشتركة (مهندسين اثنين بالتساوي)
+                    </label>
+                    {newOp.hasSecondEngineer && (
+                      <div>
+                        <label className="block text-[11px] mb-1 font-bold">المهندس الشريك الثاني:</label>
+                        <select value={newOp.secondEngineer} onChange={e => setNewOp(prev => ({ ...prev, secondEngineer: e.target.value }))} className="w-full border dark:border-slate-500 p-2 rounded-xl dark:bg-slate-600 font-bold">
+                          {toArr(settings.engineers).map(e => <option key={e} value={e}>{e}</option>)}
+                        </select>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">يتم تقسيم إجمالي أتعاب الطلعة مناصفة (50% لكل مهندس) في كشوف الحساب.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>بيان الأعمال (الوصف الذي سيوضع في المستخلص) <input type="text" value={newOp.workDescription} onChange={e=>setNewOp({...newOp, workDescription: e.target.value})} placeholder="تخطيط 80 فدان موقع المحمية..." className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  
+                  <div className="flex gap-4 py-1">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={newOp.isFaddan} onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({...prev, isFaddan: checked, isSketch: checked ? false : prev.isSketch, agreedAmount: checked ? (parseNum(prev.faddanQty) * parseNum(prev.faddanPrice)) : prev.agreedAmount}));
+                        }} className="w-4 h-4 rounded text-amber-600" /> 🌾 حساب بالفدان
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={newOp.isSketch} onChange={e=>{
+                          const checked = e.target.checked;
+                          setNewOp(prev => ({...prev, isSketch: checked, isFaddan: checked ? false : prev.isFaddan}));
+                        }} className="w-4 h-4 rounded text-blue-600" /> 📐 كروكيات
+                    </label>
+                  </div>
+
+                  {newOp.isFaddan && (
+                    <div className="grid grid-cols-2 gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800">
+                      <div>عدد الأفدنة: <input type="number" step="any" value={newOp.faddanQty} onChange={e=>{
+                            const q = e.target.value;
+                            setNewOp(prev => ({...prev, faddanQty: q, agreedAmount: parseNum(q) * parseNum(prev.faddanPrice)}));
+                          }} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700 mt-1" /></div>
+                      <div>سعر الفدان (الفئة): <input type="number" step="any" value={newOp.faddanPrice} onChange={e=>{
+                            const p = e.target.value;
+                            setNewOp(prev => ({...prev, faddanPrice: p, agreedAmount: parseNum(prev.faddanQty) * parseNum(p)}));
+                          }} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700 mt-1" /></div>
+                    </div>
+                  )}
+
+                  {newOp.isSketch && (
+                    <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800">
+                      عدد الكروكيات: <input type="number" value={newOp.sketchesCount} onChange={e=>setNewOp({...newOp, sketchesCount: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700 mt-1" />
+                    </div>
+                  )}
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1">
+                    <label className="block text-amber-900 dark:text-amber-300 font-black">💰 المبلغ النهائي المتفق عليه مع العميل (آلي مع إمكانية التعديل الحر):</label>
+                    <input type="number" step="any" value={newOp.agreedAmount} onChange={e=>setNewOp({...newOp, agreedAmount: e.target.value})} placeholder="أدخل المبلغ المتفق عليه..." className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 bg-white text-indigo-700 dark:text-indigo-300 font-black text-sm" required />
+                    <span className="text-[10px] text-amber-800 dark:text-amber-400 block">يُحسب تلقائياً من الفدان أو نوع العمل، ويمكنك تغييره يدوياً في أي وقت.</span>
+                  </div>
+
+                  <div className="p-3 bg-indigo-50 dark:bg-slate-700/60 rounded-2xl border border-indigo-200 dark:border-slate-600 space-y-2">
+                    <label className="block text-indigo-900 dark:text-indigo-300 font-black text-[11px]">⚙️ طريقة احتساب أتعاب المهندس في هذه العملية:</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'auto'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'auto' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>⚡ تلقائي</button>
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'engDay_devHalf'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'engDay_devHalf' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>🛰 مهندس يوم + جهاز 1/2</button>
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent80'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent80' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>🎯 نسبة 80% مهندس</button>
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'percent70'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'percent70' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>🎯 نسبة 70% مهندس</button>
+                      <button type="button" onClick={()=>setNewOp({...newOp, engCalcMethod: 'customFixed'})} className={`p-2 rounded-xl border font-bold text-center transition ${newOp.engCalcMethod === 'customFixed' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>💵 مبلغ مقطوع ثابت</button>
+                    </div>
+                    {newOp.engCalcMethod === 'customFixed' && (
+                      <div className="pt-1"><label className="block text-[10px] text-slate-600 dark:text-slate-300 mb-1">أدخل مبلغ أتعاب المهندس المقطوع (ج.م):</label><input type="number" step="any" value={newOp.engCustomFixedAmount} onChange={e=>setNewOp({...newOp, engCustomFixedAmount: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-800 bg-white font-bold text-emerald-600" /></div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>مصاريف عمالة <input type="number" value={newOp.laborCost} onChange={e=>setNewOp({...newOp, laborCost: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/></div>
+                    <div>مصاريف سيارة <input type="number" value={newOp.carCost} onChange={e=>setNewOp({...newOp, carCost: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/></div>
+                  </div>
+
+                  <div>المحصل فوراً في الموقع (إن وجد) <input type="number" value={newOp.paidNow} onChange={e=>setNewOp({...newOp, paidNow: e.target.value})} className="w-full border dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/></div>
+
+                  <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 font-bold space-y-0.5">
+                    <div className="flex justify-between"><span>👷 أتعاب المهندس: <strong>{(livePreview.engFee || 0).toLocaleString()} ج.م</strong></span><span>🛰 حصة الجهاز: <strong>{(livePreview.deviceFee || 0).toLocaleString()} ج.م</strong></span></div>
+                    <div className="flex justify-between text-rose-600 dark:text-rose-400 pt-1 border-t border-emerald-200 dark:border-emerald-800/50 mt-1"><span>🚗 مصاريف (عمالة+سيارة): <strong>{(liveExpenses.totalExp || 0).toLocaleString()} ج.م</strong></span><span>🏢 صافي المكتب: <strong>{(livePreview.officeFee || 0).toLocaleString()} ج.م</strong></span></div>
+                  </div>
+                  <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">{editingOp ? 'حفظ التعديلات' : 'حفظ الطلعة اليومية'}</button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {payModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 print-hidden">
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setPayModalOpen(false)}></div>
+              <div className="relative bg-white dark:bg-slate-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl z-50">
+                <div className="flex justify-between items-center border-b dark:border-slate-700 pb-3 mb-3">
+                  <h3 className="font-black text-sm">💰 تسجيل دفعة مسددة من العميل</h3>
+                  <button onClick={()=>setPayModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                </div>
+                <form onSubmit={handleAddPayment} className="space-y-3 text-xs font-bold">
+                  <div>التاريخ <input type="date" value={newPayment.date} onChange={e=>setNewPayment({...newPayment, date: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required/></div>
+                  <div>العميل 
+                    <select value={newPayment.clientName} onChange={e=>setNewPayment({...newPayment, clientName: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1" required>
+                      <option value="">-- اختر العميل --</option>
+                      {clientNames.map(c=><option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>المبلغ المسدد <input type="number" value={newPayment.amount} onChange={e=>setNewPayment({...newPayment, amount: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1 text-emerald-600 font-black text-sm" required/></div>
+                  <div>البيان / الملاحظات <input type="text" value={newPayment.notes} onChange={e=>setNewPayment({...newPayment, notes: e.target.value})} className="w-full border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 mt-1"/></div>
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-black mt-2 shadow-sm">قيد الدفعة في الحساب</button>
+                </form>
+              </div>
+            </div>
+          )}
+
           <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t dark:border-slate-700 px-2 py-1.5 flex justify-around items-center z-40 shadow-lg print-hidden">
-            <button onClick={()=>setActiveTab('dashboard')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">📊</span><span className="text-[9px] mt-0.5">الرئيسية</span></button>
-            <button onClick={()=>setActiveTab('projects')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='projects'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">📁</span><span className="text-[9px] mt-0.5">المشاريع</span></button>
-            <button onClick={()=>setActiveTab('add_data')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='add_data'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">➕</span><span className="text-[9px] mt-0.5">فاتورة</span></button>
-            <button onClick={()=>setActiveTab('expenses')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='expenses'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">💸</span><span className="text-[9px] mt-0.5">المصاريف</span></button>
+            <button onClick={()=>setActiveTab('dashboard')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span className="text-base">📊</span><span className="text-[9px] mt-0.5">الرئيسية</span></button>
+            <button onClick={()=>setActiveTab('extracts')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='extracts'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span className="text-base">📄</span><span className="text-[9px] mt-0.5">المستخلص</span></button>
+            <button onClick={()=>setActiveTab('operations')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='operations'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span className="text-base">📐</span><span className="text-[9px] mt-0.5">الطلعات</span></button>
+            <button onClick={()=>setActiveTab('vault')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='vault'?'text-indigo-600 dark:text-indigo-400 font-black':'text-slate-500'}`}><span className="text-base">💵</span><span className="text-[9px] mt-0.5">الخزينة</span></button>
             <button onClick={()=>setDrawerOpen(true)} className="flex flex-col items-center py-1 px-2 text-slate-500"><span className="text-base">☰</span><span className="text-[9px] mt-0.5">المزيد</span></button>
           </nav>
 
-          {toast.show && <div className="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-5 py-3 rounded-2xl text-xs z-50 shadow-2xl font-bold print-hidden toast-anim flex items-center gap-2"><span>{toast.type === 'error' ? '⚠️' : '✅'}</span><span>{toast.message}</span></div>}
+          {toast.show && <div className="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-5 py-3 rounded-2xl text-xs z-50 shadow-2xl font-bold print-hidden toast-anim flex items-center gap-2">
+            <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
+            <span>{toast.message}</span>
+          </div>}
         </div>
       );
     }
