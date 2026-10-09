@@ -184,12 +184,16 @@
 
     const ensureArr = (data) => Array.isArray(data) ? data : (data ? Object.values(data) : []);
 
-    // 🔴 حل مشكلة تعطل القوائم المنسدلة: دالة تنظيف المصفوفات من الكائنات التالفة
+    // ✨ تم تحديث الفلتر ليكون مضاداً لانهيار القوائم (WSOD Prevention) ✨
     const cleanArray = (arr, defaultArr) => {
       if (!arr) return defaultArr;
-      const ensured = Array.isArray(arr) ? arr : Object.values(arr);
-      const clean = ensured.filter(i => i !== null && typeof i !== 'object').map(String);
-      return clean.length > 0 ? clean : defaultArr;
+      const ensured = Array.isArray(arr) ? arr : (typeof arr === 'object' ? Object.values(arr) : [arr]);
+      const clean = ensured
+        .filter(i => i !== null && i !== undefined)
+        .map(i => String(i).trim())
+        .filter(i => i !== '' && i !== '[object Object]');
+      const uniqueClean = Array.from(new Set(clean));
+      return uniqueClean.length > 0 ? uniqueClean : defaultArr;
     };
 
     const constructionStorage = {
@@ -463,7 +467,7 @@
             if (data.roles) { setUserRolesMap(data.roles); constructionStorage.set('roles', data.roles); }
 
             const savedSettings = data.settings || {};
-            // استخدام دالة التنظيف لتجنب انهيار القوائم
+            // فلتر التنظيف يعمل هنا بقوة
             const finalSettings = {
               mainCategories: cleanArray(savedSettings.mainCategories, initialSettings.mainCategories),
               subCategories: cleanArray(savedSettings.subCategories, initialSettings.subCategories),
@@ -561,17 +565,16 @@
         }
       }, [myEmpName]);
 
-      // 🔴 تصحيح مسار الحفظ المباشر لتجنب التداخل وحفظ الإعدادات كـ Object
       const handleAddNewSettingItem = (settingKey, currentArray, title) => {
         if (!isAdmin) { showToast("خاصية مقتصرة على الإدارة 🔒", "error"); return; }
         const newVal = window.prompt(`أدخل [${title}] جديد لإضافته للقائمة:`, "");
         if (newVal && newVal.trim() !== "") {
           const cleanVal = newVal.trim();
-          if (currentArray.includes(cleanVal)) { showToast("هذا البند موجود مسبقاً!", "error"); return; }
-          const updatedArray = [...currentArray, cleanVal];
+          const cleanCurrent = Array.isArray(currentArray) ? currentArray : [];
+          if (cleanCurrent.includes(cleanVal)) { showToast("هذا البند موجود مسبقاً!", "error"); return; }
+          const updatedArray = [...cleanCurrent, cleanVal];
           const newSettings = { ...settings, [settingKey]: updatedArray };
           setSettings(newSettings);
-          // التصحيح: حفظ التعديل في العقدة الرئيسية settings بدلاً من إنشاء عقد فرعية مشوهة
           saveSafeConstructionData('settings', 'settings', newSettings);
           showToast(`تمت إضافة "${cleanVal}" بنجاح!`);
         }
@@ -948,7 +951,7 @@
                   onChange={(e) => setSelectedProjId(e.target.value)} 
                   class="w-full sm:w-72 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-extrabold text-indigo-700 dark:text-indigo-400 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
+                  {projects.map((p, i) => <option key={p?.id || i} value={String(p?.id)}>{String(p?.id)} - {String(p?.name)}</option>)}
                 </select>
               </div>
               <div class="flex items-center justify-between sm:justify-end gap-3 text-[11px] text-slate-500 dark:text-slate-400">
@@ -1038,7 +1041,7 @@
                       class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 font-bold p-2.5 rounded-xl outline-none"
                     >
                       <option value="">اختر اسمك...</option>
-                      {settings.employees.map((emp, i) => <option key={i} value={String(emp)}>{String(emp)}</option>)}
+                      {settings.employees.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
                     </select>
                   </div>
                 </div>
@@ -1107,14 +1110,14 @@
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
-                      {projects.map(p => (
-                        <tr key={p.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                          <td class="p-3 font-bold text-indigo-600 font-mono">{p.id}</td>
-                          <td class="p-3 font-bold text-slate-900 dark:text-white">{p.name}</td>
-                          <td class="p-3 text-slate-500">{p.consultant || '-'}</td>
-                          <td class="p-3 text-slate-500">{p.location || '-'}</td>
-                          <td class="p-3 font-mono font-bold">{isAdmin || isAccountant ? `${parseNum(p.budget).toLocaleString()} ج.م` : '🔒 محجوب'}</td>
-                          <td class="p-3"><span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold">{p.status || 'جاري'}</span></td>
+                      {projects.map((p, i) => (
+                        <tr key={p?.id || i} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <td class="p-3 font-bold text-indigo-600 font-mono">{String(p?.id)}</td>
+                          <td class="p-3 font-bold text-slate-900 dark:text-white">{String(p?.name)}</td>
+                          <td class="p-3 text-slate-500">{p?.consultant || '-'}</td>
+                          <td class="p-3 text-slate-500">{p?.location || '-'}</td>
+                          <td class="p-3 font-mono font-bold">{isAdmin || isAccountant ? `${parseNum(p?.budget).toLocaleString()} ج.م` : '🔒 محجوب'}</td>
+                          <td class="p-3"><span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold">{p?.status || 'جاري'}</span></td>
                           {isAdmin && (
                             <td class="p-3 text-center">
                               <div class="inline-flex items-center gap-1.5">
@@ -1295,22 +1298,22 @@
                       {filteredSearchExpenses.length === 0 ? (
                         <tr><td colSpan={canEditOrDelete ? 11 : 10} class="text-center p-6 text-slate-400">لا توجد سجلات مسجلة</td></tr>
                       ) : (
-                        filteredSearchExpenses.map((e) => (
-                          <tr key={e.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                            <td class="p-3 text-slate-500 font-mono text-[11px]">{e.date}</td>
-                            <td class="p-3 font-bold text-slate-900 dark:text-white">{e.mainCategory} - {e.subCategory}</td>
-                            <td class="p-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">{e.description || '-'}</td>
-                            <td class="p-3 text-slate-600 dark:text-slate-400">{e.supplier || '-'}</td>
-                            <td class="p-3 text-center">{parseNum(e.quantity)}</td>
-                            <td class="p-3 text-center font-mono">{parseNum(e.unitPrice).toLocaleString()}</td>
-                            <td class="p-3 text-center font-black text-rose-600 font-mono">{parseNum(e.amount).toLocaleString()}</td>
+                        filteredSearchExpenses.map((e, i) => (
+                          <tr key={e?.id || i} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                            <td class="p-3 text-slate-500 font-mono text-[11px]">{e?.date}</td>
+                            <td class="p-3 font-bold text-slate-900 dark:text-white">{e?.mainCategory} - {e?.subCategory}</td>
+                            <td class="p-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">{e?.description || '-'}</td>
+                            <td class="p-3 text-slate-600 dark:text-slate-400">{e?.supplier || '-'}</td>
+                            <td class="p-3 text-center">{parseNum(e?.quantity)}</td>
+                            <td class="p-3 text-center font-mono">{parseNum(e?.unitPrice).toLocaleString()}</td>
+                            <td class="p-3 text-center font-black text-rose-600 font-mono">{parseNum(e?.amount).toLocaleString()}</td>
                             <td class="p-3">
                               <span class="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-300">
-                                {e.paymentMethod}
+                                {e?.paymentMethod}
                               </span>
                             </td>
                             <td class="p-3 text-center">
-                              {e.receiptImg ? (
+                              {e?.receiptImg ? (
                                 <button onClick={()=>setActiveInvoiceModal(e.receiptImg)} class="text-indigo-600 hover:underline font-bold text-[11px]">معاينة</button>
                               ) : <span class="text-slate-300">-</span>}
                             </td>
@@ -1376,12 +1379,12 @@
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
-                      {projAdvances.map(a => (
-                        <tr key={a.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                          <td class="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td>
-                          <td class="p-3 font-bold text-slate-900 dark:text-white">{a.employeeName}</td>
-                          <td class="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
-                          <td class="p-3 text-slate-500">{a.notes || '-'}</td>
+                      {projAdvances.map((a, i) => (
+                        <tr key={a?.id || i} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <td class="p-3 text-slate-500 font-mono text-[11px]">{a?.date}</td>
+                          <td class="p-3 font-bold text-slate-900 dark:text-white">{a?.employeeName}</td>
+                          <td class="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a?.amount).toLocaleString()} ج.م</td>
+                          <td class="p-3 text-slate-500">{a?.notes || '-'}</td>
                           {canEditOrDelete && (
                             <td class="p-3 text-center">
                               <div class="inline-flex items-center gap-1.5">
@@ -1431,12 +1434,12 @@
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
-                      {projPayments.map(p => (
-                        <tr key={p.id} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                          <td class="p-3 text-slate-500 font-mono text-[11px]">{p.date}</td>
-                          <td class="p-3 font-bold text-indigo-600">{p.projectId}</td>
-                          <td class="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
-                          <td class="p-3 text-slate-500">{p.notes || '-'}</td>
+                      {projPayments.map((p, i) => (
+                        <tr key={p?.id || i} class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <td class="p-3 text-slate-500 font-mono text-[11px]">{p?.date}</td>
+                          <td class="p-3 font-bold text-indigo-600">{p?.projectId}</td>
+                          <td class="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(p?.amount).toLocaleString()} ج.م</td>
+                          <td class="p-3 text-slate-500">{p?.notes || '-'}</td>
                           {isAdmin && (
                             <td class="p-3 text-center">
                               <div class="inline-flex items-center gap-1.5">
@@ -1765,8 +1768,8 @@
                   <table class="w-full text-right border-collapse whitespace-nowrap">
                     <thead><tr class="bg-slate-50 dark:bg-slate-800 border-b font-black"><th class="p-2">التاريخ</th><th class="p-2">البند</th><th class="p-2 text-center">المبلغ</th><th class="p-2">الحالة</th></tr></thead>
                     <tbody class="divide-y dark:divide-slate-800 font-bold">
-                      {expenses.filter(e => (e.supplier || '').trim() === selectedSupplierDetail).map(e => (
-                        <tr key={e.id}><td class="p-2 text-slate-400 font-mono">{e.date}</td><td class="p-2">{e.mainCategory} - {e.subCategory}</td><td class="p-2 text-center text-rose-600 font-mono font-black">{parseNum(e.amount).toLocaleString()}</td><td class="p-2">{e.billStatus || 'مدفوعة'}</td></tr>
+                      {expenses.filter(e => (e.supplier || '').trim() === selectedSupplierDetail).map((e, i) => (
+                        <tr key={e?.id || i}><td class="p-2 text-slate-400 font-mono">{e?.date}</td><td class="p-2">{e?.mainCategory} - {e?.subCategory}</td><td class="p-2 text-center text-rose-600 font-mono font-black">{parseNum(e?.amount).toLocaleString()}</td><td class="p-2">{e?.billStatus || 'مدفوعة'}</td></tr>
                       ))}
                     </tbody>
                   </table>
