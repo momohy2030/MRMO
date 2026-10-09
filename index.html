@@ -78,7 +78,7 @@
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-    /* حركات دراجة التحميل */
+    /* Bike Loading Animation */
     .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
     .bike-svg { width: 100%; height: 100%; overflow: visible; }
     .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
@@ -142,21 +142,24 @@
     const cleanId = (id) => (id ? String(id).trim().toLowerCase().replace(/[.#$\[\]\/]/g, "-") : "");
     const parseNum = (val) => {
       if (typeof val === "number") return isNaN(val) ? 0 : val;
-      if (!val) return 0;
+      if (!val || typeof val === "object") return 0;
       const clean = String(val).replace(/,/g, '').replace(/،/g, '.').trim();
       const n = parseFloat(clean);
       return isNaN(n) ? 0 : n;
     };
     const ensureArr = (data) => Array.isArray(data) ? data : (data ? Object.values(data) : []);
 
-    // ✨ الميكانيزم الأساسي لمنع تعطل النظام (Self-Healing) ✨
-    const cleanArray = (arr, defaultArr) => {
-      if (!arr) return defaultArr;
-      const ensured = Array.isArray(arr) ? arr : Object.values(arr);
-      // مسح أي Objects تالفة من القوائم وتحويلها لنصوص نظيفة لتجنب الشاشة البيضاء
-      const clean = ensured.filter(i => i !== null && typeof i !== 'object').map(String);
-      return clean.length > 0 ? clean : defaultArr;
-    };
+    // دالة الفلترة والتنظيف الذاتي لحماية الواجهة من الانهيار
+    function sanitizeList(raw, fallback) {
+      if (!raw) return fallback;
+      let list = Array.isArray(raw) ? raw : (typeof raw === 'object' ? Object.values(raw) : [raw]);
+      list = list.flat(Infinity);
+      const clean = list
+        .filter(item => item !== null && item !== undefined && typeof item !== 'object')
+        .map(item => String(item).trim())
+        .filter(item => item.length > 0 && item !== '[object Object]');
+      return clean.length > 0 ? Array.from(new Set(clean)) : fallback;
+    }
 
     const constructionStorage = {
       get(key, fallback = []) { try { const item = localStorage.getItem(`construction_${key}`); return item ? JSON.parse(item) : fallback; } catch { return fallback; } },
@@ -207,14 +210,49 @@
       );
     }
 
+    // جدار الحماية ضد الشاشات البيضاء (Error Boundary)
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, info) {
+        console.error("Critical Render Error caught:", error, info);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-white text-center font-sans">
+              <div className="text-4xl mb-4">⚠️</div>
+              <h2 className="text-lg font-black mb-2 text-amber-400">حدث خطأ في قراءة البيانات المؤقتة</h2>
+              <p className="text-xs text-slate-400 mb-6 max-w-sm leading-relaxed">تم حماية التطبيق من الإغلاق. اضغط على الزر أدناه لتنظيف الذاكرة التالفة وإعادة التحميل فوراً:</p>
+              <button 
+                onClick={() => { localStorage.clear(); window.location.reload(); }}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-6 py-3 rounded-2xl text-xs transition shadow-lg"
+              >
+                تنظيف الذاكرة وإعادة التشغيل 🔄
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
     function App() {
+      const todayDate = new Date().toISOString().split('T')[0];
+
+      // 1. جميع الـ State Hooks في بداية الدالة حصراً لتجنب أخطاء النطاق
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
       const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
       const [isOnline, setIsOnline] = useState(navigator.onLine);
       const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
       
-      const [isLampOn, setIsLampOn] = useState(false);
+      const [isLampOn, setIsLampOn] = useState(true); // مضاءة تلقائياً لتكون الشاشة مرئية
       const [loginEmail, setLoginEmail] = useState("");
       const [loginPassword, setLoginPassword] = useState("");
 
@@ -228,13 +266,12 @@
       
       const [settings, setSettings] = useState(() => {
         const saved = constructionStorage.get('settings', {});
-        // تفعيل فلتر التنظيف عند بدء تشغيل النظام
         return {
-          mainCategories: cleanArray(saved.mainCategories, initialSettings.mainCategories),
-          subCategories: cleanArray(saved.subCategories, initialSettings.subCategories),
-          costTypes: cleanArray(saved.costTypes, initialSettings.costTypes),
-          suppliers: cleanArray(saved.suppliers, initialSettings.suppliers),
-          employees: cleanArray(saved.employees, initialSettings.employees),
+          mainCategories: sanitizeList(saved.mainCategories, initialSettings.mainCategories),
+          subCategories: sanitizeList(saved.subCategories, initialSettings.subCategories),
+          costTypes: sanitizeList(saved.costTypes, initialSettings.costTypes),
+          suppliers: sanitizeList(saved.suppliers, initialSettings.suppliers),
+          employees: sanitizeList(saved.employees, initialSettings.employees),
           logo: typeof saved.logo === 'string' ? saved.logo : ""
         };
       });
@@ -256,8 +293,6 @@
       const [searchCostType, setSearchCostType] = useState("");
       const [newRoleInput, setNewRoleInput] = useState({ email: "", role: "engineer" });
 
-      const todayDate = new Date().toISOString().split('T')[0];
-
       const [newProj, setNewProj] = useState({ id: "cons-01", name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
       const [newExp, setNewExp] = useState({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", billStatus: "مدفوعة", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: "", receiptImg: "" });
       const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: "" });
@@ -265,7 +300,7 @@
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
       const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
 
-      // الصلاحيات
+      // 2. التحقق من الصلاحيات
       const currentUserEmail = (user?.email || user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
@@ -309,7 +344,7 @@
         return `cons-${next < 10 ? '0' + next : next}`;
       }, [projects]);
 
-      // الخطافات (UseEffects)
+      // 3. الخطافات (UseEffects)
       useEffect(() => {
         const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) constructionStorage.syncQueue(db); };
         const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
@@ -325,7 +360,7 @@
 
       useEffect(() => {
         if (!auth) { setAuthLoading(false); return; }
-        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 6000);
+        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 5000);
 
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           clearTimeout(safetyTimer);
@@ -372,13 +407,12 @@
             if (data.roles) { setUserRolesMap(data.roles); constructionStorage.set('roles', data.roles); }
 
             const savedSettings = data.settings || {};
-            // تفعيل فلتر التنظيف عند جلب البيانات من السيرفر
             const finalSettings = {
-              mainCategories: cleanArray(savedSettings.mainCategories, initialSettings.mainCategories),
-              subCategories: cleanArray(savedSettings.subCategories, initialSettings.subCategories),
-              costTypes: cleanArray(savedSettings.costTypes, initialSettings.costTypes),
-              suppliers: cleanArray(savedSettings.suppliers, initialSettings.suppliers),
-              employees: cleanArray(savedSettings.employees, initialSettings.employees),
+              mainCategories: sanitizeList(savedSettings.mainCategories, initialSettings.mainCategories),
+              subCategories: sanitizeList(savedSettings.subCategories, initialSettings.subCategories),
+              costTypes: sanitizeList(savedSettings.costTypes, initialSettings.costTypes),
+              suppliers: sanitizeList(savedSettings.suppliers, initialSettings.suppliers),
+              employees: sanitizeList(savedSettings.employees, initialSettings.employees),
               logo: typeof savedSettings.logo === 'string' ? savedSettings.logo : ""
             };
             setSettings(finalSettings); constructionStorage.set('settings', finalSettings);
@@ -453,7 +487,7 @@
         else constructionStorage.addToQueue(path, data);
       };
 
-      // ✨ تم حل وتصحيح مسار الحفظ لتجنب تلف قاعدة البيانات والشاشة البيضاء ✨
+      // الدالة المصححة لإضافة بنود القوائم بأمان تام
       const handleAddNewSettingItem = (settingKey, currentArray, title) => {
         if (!isAdmin) { showToast("خاصية مقتصرة على الإدارة 🔒", "error"); return; }
         const newVal = window.prompt(`أدخل [${title}] جديد لإضافته للقائمة:`, "");
@@ -617,12 +651,7 @@
         ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
       ];
 
-
-      // ==========================================
-      // 6. شاشات التحميل والدخول المبدئية (EARLY RETURNS)
-      // ==========================================
-      
-      // أ) دراجة التحميل
+      // 6. شاشات التحميل والدخول المبدئية
       if (authLoading) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
@@ -659,84 +688,108 @@
         );
       }
 
-      // ب) شاشة تسجيل الدخول المضيئة المنقسمة
+      // شاشة الدخول المضيئة المنقسمة
       if (!user) {
         return (
-          <div className={`min-h-screen flex flex-col md:flex-row items-center justify-center px-4 transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
-            <div className="relative flex flex-col items-center mb-10 md:mb-0 md:ml-16 z-20">
-              <div className={`w-40 h-20 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
-              <div className={`w-3 h-32 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-              <div className={`w-24 h-4 rounded-t-lg transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-              <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-16 left-1/2 ml-8 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة النظام">
-                <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-16' : 'h-10'}`}></div>
-                <div className="w-4 h-4 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
-              </div>
-            </div>
-
-            <div className={`relative transition-all duration-1000 transform ${isLampOn ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95 pointer-events-none'}`}>
-              {isLampOn && <div className="absolute -inset-4 bg-amber-400/10 blur-2xl rounded-[3rem] z-0"></div>}
+          <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 md:p-8 transition-colors duration-500">
+            <div className="flex flex-col md:flex-row bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl overflow-hidden w-full max-w-5xl border border-slate-200 dark:border-slate-700 min-h-[500px]">
               
-              <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center relative z-10">
-                <div className="w-14 h-14 bg-white/20 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl shadow-inner">🏗️</div>
-                <h2 className="text-xl font-black text-white">مكتب مساحة</h2>
-                <p className="text-slate-300 text-[11px] mt-1 mb-4 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
-                
-                {/* 🔴 أزرار التبديل 🔴 */}
-                <div className="flex bg-slate-900/50 p-1 rounded-xl mb-5 border border-white/10">
+              <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white dark:bg-slate-800 relative z-20">
+                <div className="mb-6 text-center md:text-right">
+                  <h2 className="text-3xl font-black text-slate-900 dark:text-white">مكتب مساحة</h2>
+                  <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-1">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
+                </div>
+
+                {/* أزرار التبديل السريعة */}
+                <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl mb-6 border border-slate-200 dark:border-slate-700">
                   <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2 rounded-lg shadow-md text-xs">
                     🏗️ الإنشاءات
                   </button>
-                  <a href="survey.html" className="flex-1 text-slate-400 hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
+                  <a href="survey.html" className="flex-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
                     📐 المساحة
                   </a>
                 </div>
 
                 {accessDeniedMessage ? (
-                  <div className="space-y-3">
-                    <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-xs font-bold leading-relaxed">⚠️ {accessDeniedMessage}</div>
+                  <div className="space-y-4">
+                    <div className="bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 p-4 rounded-2xl text-sm font-bold leading-relaxed">
+                      ⚠️ {accessDeniedMessage}
+                    </div>
                   </div>
                 ) : (
                   <>
-                    <form onSubmit={handleEmailLogin} className="space-y-3 mb-4">
-                      <div className="relative">
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">✉️</span>
-                        <input type="email" placeholder="البريد الإلكتروني..." value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
+                    <form onSubmit={handleEmailLogin} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">البريد الإلكتروني</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">✉️</span>
+                          <input 
+                            type="email" placeholder="mail@example.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
+                          />
+                        </div>
                       </div>
-                      <div className="relative">
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">🔒</span>
-                        <input type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">الرقم السري</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">🔒</span>
+                          <input 
+                            type="password" placeholder="••••••••" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm font-bold" required
+                          />
+                        </div>
                       </div>
-                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-2.5 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all text-xs">
-                        تسجيل الدخول
+                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3.5 rounded-xl shadow-md transition-all text-sm mt-2">
+                        تسجيل الدخول للنظام
                       </button>
                     </form>
 
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="h-px bg-white/20 flex-1"></div>
-                      <span className="text-white/50 text-[10px] font-bold">أو بواسطة</span>
-                      <div className="h-px bg-white/20 flex-1"></div>
+                    <div className="flex items-center gap-3 my-6">
+                      <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                      <span className="text-slate-400 text-xs font-bold">أو الدخول بواسطة</span>
+                      <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
-                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
+                    <div className="grid grid-cols-2 gap-3">
+                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold py-3 rounded-xl shadow-sm transition-all text-xs">
+                        <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
                       </button>
-                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
-                        📱 هاتف
+                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-2 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-bold py-3 rounded-xl shadow-sm transition-all text-xs">
+                        📱 رقم الهاتف
                       </button>
                     </div>
                   </>
                 )}
               </div>
+
+              {/* الأباجورة التفاعلية */}
+              <div className={`w-full md:w-1/2 p-8 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px] transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
+                {isLampOn && <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-amber-400/20 rounded-full blur-[80px]"></div>}
+                
+                <h3 className="text-white font-black text-xl mb-12 z-10 text-center drop-shadow-md">نظام الإنشاءات</h3>
+                
+                <div className="relative flex flex-col items-center z-20">
+                  <div className={`w-48 h-24 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
+                  <div className={`w-4 h-36 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
+                  <div className={`w-32 h-5 rounded-t-xl transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
+
+                  <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-20 left-1/2 ml-10 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة الأباجورة">
+                    <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-20' : 'h-12'}`}></div>
+                    <div className="w-5 h-5 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
+                  </div>
+                </div>
+
+                <p className="text-slate-300 font-bold text-xs mt-12 z-10 text-center bg-black/40 py-2 px-5 rounded-full backdrop-blur-sm border border-white/10">
+                  اسحب الخيط لإضاءة الشاشة 💡
+                </p>
+              </div>
+
             </div>
           </div>
         );
       }
 
-
-      // ==========================================
-      // 7. الواجهة الرئيسية للإنشاءات (Main Application Render)
-      // ==========================================
+      // 7. الواجهة الرئيسية للإنشاءات
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
           
@@ -761,7 +814,7 @@
             </div>
 
             <div className="flex items-center gap-2">
-              <button onClick={toggleTheme} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
+              <button onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
               <a href="survey.html" className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition"><span>📐</span> <span className="hidden sm:inline">قطاع المساحة</span></a>
               <button onClick={()=>setDrawerOpen(true)} className="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">☰</button>
             </div>
@@ -921,6 +974,7 @@
                 </div>
               )}
 
+              {/* تبويب إدخال الفاتورة المحصن */}
               {activeTab === "add_data" && (
                 <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
                   <h3 className="font-black text-sm text-slate-900 dark:text-white mb-4 pb-2 border-b dark:border-slate-700 flex items-center gap-2"><span>💸</span> تسجيل فاتورة ومصروف جديد</h3>
@@ -1365,23 +1419,15 @@
                       <h3 className="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للإنشاءات</h3>
                       <form onSubmit={handleSaveRole} className="flex flex-col sm:flex-row gap-2.5">
                         <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} className="flex-1 border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800" required/>
-                        <select value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold w-1/3 text-xs">
+                        <select value={newRoleInput.role} onChange={e=>setNewRoleInput({...newRoleInput, role: e.target.value})} className="border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800 font-bold">
                           <option value="engineer">👷 مهندس موقع</option>
                           <option value="accountant">💼 محاسب</option>
                           <option value="pm">💼 مدير مشاريع</option>
                           <option value="executive">💼 المدير التنفيذي</option>
                           <option value="admin">👑 إدارة عامة</option>
                         </select>
-                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 py-2.5 font-black text-xs">تعيين</button>
+                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 py-2.5 font-black">حفظ</button>
                       </form>
-                    </div>
-                  )}
-
-                  {isSuperAdminExact && (
-                    <div className="pt-3 mt-4">
-                      <button onClick={()=>setActiveTab('audit_log')} className="w-full bg-amber-600 hover:bg-amber-500 text-white p-3 rounded-2xl text-xs font-black shadow-xs transition">
-                        🛡️ فتح سجل النشاطات والمراقبة
-                      </button>
                     </div>
                   )}
                 </div>
@@ -1401,9 +1447,7 @@
                     <thead><tr className="bg-slate-50 dark:bg-slate-800 border-b font-black"><th className="p-2">التاريخ</th><th className="p-2">البند</th><th className="p-2 text-center">المبلغ</th><th className="p-2">الحالة</th></tr></thead>
                     <tbody className="divide-y dark:divide-slate-800 font-bold">
                       {expenses.filter(e => (e.supplier || '').trim() === selectedSupplierDetail).map(e => (
-                        <tr key={String(e.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                          <td className="p-2 text-slate-400 font-mono">{e.date}</td><td className="p-2">{e.mainCategory} - {e.subCategory}</td><td className="p-2 text-center text-rose-600 font-mono font-black">{parseNum(e.amount).toLocaleString()}</td><td className="p-2">{e.billStatus || 'مدفوعة'}</td>
-                        </tr>
+                        <tr key={String(e.id)}><td className="p-2 text-slate-400 font-mono">{e.date}</td><td className="p-2">{e.mainCategory} - {e.subCategory}</td><td className="p-2 text-center text-rose-600 font-mono font-black">{parseNum(e.amount).toLocaleString()}</td><td className="p-2">{e.billStatus || 'مدفوعة'}</td></tr>
                       ))}
                     </tbody>
                   </table>
@@ -1448,20 +1492,54 @@
           )}
 
           <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-lg z-40 px-2 py-1 flex justify-around items-center">
-            <button onClick={()=>setActiveTab('dashboard')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='dashboard'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">📊</span><span className="text-[9px] mt-0.5">الرئيسية</span></button>
-            <button onClick={()=>setActiveTab('projects')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='projects'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">📁</span><span className="text-[9px] mt-0.5">المشاريع</span></button>
-            <button onClick={()=>setActiveTab('add_data')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='add_data'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">➕</span><span className="text-[9px] mt-0.5">فاتورة</span></button>
-            <button onClick={()=>setActiveTab('expenses')} className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${activeTab==='expenses'?'text-amber-500 font-black':'text-slate-500'}`}><span className="text-base">💸</span><span className="text-[9px] mt-0.5">المصاريف</span></button>
-            <button onClick={()=>setDrawerOpen(true)} className="flex flex-col items-center py-1 px-2 text-slate-500"><span className="text-base">☰</span><span className="text-[9px] mt-0.5">المزيد</span></button>
+            {navTabs.slice(0, 4).map(tab => (
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id)} 
+                className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl transition ${
+                  activeTab === tab.id ? "text-amber-500 font-black" : "text-slate-400 hover:text-slate-600"
+                }`}
+              >
+                <span className="text-base">{tab.icon}</span>
+                <span className="text-[10px] mt-0.5">{tab.label}</span>
+              </button>
+            ))}
+            <button 
+              onClick={() => setDrawerOpen(true)} 
+              className="flex flex-col items-center justify-center py-1.5 px-3 text-slate-400 hover:text-slate-600"
+            >
+              <span className="text-base">☰</span>
+              <span className="text-[10px] mt-0.5">المزيد</span>
+            </button>
           </nav>
 
-          {toast.show && <div className="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-5 py-3 rounded-2xl text-xs z-50 shadow-2xl font-bold print-hidden toast-anim flex items-center gap-2"><span>{toast.type === 'error' ? '⚠️' : '✅'}</span><span>{toast.message}</span></div>}
+          {toast.show && (
+            <div className="fixed bottom-16 md:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none toast-anim">
+              <div className={`px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2 text-xs font-bold text-white ${toast.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
+                <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
+                <span>{toast.message}</span>
+              </div>
+            </div>
+          )}
+
+          {activeInvoiceModal && (
+            <div className="fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl max-w-md w-full flex flex-col items-center shadow-2xl">
+                <img src={activeInvoiceModal} className="max-h-[65vh] object-contain rounded-2xl mb-3 w-full" />
+                <button onClick={()=>setActiveInvoiceModal(null)} className="w-full bg-slate-900 dark:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs">إغلاق</button>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    root.render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
   </script>
 </body>
 </html>
