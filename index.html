@@ -14,14 +14,7 @@
   <script>
     tailwind.config = {
       darkMode: 'class',
-      theme: {
-        extend: { 
-          fontFamily: { sans: ['Cairo', 'sans-serif'] },
-          colors: {
-            brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#1e1b4b' }
-          }
-        }
-      }
+      theme: { extend: { fontFamily: { sans: ['Cairo', 'sans-serif'] } } }
     }
   </script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -38,45 +31,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   
   <style>
-    body { 
-      font-family: 'Cairo', sans-serif; 
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
+    body { font-family: 'Cairo', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
     .custom-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
     .custom-scroll::-webkit-scrollbar-track { background: transparent; }
     .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
     .dark .custom-scroll::-webkit-scrollbar-thumb { background: #475569; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    
     @media print {
       body * { visibility: hidden !important; }
       #printable-area, #printable-area * { visibility: visible !important; }
-      #printable-area {
-        position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 10mm !important; box-shadow: none !important; border: none !important; background: white !important; color: black !important;
-      }
+      #printable-area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 10mm !important; box-shadow: none !important; border: none !important; background: white !important; color: black !important; }
       .print-hidden { display: none !important; }
-      .print-break-inside { page-break-inside: avoid; }
     }
-
     .pdf-render-mode { background: #ffffff !important; color: #0f172a !important; direction: rtl !important; font-family: 'Cairo', Arial, sans-serif !important; }
-    .pdf-render-mode * { letter-spacing: 0 !important; word-spacing: normal !important; }
     .pdf-num { direction: ltr !important; unicode-bidi: isolate !important; display: inline-block !important; font-family: Arial, sans-serif !important; white-space: nowrap !important; }
-
-    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-    .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
-    .bike-svg { width: 100%; height: 100%; overflow: visible; }
-    .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
-    .pedal { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
-    .body-bounce { animation: bounce 0.6s ease-in-out infinite alternate; }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    @keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-4px); } }
-    .loading-text { font-family: 'Courier New', Courier, monospace; font-weight: bold; letter-spacing: 2px; color: #f59e0b; font-size: 1.2rem; margin-top: 15px; text-align: center; }
-    .loading-text::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
-    @keyframes dots { 0%, 20% { content: ''; } 40% { content: '.'; } 60% { content: '..'; } 80%, 100% { content: '...'; } }
   </style>
 </head>
 <body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
@@ -92,8 +61,7 @@
       projectId: "mrmo-d8760",
       storageBucket: "mrmo-d8760.firebasestorage.app",
       messagingSenderId: "510855132508",
-      appId: "1:510855132508:web:feee377429a2d88c277d99",
-      measurementId: "G-N9DW5R28H0"
+      appId: "1:510855132508:web:feee377429a2d88c277d99"
     };
 
     const ADMIN_WHATSAPP_NUMBER = "201095545982";
@@ -101,12 +69,11 @@
     const EXECUTIVE_DIRECTOR_EMAIL = "aymanmousawahat@gmail.com";
     const PROJECT_MANAGER_EMAILS = ["alaayousef1698@gmail.com"];
     const DIRECTOR_EMAILS = [SUPER_ADMIN_EMAIL, EXECUTIVE_DIRECTOR_EMAIL, ...PROJECT_MANAGER_EMAILS, "+201000000000", "+201095545982"];
-    const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
     const BLOCKED_CONSTRUCTION_EMAILS = ["ahmnab23@gmail.com"];
 
     let db = null; let auth = null;
     try {
-      if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+      if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
       db = firebase.database(); auth = firebase.auth(); auth.languageCode = 'ar';
     } catch (e) { console.error("Firebase init error:", e); }
 
@@ -120,6 +87,7 @@
       logo: ""
     };
 
+    // دوال الحماية الأساسية لمنع الشاشة البيضاء تماماً
     const cleanId = (id) => (id ? String(id).trim().toLowerCase().replace(/[.#$\[\]\/]/g, "-") : "");
     const parseNum = (val) => {
       if (typeof val === "number") return isNaN(val) ? 0 : val;
@@ -127,33 +95,21 @@
       const clean = String(val).replace(/,/g, '').replace(/،/g, '.').trim();
       const n = parseFloat(clean); return isNaN(n) ? 0 : n;
     };
-
-    // 🛡️ دالة العلاج والتنظيف الذاتي القوية (تحل مشكلة الشاشة البيضاء والقوائم المنسدلة نهائياً) 🛡️
-    const getCleanArray = (rawData, fallbackArray) => {
-        if (!rawData) return fallbackArray;
-        let result = [];
-        const extract = (val, depth) => {
-            if (depth > 4) return; // منع التكرار اللانهائي
-            if (val === null || val === undefined) return;
-            
-            if (typeof val === 'string' || typeof val === 'number') {
-                const str = String(val).trim();
-                if (str !== '' && str !== '[object Object]') result.push(str);
-            } else if (Array.isArray(val)) {
-                val.forEach(v => extract(v, depth + 1));
-            } else if (typeof val === 'object') {
-                Object.values(val).forEach(v => extract(v, depth + 1));
-            }
-        };
-        extract(rawData, 0);
-        return result.length > 0 ? Array.from(new Set(result)) : fallbackArray;
-    };
-
     const ensureArr = (data) => {
       if (!data) return [];
       if (Array.isArray(data)) return data;
       if (typeof data === 'object') return Object.values(data);
       return []; 
+    };
+    const safeStr = (val) => {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'object') return ''; // يمنع React من الانهيار إذا كان الحقل Object بالخطأ
+      return String(val);
+    };
+    const ensureStringArr = (data, fallback) => {
+      const arr = ensureArr(data);
+      const clean = arr.map(i => typeof i === 'string' ? i : (i && typeof i.name === 'string' ? i.name : String(i))).filter(i => i && i !== '[object Object]');
+      return clean.length > 0 ? Array.from(new Set(clean)) : fallback;
     };
 
     const constructionStorage = {
@@ -231,26 +187,25 @@
       const [isOnline, setIsOnline] = useState(navigator.onLine);
       const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
       
-      const [isLampOn, setIsLampOn] = useState(true);
       const [loginEmail, setLoginEmail] = useState("");
       const [loginPassword, setLoginPassword] = useState("");
 
-      const [projects, setProjects] = useState(() => ensureArr(constructionStorage.get('projects', initialProjects)).filter(p=>p&&typeof p==='object'));
-      const [expenses, setExpenses] = useState(() => ensureArr(constructionStorage.get('expenses', [])).filter(p=>p&&typeof p==='object'));
-      const [extracts, setExtracts] = useState(() => ensureArr(constructionStorage.get('extracts', [])).filter(p=>p&&typeof p==='object'));
-      const [payments, setPayments] = useState(() => ensureArr(constructionStorage.get('payments', [])).filter(p=>p&&typeof p==='object'));
-      const [advances, setAdvances] = useState(() => ensureArr(constructionStorage.get('advances', [])).filter(p=>p&&typeof p==='object'));
-      const [supplierPayments, setSupplierPayments] = useState(() => ensureArr(constructionStorage.get('supplier_payments', [])).filter(p=>p&&typeof p==='object'));
-      const [loginLogs, setLoginLogs] = useState(() => ensureArr(constructionStorage.get('login_logs', [])).filter(p=>p&&typeof p==='object'));
+      const [projects, setProjects] = useState(() => ensureArr(constructionStorage.get('projects', initialProjects)));
+      const [expenses, setExpenses] = useState(() => ensureArr(constructionStorage.get('expenses', [])));
+      const [extracts, setExtracts] = useState(() => ensureArr(constructionStorage.get('extracts', [])));
+      const [payments, setPayments] = useState(() => ensureArr(constructionStorage.get('payments', [])));
+      const [advances, setAdvances] = useState(() => ensureArr(constructionStorage.get('advances', [])));
+      const [supplierPayments, setSupplierPayments] = useState(() => ensureArr(constructionStorage.get('supplier_payments', [])));
+      const [loginLogs, setLoginLogs] = useState(() => ensureArr(constructionStorage.get('login_logs', [])));
       
       const [settings, setSettings] = useState(() => {
         const saved = constructionStorage.get('settings', {});
         return {
-          mainCategories: getCleanArray(saved.mainCategories, initialSettings.mainCategories),
-          subCategories: getCleanArray(saved.subCategories, initialSettings.subCategories),
-          costTypes: getCleanArray(saved.costTypes, initialSettings.costTypes),
-          suppliers: getCleanArray(saved.suppliers, initialSettings.suppliers),
-          employees: getCleanArray(saved.employees, initialSettings.employees),
+          mainCategories: ensureStringArr(saved.mainCategories, initialSettings.mainCategories),
+          subCategories: ensureStringArr(saved.subCategories, initialSettings.subCategories),
+          costTypes: ensureStringArr(saved.costTypes, initialSettings.costTypes),
+          suppliers: ensureStringArr(saved.suppliers, initialSettings.suppliers),
+          employees: ensureStringArr(saved.employees, initialSettings.employees),
           logo: typeof saved.logo === 'string' ? saved.logo : ""
         };
       });
@@ -279,8 +234,8 @@
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
       const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
 
-      // الصلاحيات
-      const currentUserEmail = (user?.email || user?.identifier || "").trim().toLowerCase();
+      // الصلاحيات 
+      const currentUserEmail = safeStr(user?.email || user?.identifier).toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
       const isSuperAdminHardcoded = currentUserEmail === SUPER_ADMIN_EMAIL.toLowerCase() || currentUserEmail.includes("mohamedmohy676676");
@@ -315,7 +270,7 @@
 
       const nextSuggestedProjectId = useMemo(() => {
         const consNumbers = projects.map(p => { 
-          const m = String(p?.id || '').match(/^cons-(\d+)$/i); 
+          const m = safeStr(p?.id).match(/^cons-(\d+)$/i); 
           return m ? parseInt(m[1], 10) : 0; 
         }).filter(n => n > 0);
         const maxNum = consNumbers.length > 0 ? Math.max(...consNumbers) : 0;
@@ -323,7 +278,6 @@
         return `cons-${next < 10 ? '0' + next : next}`;
       }, [projects]);
 
-      // الخطافات (UseEffects)
       useEffect(() => {
         const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) constructionStorage.syncQueue(db); };
         const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
@@ -339,70 +293,56 @@
 
       useEffect(() => {
         if (!auth) { setAuthLoading(false); return; }
-        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 4000);
+        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 3000);
 
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
           clearTimeout(safetyTimer);
           if (currentUser) {
-            const identifier = (currentUser.email || currentUser.phoneNumber || "").toLowerCase().trim();
+            const identifier = safeStr(currentUser.email || currentUser.phoneNumber).toLowerCase();
             if (BLOCKED_CONSTRUCTION_EMAILS.some(b => identifier.includes(b.toLowerCase()))) {
               setAccessDeniedMessage("عفواً، حسابك مصرح له بالدخول لقطاع المساحة فقط.");
               auth.signOut(); setUser(null); setAuthLoading(false); return;
             }
             setAccessDeniedMessage("");
             setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", email: currentUser.email || currentUser.phoneNumber || "", identifier });
-            try { localStorage.setItem('last_const_user_email', identifier); localStorage.setItem('last_const_user_name', currentUser.displayName || identifier); } catch(e) {}
+            try { localStorage.setItem('last_const_user_email', identifier); localStorage.setItem('last_const_user_name', safeStr(currentUser.displayName || identifier)); } catch(e) {}
           } else {
             try {
               const savedEmail = localStorage.getItem('last_const_user_email');
               if (savedEmail && !navigator.onLine) {
                 setUser({ identifier: savedEmail, email: savedEmail, name: localStorage.getItem('last_const_user_name') || savedEmail });
-              } else {
-                setUser(null);
-              }
+              } else { setUser(null); }
             } catch(e) { setUser(null); }
           }
           setAuthLoading(false);
         });
-
         return () => { clearTimeout(safetyTimer); unsubscribe(); };
       }, []);
 
-      // 🛡️ الاستماع لقاعدة البيانات وإصلاح التلف الصامت 🛡️
+      // جلب البيانات من السيرفر بشكل آمن وبسيط
       useEffect(() => {
         if (!db || !user) return;
         
         const listeners = [
-          { path: 'projects', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object'); const f = arr.length ? arr : initialProjects; setProjects(f); constructionStorage.set('projects', f); } },
-          { path: 'expenses', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setExpenses(arr); constructionStorage.set('expenses', arr); } },
-          { path: 'extracts', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setExtracts(arr); constructionStorage.set('extracts', arr); } },
-          { path: 'payments', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setPayments(arr); constructionStorage.set('payments', arr); } },
-          { path: 'advances', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setAdvances(arr); constructionStorage.set('advances', arr); } },
-          { path: 'supplier_payments', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setSupplierPayments(arr); constructionStorage.set('supplier_payments', arr); } },
-          { path: 'login_logs', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setLoginLogs(arr); constructionStorage.set('login_logs', arr); } },
+          { path: 'projects', setter: (d) => { const arr = ensureArr(d); const f = arr.length ? arr : initialProjects; setProjects(f); constructionStorage.set('projects', f); } },
+          { path: 'expenses', setter: (d) => { const arr = ensureArr(d).reverse(); setExpenses(arr); constructionStorage.set('expenses', arr); } },
+          { path: 'extracts', setter: (d) => { const arr = ensureArr(d).reverse(); setExtracts(arr); constructionStorage.set('extracts', arr); } },
+          { path: 'payments', setter: (d) => { const arr = ensureArr(d).reverse(); setPayments(arr); constructionStorage.set('payments', arr); } },
+          { path: 'advances', setter: (d) => { const arr = ensureArr(d).reverse(); setAdvances(arr); constructionStorage.set('advances', arr); } },
+          { path: 'supplier_payments', setter: (d) => { const arr = ensureArr(d).reverse(); setSupplierPayments(arr); constructionStorage.set('supplier_payments', arr); } },
+          { path: 'login_logs', setter: (d) => { const arr = ensureArr(d).reverse(); setLoginLogs(arr); constructionStorage.set('login_logs', arr); } },
           { path: 'roles', setter: (d) => { const r = d || {}; setUserRolesMap(r); constructionStorage.set('roles', r); } },
           { path: 'settings', setter: (d) => { 
               const s = d || {};
               const finalSettings = {
-                mainCategories: getCleanArray(s.mainCategories, initialSettings.mainCategories),
-                subCategories: getCleanArray(s.subCategories, initialSettings.subCategories),
-                costTypes: getCleanArray(s.costTypes, initialSettings.costTypes),
-                suppliers: getCleanArray(s.suppliers, initialSettings.suppliers),
-                employees: getCleanArray(s.employees, initialSettings.employees),
+                mainCategories: ensureStringArr(s.mainCategories, initialSettings.mainCategories),
+                subCategories: ensureStringArr(s.subCategories, initialSettings.subCategories),
+                costTypes: ensureStringArr(s.costTypes, initialSettings.costTypes),
+                suppliers: ensureStringArr(s.suppliers, initialSettings.suppliers),
+                employees: ensureStringArr(s.employees, initialSettings.employees),
                 logo: typeof s.logo === 'string' ? s.logo : ""
               };
               setSettings(finalSettings); constructionStorage.set('settings', finalSettings);
-
-              // 🛡️ إذا وجدنا أن البيانات القادمة من السيرفر تالفة، نقوم بإصلاحها ورفعها صامتاً
-              let isCorrupted = false;
-              ['mainCategories', 'subCategories', 'costTypes', 'suppliers', 'employees'].forEach(key => {
-                  if (!Array.isArray(s[key]) || (s[key] && s[key].length > 0 && typeof s[key][0] === 'object')) {
-                      isCorrupted = true;
-                  }
-              });
-              if (isCorrupted && navigator.onLine) {
-                  db.ref('settings').set(finalSettings);
-              }
             } 
           }
         ];
@@ -433,15 +373,12 @@
         }
       }, [myEmpName]);
 
-      // دوال التحكم (Handlers)
-      const showToast = (message, type = "success") => { 
-        setToast({ show: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3200); 
-      };
+      const showToast = (message, type = "success") => { setToast({ show: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3200); };
 
       const recordLoginLog = (currentUser, roleName) => {
         if (!currentUser) return;
         const now = new Date(); const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const logEntry = { uid: currentUser.uid || 'offline-user', name: currentUser.displayName || currentUser.name || currentUser.identifier || "مستخدم", identifier: currentUser.identifier || currentUser.email || "غير محدد", role: roleName, device: isMobile ? "📱 هاتف محمول" : "💻 كمبيوتر", timestamp: now.toISOString(), formattedDate: now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG') };
+        const logEntry = { uid: currentUser.uid || 'offline-user', name: safeStr(currentUser.displayName || currentUser.name || currentUser.identifier) || "مستخدم", identifier: safeStr(currentUser.identifier || currentUser.email) || "غير محدد", role: roleName, device: isMobile ? "📱 هاتف محمول" : "💻 كمبيوتر", timestamp: now.toISOString(), formattedDate: now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG') };
         if (navigator.onLine && db) db.ref('login_logs').push(logEntry);
       };
 
@@ -458,9 +395,7 @@
       };
 
       const handleGoogleLogin = () => { setAuthLoading(true); auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch((error) => { setAuthLoading(false); showToast("تعذر الدخول: " + error.message, "error"); }); };
-
       const handlePhoneLoginClick = () => { showToast("لتسجيل الدخول برقم الهاتف يجب تفعيل reCAPTCHA من لوحة تحكم Firebase أولاً.", "error"); };
-
       const handleLogout = () => { auth.signOut(); setDrawerOpen(false); };
 
       const saveSafeConstructionData = (path, storageKey, data) => {
@@ -469,7 +404,7 @@
         else constructionStorage.addToQueue(path, data);
       };
 
-      // 🛡️ تصحيح زر ➕ لرفع البند فقط وعدم إرسال كائنات متداخلة 🛡️
+      // إضافة بند قائمة منسدلة
       const handleAddNewSettingItem = (settingKey, currentArray, title) => {
         if (!isAdmin) { showToast("خاصية مقتصرة على الإدارة 🔒", "error"); return; }
         const newVal = window.prompt(`أدخل [${title}] جديد لإضافته للقائمة:`, "");
@@ -477,15 +412,9 @@
           const cleanVal = newVal.trim();
           if (currentArray.includes(cleanVal)) { showToast("هذا البند موجود مسبقاً!", "error"); return; }
           const updatedArray = [...currentArray, cleanVal]; 
-          
           const newSettings = { ...settings, [settingKey]: updatedArray };
           setSettings(newSettings); 
-          constructionStorage.set('settings', newSettings);
-
-          // الحفظ في المسار الفرعي فقط لعدم تدمير البيانات
-          if (navigator.onLine && db) {
-             db.ref(`settings/${settingKey}`).set(updatedArray);
-          }
+          saveSafeConstructionData('settings', 'settings', newSettings);
           showToast(`تمت إضافة "${cleanVal}" بنجاح!`);
         }
       };
@@ -562,14 +491,14 @@
       const totalReceived = projPayments.reduce((sum, item) => sum + parseNum(item?.amount), 0);
       const netProfit = totalWorkNet - totalCost;
 
-      const projDirectCashExp = projExpenses.filter(e => e?.paymentMethod !== 'خصم من العهدة' && (e?.billStatus || 'مدفوعة') === 'مدفوعة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
+      const projDirectCashExp = projExpenses.filter(e => safeStr(e?.paymentMethod) !== 'خصم من العهدة' && safeStr(e?.billStatus || 'مدفوعة') === 'مدفوعة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
       const projTotalAdvancesGiven = projAdvances.reduce((sum, a) => sum + parseNum(a?.amount), 0);
       const projTotalSuppPaid = projSuppPayments.reduce((sum, p) => sum + parseNum(p?.amount), 0);
       const centralCashRemaining = totalReceived - projDirectCashExp - projTotalAdvancesGiven - projTotalSuppPaid;
 
       const allEmpCustodyBalance = (settings?.employees || []).reduce((acc, emp) => {
-        const adv = projAdvances.filter(a => String(a?.employeeName) === String(emp)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
-        const spent = projExpenses.filter(e => String(e?.paymentMethod) === 'خصم من العهدة' && String(e?.custodyEmployee) === String(emp)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const adv = projAdvances.filter(a => safeStr(a?.employeeName) === safeStr(emp)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
+        const spent = projExpenses.filter(e => safeStr(e?.paymentMethod) === 'خصم من العهدة' && safeStr(e?.custodyEmployee) === safeStr(emp)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
         return acc + Math.max(0, adv - spent);
       }, 0);
 
@@ -581,34 +510,34 @@
       const allPay = payments.reduce((sum, item) => sum + parseNum(item?.amount), 0);
 
       const projExpMap = {};
-      projExpenses.forEach(e => { const cat = String(e?.mainCategory || 'غير محدد'); projExpMap[cat] = (projExpMap[cat] || 0) + parseNum(e?.amount); });
+      projExpenses.forEach(e => { const cat = safeStr(e?.mainCategory || 'غير محدد'); projExpMap[cat] = (projExpMap[cat] || 0) + parseNum(e?.amount); });
       const projExpLabels = Object.keys(projExpMap);
       const projExpData = Object.values(projExpMap);
 
-      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || String(e?.mainCategory) === searchMainCat) && (searchSubCat === "" || String(e?.subCategory) === searchSubCat) && (searchCostType === "" || String(e?.costType) === searchCostType); });
+      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || safeStr(e?.mainCategory) === searchMainCat) && (searchSubCat === "" || safeStr(e?.subCategory) === searchSubCat) && (searchCostType === "" || safeStr(e?.costType) === searchCostType); });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + parseNum(e?.amount), 0);
 
-      const allSupplierNames = Array.from(new Set([...(settings?.suppliers || []), ...expenses.map(e => e?.supplier).filter(Boolean), ...supplierPayments.map(p => p?.supplier).filter(Boolean)])).map(s => String(s || '').trim()).filter(Boolean);
+      const allSupplierNames = Array.from(new Set([...(settings?.suppliers || []), ...expenses.map(e => e?.supplier).filter(Boolean), ...supplierPayments.map(p => p?.supplier).filter(Boolean)])).map(s => safeStr(s).trim()).filter(Boolean);
       const cleanSuppliersList = Array.from(new Set(allSupplierNames));
 
       const suppliersLedger = cleanSuppliersList.map(supp => {
         const targetExp = suppScope === "project" ? projExpenses : expenses; const targetSuppPay = suppScope === "project" ? projSuppPayments : supplierPayments;
-        const allInvoices = targetExp.filter(e => String(e?.supplier || '').trim() === supp);
+        const allInvoices = targetExp.filter(e => safeStr(e?.supplier).trim() === supp);
         const totalPurchases = allInvoices.reduce((sum, e) => sum + parseNum(e?.amount), 0);
-        const creditPurchases = allInvoices.filter(e => String(e?.billStatus || 'مدفوعة') === 'آجلة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const creditPurchases = allInvoices.filter(e => safeStr(e?.billStatus || 'مدفوعة') === 'آجلة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
         const paidPurchases = totalPurchases - creditPurchases;
-        const totalPaidToCreditor = targetSuppPay.filter(p => String(p?.supplier || '').trim() === supp).reduce((sum, p) => sum + parseNum(p?.amount), 0);
+        const totalPaidToCreditor = targetSuppPay.filter(p => safeStr(p?.supplier).trim() === supp).reduce((sum, p) => sum + parseNum(p?.amount), 0);
         const balance = totalPaidToCreditor - creditPurchases;
         return { name: supp, totalPurchases, creditPurchases, paidPurchases, totalPaid: totalPaidToCreditor, balance };
       }).filter(s => s.totalPurchases > 0 || s.totalPaid > 0);
 
       const getCustodyStats = (empName) => {
-        const empAdv = projAdvances.filter(a => String(a?.employeeName) === String(empName)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
-        const empExp = projExpenses.filter(e => String(e?.paymentMethod) === 'خصم من العهدة' && String(e?.custodyEmployee) === String(empName)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const empAdv = projAdvances.filter(a => safeStr(a?.employeeName) === safeStr(empName)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
+        const empExp = projExpenses.filter(e => safeStr(e?.paymentMethod) === 'خصم من العهدة' && safeStr(e?.custodyEmployee) === safeStr(empName)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
         return { received: empAdv, spent: empExp, balance: empAdv - empExp };
       };
 
-      const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: String(emp), ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
+      const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: safeStr(emp), ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "الرئيسية", icon: "📊" }] : [{ id: "my_custody", label: "عهدتي", icon: "💼" }]),
@@ -624,97 +553,53 @@
         ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
       ];
 
-      // شاشات التحميل والدخول المبدئية
+      // الشاشات המبدئية
       if (authLoading) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-900">
-            <div className="bike-container">
-              <svg className="bike-svg" viewBox="0 0 100 100" fill="none" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <g className="body-bounce">
-                  <polyline points="30,60 45,35 75,35 60,60 30,60" />
-                  <line x1="45" y1="35" x2="40" y2="25" />
-                  <line x1="35" y1="25" x2="45" y2="25" />
-                  <line x1="75" y1="35" x2="70" y2="20" />
-                  <path d="M70,20 Q80,15 85,25" />
-                </g>
-                <g transform="translate(30, 60)"><circle cx="0" cy="0" r="15" className="wheel" /><circle cx="0" cy="0" r="2" fill="#f59e0b" /><line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" /><line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" /></g>
-                <g transform="translate(75, 60)"><circle cx="0" cy="0" r="15" className="wheel" /><circle cx="0" cy="0" r="2" fill="#f59e0b" /><line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" /><line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" /></g>
-                <g transform="translate(60, 60)" className="pedal"><circle cx="0" cy="0" r="4" fill="#f59e0b" /><line x1="0" y1="-8" x2="0" y2="8" strokeWidth="2" /></g>
-              </svg>
-            </div>
-            <div className="loading-text text-amber-500">Loading</div>
-            <div className="text-[10px] text-slate-500 font-bold mt-2 font-cairo">جاري تأمين وربط الاتصال...</div>
+            <div className="animate-spin text-5xl mb-4">⚙️</div>
+            <div className="text-indigo-500 font-bold text-sm">جاري التحميل...</div>
           </div>
         );
       }
 
       if (!user) {
         return (
-          <div className={`min-h-screen flex flex-col md:flex-row items-center justify-center px-4 transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
-            <div className="relative flex flex-col items-center mb-10 md:mb-0 md:ml-16 z-20">
-              <div className={`w-40 h-20 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
-              <div className={`w-3 h-32 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-              <div className={`w-24 h-4 rounded-t-lg transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-              <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-16 left-1/2 ml-8 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة النظام">
-                <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-16' : 'h-10'}`}></div>
-                <div className="w-4 h-4 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
-              </div>
-            </div>
-
-            <div className={`relative transition-all duration-1000 transform ${isLampOn ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95 pointer-events-none'}`}>
-              {isLampOn && <div className="absolute -inset-4 bg-amber-400/10 blur-2xl rounded-[3rem] z-0"></div>}
+          <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4">
+            <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-xl w-full max-w-md text-center border border-slate-200 dark:border-slate-700">
+              <div className="w-16 h-16 bg-amber-50 dark:bg-amber-900/30 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🏗️</div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white">مكتب مساحة</h2>
+              <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-1 mb-6">إدارة المشروعات والإنشاءات</p>
               
-              <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center relative z-10">
-                <div className="w-14 h-14 bg-white/20 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl shadow-inner">🏗️</div>
-                <h2 className="text-xl font-black text-white">مكتب مساحة</h2>
-                <p className="text-slate-300 text-[11px] mt-1 mb-5 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
-                
-                {/* ✨ أزرار التبديل الفخمة والواضحة ✨ */}
-                <div className="flex bg-slate-200/20 dark:bg-slate-800/80 p-1.5 rounded-2xl mb-6 border border-white/10 shadow-inner pointer-events-auto">
-                  <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2.5 rounded-xl shadow-md text-xs transition-all">
-                    🏗️ قطاع الإنشاءات
-                  </button>
-                  <a href="survey.html" className="flex-1 text-slate-300 hover:text-white hover:bg-white/10 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center">
-                    📐 قطاع المساحة
-                  </a>
+              {/* ✨ أزرار التبديل الفخمة والمستقرة ✨ */}
+              <div className="flex bg-slate-100 dark:bg-slate-900/80 p-1.5 rounded-2xl mb-6 border border-slate-200 dark:border-slate-700">
+                <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2.5 rounded-xl shadow-md text-xs transition-all">
+                  🏗️ الإنشاءات
+                </button>
+                <a href="survey.html" className="flex-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center">
+                  📐 المساحة
+                </a>
+              </div>
+
+              {accessDeniedMessage && (
+                <div className="bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 p-3 rounded-xl text-xs font-bold mb-4">
+                  ⚠️ {accessDeniedMessage}
                 </div>
+              )}
 
-                {accessDeniedMessage ? (
-                  <div className="space-y-3 pointer-events-auto">
-                    <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-xs font-bold leading-relaxed">⚠️ {accessDeniedMessage}</div>
-                  </div>
-                ) : (
-                  <div className="pointer-events-auto">
-                    <form onSubmit={handleEmailLogin} className="space-y-3 mb-4">
-                      <div className="relative">
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">✉️</span>
-                        <input type="email" placeholder="البريد الإلكتروني..." value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
-                      </div>
-                      <div className="relative">
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">🔒</span>
-                        <input type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
-                      </div>
-                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-2.5 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all text-xs">
-                        تسجيل الدخول
-                      </button>
-                    </form>
+              <form onSubmit={handleEmailLogin} className="space-y-4">
+                <input type="email" placeholder="البريد الإلكتروني..." value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white px-4 py-3 rounded-xl outline-none focus:border-amber-500 transition text-sm font-bold" required />
+                <input type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white px-4 py-3 rounded-xl outline-none focus:border-amber-500 transition text-sm font-bold" required />
+                <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl shadow-md transition-all text-sm">تسجيل الدخول</button>
+              </form>
 
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="h-px bg-white/20 flex-1"></div>
-                      <span className="text-white/50 text-[10px] font-bold">أو بواسطة</span>
-                      <div className="h-px bg-white/20 flex-1"></div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
-                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
-                      </button>
-                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
-                        📱 هاتف
-                      </button>
-                    </div>
-                  </div>
-                )}
+              <div className="flex items-center gap-3 my-5"><div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div><span className="text-slate-400 text-[10px] font-bold">أو بواسطة</span><div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div></div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-xs">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
+                </button>
+                <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold py-2.5 rounded-xl shadow-sm transition-all text-xs">📱 هاتف</button>
               </div>
             </div>
           </div>
@@ -725,11 +610,7 @@
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
           
-          {!isOnline && (
-            <div className="bg-rose-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
-              <span>📡</span><span>أنت متصل محلياً بدون إنترنت. يتم حفظ السجلات بالجهاز وترفع فور عودة الشبكة.</span>
-            </div>
-          )}
+          {!isOnline && (<div className="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs"><span>📡</span><span>أنت متصل محلياً بدون إنترنت. يتم حفظ السجلات بالجهاز وترفع فور عودة الشبكة.</span></div>)}
 
           <header className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div className="flex items-center gap-2">
@@ -737,19 +618,17 @@
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-sm font-black text-slate-900 dark:text-white">مكتب مساحة</h1>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs text-white ${userRoleKey === 'superadmin' ? 'bg-amber-500 text-slate-900' : userRoleKey === 'executive' || userRoleKey === 'pm' ? 'bg-indigo-600' : userRoleKey === 'accountant' ? 'bg-emerald-600' : userRoleKey === 'admin' ? 'bg-amber-500 text-slate-900' : 'bg-blue-600'}`}>
-                    {userRoleTitle}
-                  </span>
+                  <span className="bg-amber-500 text-slate-900 text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs">{userRoleTitle}</span>
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none mt-0.5">{user.email}</div>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <button onClick={toggleTheme} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
+              <button onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
               {/* ✨ زر التبديل الفخم في الترويسة العلوية ✨ */}
               <a href="survey.html" className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs transition">
-                <span>📐</span> <span className="hidden sm:inline">الانتقال للمساحة</span>
+                <span>📐</span> <span className="hidden sm:inline">قطاع المساحة</span>
               </a>
               <button onClick={()=>setDrawerOpen(true)} className="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">☰</button>
             </div>
@@ -764,10 +643,7 @@
                   </button>
                 ))}
               </div>
-              <div className="p-3 border-t border-slate-800 text-[11px] text-center">
-                <div className="truncate text-slate-400 mb-2 font-mono">{user.email}</div>
-                <button onClick={handleLogout} className="w-full bg-rose-600/20 text-rose-400 py-2 rounded-xl font-bold">تسجيل الخروج</button>
-              </div>
+              <div className="p-3 border-t border-slate-800 text-[11px] text-center"><div className="truncate text-slate-400 mb-2 font-mono">{user.email}</div><button onClick={handleLogout} className="w-full bg-rose-600/20 text-rose-400 py-2 rounded-xl font-bold">تسجيل الخروج</button></div>
             </aside>
 
             {drawerOpen && (
@@ -775,39 +651,31 @@
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setDrawerOpen(false)}></div>
                 <div className="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-4 flex flex-col justify-between">
                   <div>
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-                      <div><span className="font-black text-sm">أقسام الإنشاءات</span><span className="block text-[10px] text-amber-400 font-bold mt-1">{userRoleTitle}</span></div>
-                      <button onClick={()=>setDrawerOpen(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
-                    </div>
-                    <nav className="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">
-                      {navTabs.map(t => (
-                        <button key={t.id} onClick={() => { setActiveTab(t.id); setDrawerOpen(false); }} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl ${activeTab===t.id ? 'bg-amber-500 text-slate-900 font-black' : 'text-slate-300 hover:bg-slate-800'}`}>
-                          <span>{t.icon}</span> <span>{t.label}</span>
-                        </button>
-                      ))}
-                    </nav>
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-3"><div><span className="font-black text-sm">أقسام الإنشاءات</span><span className="block text-[10px] text-amber-400 font-bold mt-1">{userRoleTitle}</span></div><button onClick={()=>setDrawerOpen(false)} className="text-slate-400 hover:text-white text-lg">✕</button></div>
+                    <nav className="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">{navTabs.map(t => (<button key={t.id} onClick={() => { setActiveTab(t.id); setDrawerOpen(false); }} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl ${activeTab===t.id ? 'bg-amber-500 text-slate-900 font-black' : 'text-slate-300 hover:bg-slate-800'}`}><span>{t.icon}</span> <span>{t.label}</span></button>))}</nav>
                   </div>
-                  <div className="pt-3 border-t border-slate-800 text-xs text-center">
-                    <div className="truncate text-slate-400 font-mono mb-2">{user.email}</div>
-                    <button onClick={handleLogout} className="w-full bg-rose-600/20 text-rose-400 py-2.5 rounded-xl font-bold">تسجيل الخروج</button>
-                  </div>
+                  <div className="pt-3 border-t border-slate-800 text-xs text-center"><div className="truncate text-slate-400 font-mono mb-2">{user.email}</div><button onClick={handleLogout} className="w-full bg-rose-600/20 text-rose-400 py-2.5 rounded-xl font-bold">تسجيل الخروج</button></div>
                 </div>
               </div>
             )}
 
             <main className="flex-1 overflow-y-auto p-3.5 sm:p-5 text-xs max-w-7xl mx-auto w-full custom-scroll">
               
+              <div className="mb-4 bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-xs border border-slate-200/80 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <span className="font-extrabold text-slate-600 dark:text-slate-400 whitespace-nowrap">المشروع:</span>
+                  <select value={selectedProjId} onChange={(e) => setSelectedProjId(e.target.value)} className="w-full sm:w-72 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 font-extrabold text-indigo-700 dark:text-indigo-400 rounded-xl px-3 py-2 outline-none">
+                    {projects.map(p => <option key={String(p.id)} value={String(p.id)}>{String(p.id)} - {safeStr(p.name)}</option>)}
+                  </select>
+                </div>
+              </div>
+
               {activeTab === 'dashboard' && isAdmin && (
                 <div className="space-y-4">
                   {projBudget > 0 && (
                     <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-xs text-xs">
-                      <div className="flex justify-between items-center mb-1.5 font-bold">
-                        <span className="text-slate-600 dark:text-slate-300">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span>
-                        <span className={budgetConsumedPercent > 90 ? "text-rose-600" : "text-amber-600 dark:text-amber-400"}>{budgetConsumedPercent}% مستهلك</span>
-                      </div>
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                        <div className={`h-2 rounded-full transition-all duration-500 ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-amber-500"}`} style={{ width: `${budgetConsumedPercent}%` }}></div>
-                      </div>
+                      <div className="flex justify-between items-center mb-1.5 font-bold"><span className="text-slate-600 dark:text-slate-300">ميزانية المشروع: {(projBudget).toLocaleString()} ج.م</span><span className={budgetConsumedPercent > 90 ? "text-rose-600" : "text-amber-600 dark:text-amber-400"}>{budgetConsumedPercent}% مستهلك</span></div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden"><div className={`h-2 rounded-full transition-all duration-500 ${budgetConsumedPercent > 90 ? "bg-rose-500" : "bg-amber-500"}`} style={{ width: `${budgetConsumedPercent}%` }}></div></div>
                     </div>
                   )}
 
@@ -817,37 +685,23 @@
                     <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي المصروفات</span><strong className="text-rose-600 text-sm sm:text-base font-black">{totalCost.toLocaleString()} ج.م</strong></div>
                     <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3 sm:p-4 rounded-2xl shadow-xs"><span className="text-amber-900 dark:text-amber-200 font-bold block text-[10px]">سيولة الخزينة</span><strong className="text-amber-700 dark:text-amber-400 text-base sm:text-lg font-black">{centralCashRemaining.toLocaleString()} ج.م</strong></div>
                   </div>
-                  <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
+                  <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={safeStr(currentProj.name) || 'المشروع'} />
                 </div>
               )}
 
               {activeTab === "my_custody" && !isAdmin && (
                 <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-700 shadow-xs space-y-4 text-xs">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b dark:border-slate-700">
-                    <div>
-                      <h2 className="text-base font-black text-slate-900 dark:text-white">💼 متابعة عهدتي الشخصية</h2>
-                      <p className="text-slate-500 text-[11px] mt-0.5">متابعة المبالغ المستلمة والمنصرفة والرصيد المتبقي معك.</p>
-                    </div>
-                    <div className="w-full sm:w-60">
-                      <select value={myEmpName} onChange={(e) => { setMyEmpName(e.target.value); localStorage.setItem('myEmpName', e.target.value); }} className="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 font-bold p-2.5 rounded-xl outline-none">
-                        <option value="">اختر اسمك...</option>
-                        {settings.employees.map((emp, idx) => <option key={idx} value={String(emp)}>{String(emp)}</option>)}
-                      </select>
-                    </div>
+                    <div><h2 className="text-base font-black text-slate-900 dark:text-white">💼 متابعة عهدتي الشخصية</h2><p className="text-slate-500 text-[11px] mt-0.5">متابعة المبالغ المستلمة والمنصرفة والرصيد المتبقي معك.</p></div>
+                    <div className="w-full sm:w-60"><select value={myEmpName} onChange={(e) => { setMyEmpName(e.target.value); localStorage.setItem('myEmpName', e.target.value); }} className="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 font-bold p-2.5 rounded-xl outline-none"><option value="">اختر اسمك...</option>{settings.employees.map((emp, idx) => <option key={idx} value={String(emp)}>{String(emp)}</option>)}</select></div>
                   </div>
                   {myEmpName ? (() => {
                     const myStats = getCustodyStats(myEmpName);
                     return (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 p-4 rounded-2xl text-center">
-                          <span className="text-[11px] text-emerald-800 font-bold block mb-1">إجمالي المستلم</span><span className="text-xl font-black text-emerald-600">{myStats.received.toLocaleString()} ج.م</span>
-                        </div>
-                        <div className="bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 p-4 rounded-2xl text-center">
-                          <span className="text-[11px] text-rose-800 font-bold block mb-1">إجمالي المنصرف</span><span className="text-xl font-black text-rose-600">{myStats.spent.toLocaleString()} ج.م</span>
-                        </div>
-                        <div className="bg-indigo-600 text-white p-4 rounded-2xl text-center shadow-xs">
-                          <span className="text-[11px] text-indigo-100 font-bold block mb-1">الرصيد المتبقي معك</span><span className="text-2xl font-black">{myStats.balance.toLocaleString()} ج.م</span>
-                        </div>
+                        <div className="bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 p-4 rounded-2xl text-center"><span className="text-[11px] text-emerald-800 font-bold block mb-1">إجمالي المستلم</span><span className="text-xl font-black text-emerald-600">{myStats.received.toLocaleString()} ج.م</span></div>
+                        <div className="bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 p-4 rounded-2xl text-center"><span className="text-[11px] text-rose-800 font-bold block mb-1">إجمالي المنصرف</span><span className="text-xl font-black text-rose-600">{myStats.spent.toLocaleString()} ج.م</span></div>
+                        <div className="bg-indigo-600 text-white p-4 rounded-2xl text-center shadow-xs"><span className="text-[11px] text-indigo-100 font-bold block mb-1">الرصيد المتبقي معك</span><span className="text-2xl font-black">{myStats.balance.toLocaleString()} ج.م</span></div>
                       </div>
                     );
                   })() : <div className="text-center p-6 text-slate-400 font-bold">يرجى اختيار اسمك لعرض الرصيد التفاعلي.</div>}
@@ -861,10 +715,8 @@
                       <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">📁 إضافة مشروع جديد</h3>
                       <form onSubmit={(e) => {
                         e.preventDefault(); if (!newProj.id || !newProj.name) return;
-                        const clean = cleanId(newProj.id);
-                        const projectToAdd = { ...newProj, id: clean, budget: parseNum(newProj.budget), createdBy: user?.name || 'مستخدم' };
-                        const updatedProjects = [...projects, projectToAdd];
-                        setProjects(updatedProjects); saveSafeConstructionData('projects', 'projects', updatedProjects);
+                        const clean = cleanId(newProj.id); const projectToAdd = { ...newProj, id: clean, budget: parseNum(newProj.budget), createdBy: user?.name || 'مستخدم' };
+                        const updatedProjects = [...projects, projectToAdd]; setProjects(updatedProjects); saveSafeConstructionData('projects', 'projects', updatedProjects);
                         setSelectedProjId(clean); setNewProj({ id: nextSuggestedProjectId, name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
                         showToast(`تمت إضافة المشروع بنجاح!`);
                       }} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
@@ -879,28 +731,12 @@
                   )}
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black">
-                          <th className="p-3">الكود</th><th className="p-3">المالك</th><th className="p-3">الاستشاري</th><th className="p-3">الموقع</th><th className="p-3">الميزانية</th><th className="p-3">الحالة</th>{isAdmin && <th className="p-3 text-center">إجراءات</th>}
-                        </tr>
-                      </thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">الكود</th><th className="p-3">المالك</th><th className="p-3">الاستشاري</th><th className="p-3">الموقع</th><th className="p-3">الميزانية</th><th className="p-3">الحالة</th>{isAdmin && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projects.map(p => (
                           <tr key={String(p.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 font-bold text-amber-600 font-mono">{String(p.id)}</td>
-                            <td className="p-3 font-bold text-slate-900 dark:text-white">{String(p.name)}</td>
-                            <td className="p-3 text-slate-500">{p.consultant ? String(p.consultant) : '-'}</td>
-                            <td className="p-3 text-slate-500">{p.location ? String(p.location) : '-'}</td>
-                            <td className="p-3 font-mono font-bold">{isAdmin || isAccountant ? `${parseNum(p.budget).toLocaleString()} ج.م` : '🔒 محجوب'}</td>
-                            <td className="p-3"><span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold">{String(p.status || 'جاري')}</span></td>
-                            {isAdmin && (
-                              <td className="p-3 text-center">
-                                <div className="inline-flex items-center gap-1.5">
-                                  <button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
-                                  <button onClick={()=>deleteItem('projects', p.id, projects)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
-                                </div>
-                              </td>
-                            )}
+                            <td className="p-3 font-bold text-amber-600 font-mono">{String(p.id)}</td><td className="p-3 font-bold text-slate-900 dark:text-white">{safeStr(p.name)}</td><td className="p-3 text-slate-500">{safeStr(p.consultant) || '-'}</td><td className="p-3 text-slate-500">{safeStr(p.location) || '-'}</td><td className="p-3 font-mono font-bold">{isAdmin || isAccountant ? `${parseNum(p.budget).toLocaleString()} ج.م` : '🔒 محجوب'}</td><td className="p-3"><span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold">{safeStr(p.status) || 'جاري'}</span></td>
+                            {isAdmin && (<td className="p-3 text-center"><div className="inline-flex items-center gap-1.5"><button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button><button onClick={()=>deleteItem('projects', p.id, projects)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button></div></td>)}
                           </tr>
                         ))}
                       </tbody>
@@ -909,31 +745,19 @@
                 </div>
               )}
 
-              {/* ⚠️ تبويب إضافة الفاتورة المعدل والمصمم لمنع أخطاء الـ Dropdown نهائياً ⚠️ */}
+              {/* ⚠️ تبويب إدخال الفاتورة المحصن ⚠️ */}
               {activeTab === "add_data" && (
                 <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
                   <h3 className="font-black text-sm text-slate-900 dark:text-white mb-4 pb-2 border-b dark:border-slate-700 flex items-center gap-2"><span>💸</span> تسجيل فاتورة ومصروف جديد</h3>
                   <form onSubmit={(e) => {
                     e.preventDefault();
-                    if(parseNum(newExp.unitPrice) <= 0 || parseNum(newExp.quantity) <= 0) {
-                      showToast("عفواً، الكمية وسعر الوحدة يجب أن يكونا أكبر من صفر!", "error");
-                      return;
-                    }
-                    if(newExp.paymentMethod === 'خصم من العهدة' && !newExp.custodyEmployee) { 
-                      showToast("يرجى اختيار اسم صاحب العهدة", "error"); 
-                      return; 
-                    }
+                    if(parseNum(newExp.unitPrice) <= 0 || parseNum(newExp.quantity) <= 0) { showToast("عفواً، الكمية وسعر الوحدة يجب أن يكونا أكبر من صفر!", "error"); return; }
+                    if(newExp.paymentMethod === 'خصم من العهدة' && !newExp.custodyEmployee) { showToast("يرجى اختيار اسم صاحب العهدة", "error"); return; }
                     const totalAmt = parseNum(newExp.quantity) * parseNum(newExp.unitPrice);
                     const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newExp, quantity: parseNum(newExp.quantity), unitPrice: parseNum(newExp.unitPrice), amount: totalAmt, createdBy: user?.name || 'مستخدم' };
-                    const updated = [newItem, ...expenses]; 
-                    setExpenses(updated); 
-                    saveSafeConstructionData('expenses', 'expenses', updated);
-                    
+                    const updated = [newItem, ...expenses]; setExpenses(updated); saveSafeConstructionData('expenses', 'expenses', updated);
                     setNewExp({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", billStatus: "مدفوعة", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: myEmpName || "", receiptImg: "" });
-                    
-                    const fileInput = document.getElementById('receipt-upload-input');
-                    if(fileInput) fileInput.value = "";
-                    
+                    const fileInput = document.getElementById('receipt-upload-input'); if(fileInput) fileInput.value = "";
                     showToast("تم حفظ الفاتورة بنجاح! ✅");
                   }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div><label className="block font-bold mb-1">التاريخ</label><input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required/></div>
@@ -981,9 +805,7 @@
                     <div><label className="block font-bold mb-1">الكمية</label><input type="number" step="any" value={newExp.quantity} onChange={e=>setNewExp({...newExp, quantity: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required/></div>
                     <div><label className="block font-bold mb-1">سعر الوحدة</label><input type="number" step="any" value={newExp.unitPrice} onChange={e=>setNewExp({...newExp, unitPrice: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required/></div>
                     <div className="sm:col-span-2"><label className="block font-bold mb-1">البيان / الوصف</label><input type="text" value={newExp.description} onChange={e=>setNewExp({...newExp, description: e.target.value})} placeholder="تفاصيل الفاتورة وإذن الاستلام..." className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 outline-none"/></div>
-                    <div className="sm:col-span-2"><label className="block font-bold mb-1">📸 إرفاق صورة الفاتورة</label>
-                      <input id="receipt-upload-input" type="file" accept="image/*" onChange={handleReceiptUpload} className="w-full text-xs border border-dashed dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/>
-                    </div>
+                    <div className="sm:col-span-2"><label className="block font-bold mb-1">📸 إرفاق صورة الفاتورة</label><input id="receipt-upload-input" type="file" accept="image/*" onChange={handleReceiptUpload} className="w-full text-xs border border-dashed dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/></div>
                     <div className="sm:col-span-2 bg-amber-50 dark:bg-amber-950/30 p-3 rounded-2xl flex justify-between items-center font-bold"><span>إجمالي الفاتورة:</span><span className="text-sm font-black text-amber-700 dark:text-amber-400">{(parseNum(newExp.quantity) * parseNum(newExp.unitPrice)).toLocaleString()} ج.م</span></div>
                     <div className="sm:col-span-4 mt-2"><button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-3 rounded-2xl shadow-sm transition">حفظ وتسجيل الفاتورة</button></div>
                   </form>
@@ -1009,13 +831,13 @@
                           filteredSearchExpenses.map((e) => (
                             <tr key={String(e.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50 transition">
                               <td className="p-3 text-slate-500 font-mono text-[11px]">{e.date}</td>
-                              <td className="p-3 font-bold text-slate-900 dark:text-white">{String(e.mainCategory)} - {String(e.subCategory)}</td>
-                              <td className="p-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">{e.description || '-'}</td>
-                              <td className="p-3 text-slate-600 dark:text-slate-400">{e.supplier ? String(e.supplier) : '-'}</td>
+                              <td className="p-3 font-bold text-slate-900 dark:text-white">{safeStr(e.mainCategory)} - {safeStr(e.subCategory)}</td>
+                              <td className="p-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">{safeStr(e.description) || '-'}</td>
+                              <td className="p-3 text-slate-600 dark:text-slate-400">{e.supplier ? safeStr(e.supplier) : '-'}</td>
                               <td className="p-3 text-center">{parseNum(e.quantity)}</td>
                               <td className="p-3 text-center font-mono">{parseNum(e.unitPrice).toLocaleString()}</td>
                               <td className="p-3 text-center font-black text-rose-600 font-mono">{parseNum(e.amount).toLocaleString()}</td>
-                              <td className="p-3"><span className="text-[10px] bg-slate-100 dark:bg-slate-600 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-300">{e.paymentMethod}</span></td>
+                              <td className="p-3"><span className="text-[10px] bg-slate-100 dark:bg-slate-600 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-300">{safeStr(e.paymentMethod)}</span></td>
                               <td className="p-3 text-center">{e.receiptImg ? (<button onClick={()=>setActiveInvoiceModal(e.receiptImg)} className="text-indigo-600 hover:underline font-bold text-[11px]">معاينة</button>) : <span className="text-slate-400">-</span>}</td>
                               <td className="p-3 text-center"><button onClick={() => { const msg = `🏢 *إشعار فاتورة توريد*\n🏗️ *المشروع:* ${currentProj.name}\n📌 *البند:* ${e.mainCategory} - ${e.subCategory}\n💰 *المبلغ:* ${parseNum(e.amount).toLocaleString()} ج.م\n🗓 *التاريخ:* ${e.date}`; window.open(`https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank'); }} className="text-emerald-600 hover:text-emerald-700 text-xs">📲</button></td>
                               {canEditOrDelete && (
@@ -1040,44 +862,25 @@
                   <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
                     <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">💵 تسليم عهدة وسلفة جديدة</h3>
                     <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
+                      e.preventDefault(); if(!newAdv.employeeName || parseNum(newAdv.amount) <= 0) return;
                       const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newAdv, amount: parseNum(newAdv.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...advances];
-                      setAdvances(updated);
-                      saveSafeConstructionData('advances', 'advances', updated);
-                      setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" });
-                      showToast("تم تسجيل العهدة بنجاح! 💵");
+                      const updated = [newItem, ...advances]; setAdvances(updated); saveSafeConstructionData('advances', 'advances', updated);
+                      setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" }); showToast("تم تسجيل العهدة بنجاح! 💵");
                     }} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                       <input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required>
-                        <option value="">اختر الموظف...</option>
-                        {settings.employees.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
-                      </select>
+                      <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required><option value="">اختر الموظف...</option>{settings.employees.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
                       <input type="number" step="any" value={newAdv.amount} onChange={e=>setNewAdv({...newAdv, amount: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-black text-emerald-600" placeholder="المبلغ..." required/>
                       <input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="البيان..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700"/>
                       <button type="submit" className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ العهدة</button>
                     </form>
                   </div>
-
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black">
-                          <th className="p-3">التاريخ</th>
-                          <th className="p-3">الموظف</th>
-                          <th className="p-3 text-center">المبلغ</th>
-                          <th className="p-3">البيان</th>
-                          {canEditOrDelete && <th className="p-3 text-center">إجراءات</th>}
-                        </tr>
-                      </thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">التاريخ</th><th className="p-3">الموظف</th><th className="p-3 text-center">المبلغ</th><th className="p-3">البيان</th>{canEditOrDelete && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projAdvances.map(a => (
                           <tr key={String(a.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td>
-                            <td className="p-3 font-bold text-slate-900 dark:text-white">{String(a.employeeName)}</td>
-                            <td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
-                            <td className="p-3 text-slate-500">{a.notes || '-'}</td>
+                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td><td className="p-3 font-bold text-slate-900 dark:text-white">{safeStr(a.employeeName)}</td><td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td><td className="p-3 text-slate-500">{safeStr(a.notes) || '-'}</td>
                             {canEditOrDelete && (
                               <td className="p-3 text-center">
                                 <div className="inline-flex items-center gap-1.5">
@@ -1102,11 +905,8 @@
                       e.preventDefault();
                       const targetProj = cleanId(selectedProjId);
                       const newItem = { id: Date.now(), projectId: targetProj, ...newPay, amount: parseNum(newPay.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...payments];
-                      setPayments(updated);
-                      saveSafeConstructionData('payments', 'payments', updated);
-                      setNewPay({ date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: "" });
-                      showToast("تم تسجيل الدفعة بنجاح! 💵");
+                      const updated = [newItem, ...payments]; setPayments(updated); saveSafeConstructionData('payments', 'payments', updated);
+                      setNewPay({ date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: "" }); showToast("تم تسجيل الدفعة بنجاح! 💵");
                     }} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <input type="date" value={newPay.date} onChange={e=>setNewPay({...newPay, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
                       <input type="number" step="any" value={newPay.amount} onChange={e=>setNewPay({...newPay, amount: e.target.value})} placeholder="المبلغ..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-black text-emerald-600" required/>
@@ -1114,27 +914,15 @@
                       <button type="submit" className="sm:col-span-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ التحصيل</button>
                     </form>
                   </div>
-
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black">
-                          <th className="p-3">التاريخ</th>
-                          <th className="p-3">المشروع</th>
-                          <th className="p-3 text-center">المبلغ</th>
-                          <th className="p-3">البيان</th>
-                          {isAdmin && <th className="p-3 text-center">إجراءات</th>}
-                        </tr>
-                      </thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-2.5">التاريخ</th><th className="p-2.5">المشروع</th><th className="p-2.5 text-center">المبلغ</th><th className="p-2.5">البيان</th>{isAdmin && <th className="p-2.5 text-center">إجراءات</th>}</tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projPayments.map(p => (
                           <tr key={String(p.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 text-slate-500 font-mono text-[11px]">{p.date}</td>
-                            <td className="p-3 font-bold text-indigo-600">{p.projectId}</td>
-                            <td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
-                            <td className="p-3 text-slate-500">{p.notes || '-'}</td>
+                            <td className="p-2.5 whitespace-nowrap text-slate-500 font-mono">{p.date}</td><td className="p-2.5 font-bold text-indigo-600">{p.projectId}</td><td className="p-2.5 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td><td className="p-2.5 text-slate-500">{safeStr(p.notes) || '-'}</td>
                             {isAdmin && (
-                              <td className="p-3 text-center">
+                              <td className="p-2.5 text-center">
                                 <div className="inline-flex items-center gap-1.5">
                                   <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
                                   <button onClick={()=>deleteItem('payments', p.id, payments)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
@@ -1155,43 +943,27 @@
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="font-black text-sm text-slate-900 dark:text-white">🚚 سداد دفعة نقدية لمورد</h3>
                       <div className="flex gap-1.5">
-                        <button onClick={()=>setSuppScope("project")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "project" ? "bg-amber-500 text-slate-900" : "bg-slate-100 dark:bg-slate-700"}`}>المشروع الحالي</button>
-                        <button onClick={()=>setSuppScope("company")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "company" ? "bg-amber-500 text-slate-900" : "bg-slate-100 dark:bg-slate-700"}`}>كل المشاريع</button>
+                        <button onClick={()=>setSuppScope("project")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "project" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-700"}`}>المشروع الحالي</button>
+                        <button onClick={()=>setSuppScope("company")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "company" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-700"}`}>كل المشاريع</button>
                       </div>
                     </div>
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
                       const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newSuppPay, amount: parseNum(newSuppPay.amount), createdBy: user?.name || 'مستخدم' };
-                      const updated = [newItem, ...supplierPayments];
-                      setSupplierPayments(updated);
-                      saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
-                      setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" });
-                      showToast("تم تسجيل الدفعة للمورد بنجاح! 🚚");
+                      const updated = [newItem, ...supplierPayments]; setSupplierPayments(updated); saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
+                      setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" }); showToast("تم تسجيل الدفعة للمورد بنجاح! 🚚");
                     }} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                       <input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <select value={newSuppPay.supplier} onChange={e=>setNewSuppPay({...newSuppPay, supplier: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required>
-                        <option value="">اختر المورد...</option>
-                        {settings.suppliers.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
-                      </select>
+                      <select value={newSuppPay.supplier} onChange={e=>setNewSuppPay({...newSuppPay, supplier: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required><option value="">اختر المورد...</option>{settings.suppliers.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
                       <input type="number" step="any" value={newSuppPay.amount} onChange={e=>setNewSuppPay({...newSuppPay, amount: e.target.value})} placeholder="المبلغ..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-black text-emerald-600" required/>
                       <input type="text" value={newSuppPay.notes} onChange={e=>setNewSuppPay({...newSuppPay, notes: e.target.value})} placeholder="البيان أو رقم الشيك..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700"/>
                       <button type="submit" className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">قيد الدفعة للمورد</button>
                     </form>
                   </div>
-
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black">
-                          <th className="p-3">المورد</th>
-                          <th className="p-3 text-center">إجمالي المسحوبات</th>
-                          <th className="p-3 text-center text-amber-600">فواتير آجلة</th>
-                          <th className="p-3 text-center text-emerald-600">المسدد له</th>
-                          <th className="p-3 text-center">الرصيد النهائي</th>
-                          <th className="p-3 text-center">كشف الحساب</th>
-                        </tr>
-                      </thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">المورد</th><th className="p-3 text-center">إجمالي المسحوبات</th><th className="p-3 text-center text-amber-600">فواتير آجلة</th><th className="p-3 text-center text-emerald-600">المسدد له</th><th className="p-3 text-center">الرصيد النهائي</th><th className="p-3 text-center">كشف الحساب</th></tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {suppliersLedger.map((s, i) => (
                           <tr key={i} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
@@ -1199,14 +971,8 @@
                             <td className="p-3 text-center font-mono">{s.totalPurchases.toLocaleString()}</td>
                             <td className="p-3 text-center font-mono text-amber-600 font-bold">{s.creditPurchases.toLocaleString()}</td>
                             <td className="p-3 text-center font-mono text-emerald-600 font-bold">{s.totalPaid.toLocaleString()}</td>
-                            <td className={`p-3 text-center font-mono font-black ${s.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {Math.abs(s.balance).toLocaleString()} ج.م
-                            </td>
-                            <td className="p-3 text-center">
-                              <button onClick={()=>setSelectedSupplierDetail(s.name)} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 hover:bg-indigo-100 px-3 py-1 rounded-lg font-bold text-[11px]">
-                                📑 عرض كشف
-                              </button>
-                            </td>
+                            <td className={`p-3 text-center font-mono font-black ${s.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{Math.abs(s.balance).toLocaleString()} ج.م</td>
+                            <td className="p-3 text-center"><button onClick={()=>setSelectedSupplierDetail(s.name)} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 hover:bg-indigo-100 px-3 py-1 rounded-lg font-bold text-[11px]">📑 عرض كشف</button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -1229,9 +995,7 @@
                           <h1 className="text-2xl font-black text-slate-950 tracking-tight">مكتب مساحة</h1>
                           <h2 className="text-base font-extrabold text-indigo-700 mt-0.5">الموقف المالي لمشروع: {currentProj.name}</h2>
                           <div className="flex items-center gap-2 text-xs text-slate-500 font-bold mt-2">
-                            <span>كود المشروع: <strong className="text-slate-900 font-mono">#{currentProj.id}</strong></span>
-                            <span>•</span>
-                            <span>التاريخ: <span className="font-mono text-slate-700">{todayDate}</span></span>
+                            <span>كود المشروع: <strong className="text-slate-900 font-mono">#{currentProj.id}</strong></span><span>•</span><span>التاريخ: <span className="font-mono text-slate-700">{todayDate}</span></span>
                           </div>
                         </div>
                         {settings.logo && <img src={settings.logo} className="h-14 object-contain rounded-lg border p-1" />}
@@ -1251,29 +1015,22 @@
                         <h4 className="font-bold text-slate-700 mb-1.5 border-b pb-1">1. المستخلصات المعتمدة</h4>
                         <table className="w-full text-right border" style={{ tableLayout: 'fixed' }}>
                           <thead><tr className="bg-slate-100"><th className="p-1.5 border w-24">التاريخ</th><th className="p-1.5 border">المستخلص</th><th className="p-1.5 border text-center w-24">الصافي</th></tr></thead>
-                          <tbody>
-                            {projExtracts.map(ex => <tr key={String(ex.id)}><td className="p-1.5 border whitespace-nowrap"><span className="pdf-num text-[11px]">{ex.date}</span></td><td className="p-1.5 border font-bold">{ex.extractNo}</td><td className="p-1.5 border text-center font-bold text-indigo-700"><span className="pdf-num">{parseNum(ex.net).toLocaleString('en-US')}</span></td></tr>)}
-                          </tbody>
+                          <tbody>{projExtracts.map(ex => <tr key={String(ex.id)}><td className="p-1.5 border whitespace-nowrap"><span className="pdf-num text-[11px]">{ex.date}</span></td><td className="p-1.5 border font-bold">{ex.extractNo}</td><td className="p-1.5 border text-center font-bold text-indigo-700"><span className="pdf-num">{parseNum(ex.net).toLocaleString('en-US')}</span></td></tr>)}</tbody>
                         </table>
                       </div>
                       <div>
                         <h4 className="font-bold text-slate-700 mb-1.5 border-b pb-1">2. التحصيلات المستلمة</h4>
                         <table className="w-full text-right border" style={{ tableLayout: 'fixed' }}>
                           <thead><tr className="bg-slate-100"><th className="p-1.5 border w-24">التاريخ</th><th className="p-1.5 border">البيان</th><th className="p-1.5 border text-center w-24">المبلغ</th></tr></thead>
-                          <tbody>
-                            {projPayments.map(p => <tr key={String(p.id)}><td className="p-1.5 border whitespace-nowrap"><span className="pdf-num text-[11px]">{p.date}</span></td><td className="p-1.5 border">{p.notes || 'تحصيل'}</td><td className="p-1.5 border text-center font-bold text-emerald-600"><span className="pdf-num">{parseNum(p.amount).toLocaleString('en-US')}</span></td></tr>)}
-                          </tbody>
+                          <tbody>{projPayments.map(p => <tr key={String(p.id)}><td className="p-1.5 border whitespace-nowrap"><span className="pdf-num text-[11px]">{p.date}</span></td><td className="p-1.5 border">{safeStr(p.notes) || 'تحصيل'}</td><td className="p-1.5 border text-center font-bold text-emerald-600"><span className="pdf-num">{parseNum(p.amount).toLocaleString('en-US')}</span></td></tr>)}</tbody>
                         </table>
                       </div>
                     </div>
-
                     <div className="flex justify-end pt-4 print-hidden">
                       <button onClick={() => {
                         const statementMsg = `🏢 *مكتب مساحة*\n📑 *الموقف المالي لمشروع:* ${currentProj.name}\n----------------------------------\n📄 *المستخلصات:* ${totalWorkNet.toLocaleString()} ج.م\n📥 *التحصيلات:* ${totalReceived.toLocaleString()} ج.م\n📤 *المصروفات:* ${totalCost.toLocaleString()} ج.م\n🏦 *السيولة الحرة:* ${centralCashRemaining.toLocaleString()} ج.م\n📈 *الأرباح:* ${netProfit.toLocaleString()} ج.م\n----------------------------------\n🗓 *تاريخ التقرير:* ${todayDate}`;
                         generatePdfAndOpenWhatsApp('statement-pdf-target', `كشف_حساب_${currentProj.id}.pdf`, statementMsg);
-                      }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-1.5 transition">
-                        📲 إرسال PDF للأدمن
-                      </button>
+                      }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-1.5 transition">📲 إرسال PDF للأدمن</button>
                     </div>
                   </div>
                 </div>
@@ -1285,25 +1042,11 @@
                     <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">📄 اعتماد مستخلص أعمال جديد</h3>
                     <form onSubmit={(e) => {
                       e.preventDefault();
-                      const totalWork = parseNum(newExt.quantity) * parseNum(newExt.unitPrice);
-                      const net = totalWork - parseNum(newExt.deductions);
+                      const totalWork = parseNum(newExt.quantity) * parseNum(newExt.unitPrice); const net = totalWork - parseNum(newExt.deductions);
                       const targetProj = cleanId(selectedProjId);
-                      const newItem = { 
-                        id: Date.now(), 
-                        projectId: targetProj, 
-                        ...newExt, 
-                        quantity: parseNum(newExt.quantity),
-                        unitPrice: parseNum(newExt.unitPrice),
-                        totalWork, 
-                        deductions: parseNum(newExt.deductions), 
-                        net, 
-                        createdBy: user?.name || 'مستخدم' 
-                      };
-                      const updated = [newItem, ...extracts];
-                      setExtracts(updated);
-                      saveSafeConstructionData('extracts', 'extracts', updated);
-                      setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""});
-                      showToast("تم اعتماد المستخلص وحفظه!");
+                      const newItem = { id: Date.now(), projectId: targetProj, ...newExt, quantity: parseNum(newExt.quantity), unitPrice: parseNum(newExt.unitPrice), totalWork, deductions: parseNum(newExt.deductions), net, createdBy: user?.name || 'مستخدم' };
+                      const updated = [newItem, ...extracts]; setExtracts(updated); saveSafeConstructionData('extracts', 'extracts', updated);
+                      setNewExt({date: todayDate, extractNo: "", workDescription: "", quantity: 1, unitPrice: "", deductions: ""}); showToast("تم اعتماد المستخلص وحفظه!");
                     }} className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <input type="date" value={newExt.date} onChange={e=>setNewExt({...newExt, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
                       <input type="text" value={newExt.extractNo} onChange={e=>setNewExt({...newExt, extractNo: e.target.value})} placeholder="رقم المستخلص..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
@@ -1327,19 +1070,12 @@
                           <div>
                             <h1 className="text-2xl font-black text-slate-950 tracking-tight">مكتب مساحة</h1>
                             <h2 className="text-base font-extrabold text-indigo-700 mt-0.5">مستخلص أعمال جارية - إنشاءات</h2>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 font-bold mt-2">
-                              <span>كود المشروع: <strong className="text-slate-900 font-mono">#{currentProj.id}</strong></span>
-                              <span>•</span>
-                              <span>التاريخ: <span className="font-mono text-slate-700">{todayDate}</span></span>
-                            </div>
+                            <div className="flex items-center gap-2 text-xs text-slate-500 font-bold mt-2"><span>كود المشروع: <strong className="text-slate-900 font-mono">#{currentProj.id}</strong></span><span>•</span><span>التاريخ: <span className="font-mono text-slate-700">{todayDate}</span></span></div>
                           </div>
                           {settings.logo ? <img src={settings.logo} className="h-16 object-contain rounded-xl border p-1" /> : <div className="text-3xl">🏗️</div>}
                         </div>
-
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-xl mt-3 text-[11px] border border-slate-200">
-                          <div><strong>العميل المالك:</strong> {currentProj.name}</div>
-                          <div><strong>الموقع:</strong> {currentProj.location || '-'}</div>
-                          <div className="sm:col-span-2"><strong>الاستشاري:</strong> {currentProj.consultant || '-'}</div>
+                          <div><strong>العميل المالك:</strong> {currentProj.name}</div><div><strong>الموقع:</strong> {currentProj.location || '-'}</div><div className="sm:col-span-2"><strong>الاستشاري:</strong> {currentProj.consultant || '-'}</div>
                         </div>
                       </div>
 
@@ -1347,33 +1083,20 @@
                         <table className="w-full text-right border-collapse text-xs border border-slate-300" style={{ tableLayout: 'fixed' }}>
                           <thead>
                             <tr className="bg-slate-100 text-slate-700 font-black">
-                              <th className="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>التاريخ</th>
-                              <th className="p-2 border border-slate-300" style={{ width: '15%' }}>رقم المستخلص</th>
-                              <th className="p-2 border border-slate-300" style={{ width: '28%' }}>بيان الأعمال</th>
-                              <th className="p-2 border border-slate-300 text-center" style={{ width: '10%' }}>الكمية</th>
-                              <th className="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>الفئة</th>
-                              <th className="p-2 border border-slate-300 text-center" style={{ width: '11%' }}>الاستقطاعات</th>
-                              <th className="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>الصافي</th>
+                              <th className="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>التاريخ</th><th className="p-2 border border-slate-300" style={{ width: '15%' }}>رقم المستخلص</th><th className="p-2 border border-slate-300" style={{ width: '28%' }}>بيان الأعمال</th><th className="p-2 border border-slate-300 text-center" style={{ width: '10%' }}>الكمية</th><th className="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>الفئة</th><th className="p-2 border border-slate-300 text-center" style={{ width: '11%' }}>الاستقطاعات</th><th className="p-2 border border-slate-300 text-center" style={{ width: '12%' }}>الصافي</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200 font-bold">
                             {projExtracts.length === 0 ? <tr><td colSpan="7" className="text-center p-4 text-slate-400">لا توجد مستخلصات معتمدة</td></tr> :
                             projExtracts.map((ex) => (
                               <tr key={String(ex.id)}>
-                                <td className="p-2 border border-slate-300 text-center whitespace-nowrap"><span className="pdf-num text-[11px] text-slate-500">{ex.date}</span></td>
-                                <td className="p-2 border border-slate-300 font-bold text-slate-900">{ex.extractNo}</td>
-                                <td className="p-2 border border-slate-300 text-slate-700">{ex.workDescription}</td>
-                                <td className="p-2 border border-slate-300 text-center"><span className="pdf-num">{parseNum(ex.quantity).toLocaleString('en-US')}</span></td>
-                                <td className="p-2 border border-slate-300 text-center"><span className="pdf-num">{parseNum(ex.unitPrice).toLocaleString('en-US')}</span></td>
-                                <td className="p-2 border border-slate-300 text-center text-rose-600"><span className="pdf-num">{parseNum(ex.deductions).toLocaleString('en-US')}</span></td>
-                                <td className="p-2 border border-slate-300 text-center font-black text-indigo-700"><span className="pdf-num">{parseNum(ex.net).toLocaleString('en-US')}</span></td>
+                                <td className="p-2 border border-slate-300 text-center whitespace-nowrap"><span className="pdf-num text-[11px] text-slate-500">{ex.date}</span></td><td className="p-2 border border-slate-300 font-bold text-slate-900">{ex.extractNo}</td><td className="p-2 border border-slate-300 text-slate-700">{ex.workDescription}</td><td className="p-2 border border-slate-300 text-center"><span className="pdf-num">{parseNum(ex.quantity).toLocaleString('en-US')}</span></td><td className="p-2 border border-slate-300 text-center"><span className="pdf-num">{parseNum(ex.unitPrice).toLocaleString('en-US')}</span></td><td className="p-2 border border-slate-300 text-center text-rose-600"><span className="pdf-num">{parseNum(ex.deductions).toLocaleString('en-US')}</span></td><td className="p-2 border border-slate-300 text-center font-black text-indigo-700"><span className="pdf-num">{parseNum(ex.net).toLocaleString('en-US')}</span></td>
                               </tr>
                             ))}
                           </tbody>
                           <tfoot>
                             <tr className="bg-slate-800 text-white font-bold">
-                              <td className="p-2.5 text-left border border-slate-800" colSpan="6">إجمالي الصافي المعتمد:</td>
-                              <td className="p-2.5 text-center text-sm border border-slate-800"><span className="pdf-num text-white">{totalWorkNet.toLocaleString('en-US')}</span></td>
+                              <td className="p-2.5 text-left border border-slate-800" colSpan="6">إجمالي الصافي المعتمد:</td><td className="p-2.5 text-center text-sm border border-slate-800"><span className="pdf-num text-white">{totalWorkNet.toLocaleString('en-US')}</span></td>
                             </tr>
                           </tfoot>
                         </table>
@@ -1406,11 +1129,11 @@
                       <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-500 border-b dark:border-slate-600 font-black"><th className="p-2.5">المستخدم</th><th className="p-2.5">الرتبة</th><th className="p-2.5">المعرف</th><th className="p-2.5">الجهاز</th><th className="p-2.5">التاريخ والوقت</th></tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-bold">{loginLogs.map((log, i) => (
                         <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50">
-                          <td className="p-2.5 font-bold text-slate-900 dark:text-white">{log.name}</td>
-                          <td className="p-2.5"><span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg text-[10px]">{log.role}</span></td>
-                          <td className="p-2.5 text-slate-400 font-mono text-[11px]">{log.identifier}</td>
-                          <td className="p-2.5 text-slate-500">{log.device}</td>
-                          <td className="p-2.5 text-slate-400 font-mono text-[11px]">{log.formattedDate}</td>
+                          <td className="p-2.5 font-bold text-slate-900 dark:text-white">{safeStr(log.name)}</td>
+                          <td className="p-2.5"><span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg text-[10px]">{safeStr(log.role)}</span></td>
+                          <td className="p-2.5 text-slate-400 font-mono text-[11px]">{safeStr(log.identifier)}</td>
+                          <td className="p-2.5 text-slate-500">{safeStr(log.device)}</td>
+                          <td className="p-2.5 text-slate-400 font-mono text-[11px]">{safeStr(log.formattedDate)}</td>
                         </tr>
                       ))}</tbody>
                     </table>
@@ -1462,14 +1185,6 @@
                       </form>
                     </div>
                   )}
-
-                  {isSuperAdminExact && (
-                    <div className="pt-3 mt-4">
-                      <button onClick={()=>setActiveTab('audit_log')} className="w-full bg-amber-600 hover:bg-amber-500 text-white p-3 rounded-2xl text-xs font-black shadow-xs transition">
-                        🛡️ فتح سجل النشاطات والمراقبة
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </main>
@@ -1486,9 +1201,9 @@
                   <table className="w-full text-right border-collapse whitespace-nowrap">
                     <thead><tr className="bg-slate-50 dark:bg-slate-800 border-b font-black"><th className="p-2">التاريخ</th><th className="p-2">البند</th><th className="p-2 text-center">المبلغ</th><th className="p-2">الحالة</th></tr></thead>
                     <tbody className="divide-y dark:divide-slate-800 font-bold">
-                      {expenses.filter(e => (e.supplier || '').trim() === selectedSupplierDetail).map(e => (
+                      {expenses.filter(e => safeStr(e.supplier).trim() === selectedSupplierDetail).map(e => (
                         <tr key={String(e.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                          <td className="p-2 text-slate-400 font-mono">{e.date}</td><td className="p-2">{e.mainCategory} - {e.subCategory}</td><td className="p-2 text-center text-rose-600 font-mono font-black">{parseNum(e.amount).toLocaleString()}</td><td className="p-2">{e.billStatus || 'مدفوعة'}</td>
+                          <td className="p-2 text-slate-400 font-mono">{e.date}</td><td className="p-2">{safeStr(e.mainCategory)} - {safeStr(e.subCategory)}</td><td className="p-2 text-center text-rose-600 font-mono font-black">{parseNum(e.amount).toLocaleString()}</td><td className="p-2">{safeStr(e.billStatus) || 'مدفوعة'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1547,11 +1262,7 @@
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(
-      <ErrorBoundary>
-        <App />
-      </ErrorBoundary>
-    );
+    root.render(<App />);
   </script>
 </body>
 </html>
