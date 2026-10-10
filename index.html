@@ -54,16 +54,7 @@
       body * { visibility: hidden !important; }
       #printable-area, #printable-area * { visibility: visible !important; }
       #printable-area {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 10mm !important;
-        box-shadow: none !important;
-        border: none !important;
-        background: white !important;
-        color: black !important;
+        position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 10mm !important; box-shadow: none !important; border: none !important; background: white !important; color: black !important;
       }
       .print-hidden { display: none !important; }
       .print-break-inside { page-break-inside: avoid; }
@@ -78,7 +69,6 @@
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-    /* حركات دراجة التحميل */
     .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
     .bike-svg { width: 100%; height: 100%; overflow: visible; }
     .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
@@ -116,19 +106,13 @@
     const ENGINEER_EMAILS = ["mesahaforconsultant@gmail.com"];
     const BLOCKED_CONSTRUCTION_EMAILS = ["ahmnab23@gmail.com"];
 
-    let db = null;
-    let auth = null;
+    let db = null; let auth = null;
     try {
       if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
-      db = firebase.database();
-      auth = firebase.auth();
-      auth.languageCode = 'ar';
+      db = firebase.database(); auth = firebase.auth(); auth.languageCode = 'ar';
     } catch (e) { console.error("Firebase init error:", e); }
 
-    const initialProjects = [
-      { id: "cons-01", name: "مشروع رئيسي 01", location: "الموقع العام", budget: 500000, consultant: "مكتب الاستشارات الهندسية", startDate: "2026-01-01", deliveryDate: "2026-12-31", status: "جاري العمل", createdBy: "النظام" }
-    ];
-
+    const initialProjects = [{ id: "cons-01", name: "مشروع رئيسي 01", location: "الموقع العام", budget: 500000, consultant: "مكتب الاستشارات الهندسية", startDate: "2026-01-01", deliveryDate: "2026-12-31", status: "جاري العمل", createdBy: "النظام" }];
     const initialSettings = {
       mainCategories: ["مباني", "صبة خرسانه", "كهرباء", "سباكة", "محارة", "نقاشة"],
       subCategories: ["طوب", "اسمنت", "رملة", "عمالة", "الاكل", "نجار", "حداد", "خلاطة"],
@@ -139,31 +123,40 @@
     };
 
     const cleanId = (id) => (id ? String(id).trim().toLowerCase().replace(/[.#$\[\]\/]/g, "-") : "");
-    
     const parseNum = (val) => {
       if (typeof val === "number") return isNaN(val) ? 0 : val;
       if (!val || typeof val === "object") return 0;
       const clean = String(val).replace(/,/g, '').replace(/،/g, '.').trim();
-      const n = parseFloat(clean);
-      return isNaN(n) ? 0 : n;
-    };
-    
-    // فلتر قوي جداً لحماية المصفوفات
-    const ensureArr = (data) => {
-      if (!data) return [];
-      if (Array.isArray(data)) return data;
-      if (typeof data === 'object') return Object.values(data);
-      return []; // إذا كانت البيانات التالفة عبارة عن نص، يمنع تحويلها لمصفوفة حروف
+      const n = parseFloat(clean); return isNaN(n) ? 0 : n;
     };
 
-    function sanitizeList(raw, fallback) {
-      if (!raw) return fallback;
-      try {
-        const arr = Array.isArray(raw) ? raw : (typeof raw === 'object' ? Object.values(raw) : []);
-        const clean = arr.filter(item => item && typeof item !== 'object').map(item => String(item).trim()).filter(Boolean);
-        return clean.length > 0 ? Array.from(new Set(clean)) : fallback;
-      } catch (e) { return fallback; }
-    }
+    // 🛡️ فلاتر الحماية الصارمة لمعالجة أي بيانات تالفة قادمة من Firebase 🛡️
+    const parseDataArr = (d) => {
+      if (!d) return [];
+      let arr = Array.isArray(d) ? d : (typeof d === 'object' ? Object.values(d) : []);
+      // إجبار الكود على قبول الكائنات (Objects) الصحيحة فقط وتجاهل أي نصوص تالفة مسجلة كعمليات
+      return arr.filter(item => item !== null && typeof item === 'object' && !Array.isArray(item));
+    };
+
+    const parseSettingsArr = (val, fallback) => {
+      if (!val) return fallback;
+      let arr = Array.isArray(val) ? val : (typeof val === 'object' ? Object.values(val) : [val]);
+      // إجبار الكود على استخراج النصوص فقط للقوائم المنسدلة وتجاهل أي كائنات (Objects) مدمرة
+      const clean = arr.map(i => typeof i === 'object' ? JSON.stringify(i) : String(i)).filter(s => s.trim() !== '');
+      return clean.length > 0 ? Array.from(new Set(clean)) : fallback;
+    };
+
+    const parseSettingsObj = (s) => {
+      if (!s || typeof s !== 'object') return initialSettings;
+      return {
+        mainCategories: parseSettingsArr(s.mainCategories, initialSettings.mainCategories),
+        subCategories: parseSettingsArr(s.subCategories, initialSettings.subCategories),
+        costTypes: parseSettingsArr(s.costTypes, initialSettings.costTypes),
+        suppliers: parseSettingsArr(s.suppliers, initialSettings.suppliers),
+        employees: parseSettingsArr(s.employees, initialSettings.employees),
+        logo: typeof s.logo === 'string' ? s.logo : ""
+      };
+    };
 
     const constructionStorage = {
       get(key, fallback = []) { try { const item = localStorage.getItem(`construction_${key}`); return item ? JSON.parse(item) : fallback; } catch { return fallback; } },
@@ -203,9 +196,15 @@
           return (
             <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-white text-center font-sans">
               <div className="text-4xl mb-4">⚠️</div>
-              <h2 className="text-lg font-black mb-2 text-amber-400">حماية النظام من الانهيار</h2>
-              <p className="text-xs text-slate-400 mb-6 max-w-md leading-relaxed">لقد قمنا بحماية التطبيق من الإغلاق بسبب بيانات قديمة متعارضة. اضغط أدناه لتنظيف الذاكرة وإعادة التحميل:</p>
-              <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-6 py-3 rounded-2xl text-xs transition shadow-lg">إصلاح الذاكرة المؤقتة 🔄</button>
+              <h2 className="text-lg font-black mb-2 text-amber-400">تم حماية النظام من الانهيار</h2>
+              <p className="text-xs text-slate-400 mb-6 max-w-md leading-relaxed">اكتشفنا بيانات تالفة قادمة من السحابة بسبب عمليات سابقة خاطئة. قمنا بإيقاف الإغلاق للحفاظ على استقرار التطبيق. اضغط أدناه لتدمير البيانات التالفة وإعادة التحميل:</p>
+              <button onClick={() => { 
+                localStorage.clear(); 
+                if (window.confirm("هل أنت متأكد من رغبتك في تنظيف قاعدة إعدادات القوائم المنسدلة لحل المشكلة نهائياً؟ (هذا لن يحذف فواتيرك)")) {
+                  if (db) db.ref('settings').set(initialSettings);
+                }
+                window.location.reload(); 
+              }} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-6 py-3 rounded-2xl text-xs transition shadow-lg">إصلاح الذاكرة وقاعدة البيانات 🔄</button>
             </div>
           );
         }
@@ -262,25 +261,14 @@
       const [loginEmail, setLoginEmail] = useState("");
       const [loginPassword, setLoginPassword] = useState("");
 
-      const [projects, setProjects] = useState(() => ensureArr(constructionStorage.get('projects', initialProjects)));
-      const [expenses, setExpenses] = useState(() => ensureArr(constructionStorage.get('expenses', [])));
-      const [extracts, setExtracts] = useState(() => ensureArr(constructionStorage.get('extracts', [])));
-      const [payments, setPayments] = useState(() => ensureArr(constructionStorage.get('payments', [])));
-      const [advances, setAdvances] = useState(() => ensureArr(constructionStorage.get('advances', [])));
-      const [supplierPayments, setSupplierPayments] = useState(() => ensureArr(constructionStorage.get('supplier_payments', [])));
-      const [loginLogs, setLoginLogs] = useState(() => ensureArr(constructionStorage.get('login_logs', [])));
-      
-      const [settings, setSettings] = useState(() => {
-        const saved = constructionStorage.get('settings', {});
-        return {
-          mainCategories: sanitizeList(saved.mainCategories, initialSettings.mainCategories),
-          subCategories: sanitizeList(saved.subCategories, initialSettings.subCategories),
-          costTypes: sanitizeList(saved.costTypes, initialSettings.costTypes),
-          suppliers: sanitizeList(saved.suppliers, initialSettings.suppliers),
-          employees: sanitizeList(saved.employees, initialSettings.employees),
-          logo: typeof saved.logo === 'string' ? saved.logo : ""
-        };
-      });
+      const [projects, setProjects] = useState(() => parseDataArr(constructionStorage.get('projects', initialProjects)));
+      const [expenses, setExpenses] = useState(() => parseDataArr(constructionStorage.get('expenses', [])));
+      const [extracts, setExtracts] = useState(() => parseDataArr(constructionStorage.get('extracts', [])));
+      const [payments, setPayments] = useState(() => parseDataArr(constructionStorage.get('payments', [])));
+      const [advances, setAdvances] = useState(() => parseDataArr(constructionStorage.get('advances', [])));
+      const [supplierPayments, setSupplierPayments] = useState(() => parseDataArr(constructionStorage.get('supplier_payments', [])));
+      const [loginLogs, setLoginLogs] = useState(() => parseDataArr(constructionStorage.get('login_logs', [])));
+      const [settings, setSettings] = useState(() => parseSettingsObj(constructionStorage.get('settings', initialSettings)));
 
       const [userRolesMap, setUserRolesMap] = useState(() => constructionStorage.get('roles', {}));
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
@@ -306,6 +294,7 @@
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
       const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
 
+      // الصلاحيات (Memos)
       const currentUserEmail = (user?.email || user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
@@ -349,6 +338,7 @@
         return `cons-${next < 10 ? '0' + next : next}`;
       }, [projects]);
 
+      // الخطافات (UseEffects)
       useEffect(() => {
         const handleOnline = () => { setIsOnline(true); showToast("تم استعادة الاتصال بالإنترنت ومزامنة السجلات 🟢"); if (db) constructionStorage.syncQueue(db); };
         const handleOffline = () => { setIsOnline(false); showToast("أنت تعمل بدون إنترنت (حفظ محلي) 📡", "error"); };
@@ -393,30 +383,21 @@
         return () => { clearTimeout(safetyTimer); unsubscribe(); };
       }, []);
 
-      // ✨ جلب البيانات الذكي والفصل الجذري (يمنع سحب قاعدة المساحة ويمنع خطأ Permission Denied) ✨
+      // 🛡️ المزامنة مع فلاتر حماية البيانات التالفة 🛡️
       useEffect(() => {
         if (!db || !user) return;
         
-        // ربط المسارات المطلوبة في الإنشاءات بشكل فردي بدلاً من المسار الجذري
         const listeners = [
-          { path: 'projects', setter: (d) => { const arr = ensureArr(d); const f = arr.length ? arr : initialProjects; setProjects(f); constructionStorage.set('projects', f); } },
-          { path: 'expenses', setter: (d) => { const arr = ensureArr(d).reverse(); setExpenses(arr); constructionStorage.set('expenses', arr); } },
-          { path: 'extracts', setter: (d) => { const arr = ensureArr(d).reverse(); setExtracts(arr); constructionStorage.set('extracts', arr); } },
-          { path: 'payments', setter: (d) => { const arr = ensureArr(d).reverse(); setPayments(arr); constructionStorage.set('payments', arr); } },
-          { path: 'advances', setter: (d) => { const arr = ensureArr(d).reverse(); setAdvances(arr); constructionStorage.set('advances', arr); } },
-          { path: 'supplier_payments', setter: (d) => { const arr = ensureArr(d).reverse(); setSupplierPayments(arr); constructionStorage.set('supplier_payments', arr); } },
-          { path: 'login_logs', setter: (d) => { const arr = ensureArr(d).reverse(); setLoginLogs(arr); constructionStorage.set('login_logs', arr); } },
+          { path: 'projects', setter: (d) => { const arr = parseDataArr(d); const f = arr.length ? arr : initialProjects; setProjects(f); constructionStorage.set('projects', f); } },
+          { path: 'expenses', setter: (d) => { const arr = parseDataArr(d).reverse(); setExpenses(arr); constructionStorage.set('expenses', arr); } },
+          { path: 'extracts', setter: (d) => { const arr = parseDataArr(d).reverse(); setExtracts(arr); constructionStorage.set('extracts', arr); } },
+          { path: 'payments', setter: (d) => { const arr = parseDataArr(d).reverse(); setPayments(arr); constructionStorage.set('payments', arr); } },
+          { path: 'advances', setter: (d) => { const arr = parseDataArr(d).reverse(); setAdvances(arr); constructionStorage.set('advances', arr); } },
+          { path: 'supplier_payments', setter: (d) => { const arr = parseDataArr(d).reverse(); setSupplierPayments(arr); constructionStorage.set('supplier_payments', arr); } },
+          { path: 'login_logs', setter: (d) => { const arr = parseDataArr(d).reverse(); setLoginLogs(arr); constructionStorage.set('login_logs', arr); } },
           { path: 'roles', setter: (d) => { const r = d || {}; setUserRolesMap(r); constructionStorage.set('roles', r); } },
           { path: 'settings', setter: (d) => { 
-              const s = d || {}; 
-              const finalSettings = {
-                mainCategories: sanitizeList(s.mainCategories, initialSettings.mainCategories),
-                subCategories: sanitizeList(s.subCategories, initialSettings.subCategories),
-                costTypes: sanitizeList(s.costTypes, initialSettings.costTypes),
-                suppliers: sanitizeList(s.suppliers, initialSettings.suppliers),
-                employees: sanitizeList(s.employees, initialSettings.employees),
-                logo: typeof s.logo === 'string' ? s.logo : ""
-              };
+              const finalSettings = parseSettingsObj(d);
               setSettings(finalSettings); constructionStorage.set('settings', finalSettings);
             } 
           }
@@ -428,9 +409,7 @@
           });
         });
 
-        return () => {
-          listeners.forEach(({ path }) => db.ref(path).off());
-        };
+        return () => { listeners.forEach(({ path }) => db.ref(path).off()); };
       }, [user]);
 
       useEffect(() => { if (!isAdmin && activeTab === 'dashboard') setActiveTab('projects'); }, [isAdmin, activeTab]);
@@ -450,6 +429,7 @@
         }
       }, [myEmpName]);
 
+      // دوال التحكم (Handlers)
       const showToast = (message, type = "success") => { 
         setToast({ show: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3200); 
       };
@@ -457,11 +437,7 @@
       const recordLoginLog = (currentUser, roleName) => {
         if (!currentUser) return;
         const now = new Date(); const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const logEntry = { 
-          uid: currentUser.uid || 'offline-user', name: currentUser.displayName || currentUser.name || currentUser.identifier || "مستخدم", 
-          identifier: currentUser.identifier || currentUser.email || "غير محدد", 
-          role: roleName, device: isMobile ? "📱 هاتف محمول" : "💻 كمبيوتر", timestamp: now.toISOString(), formattedDate: now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG') 
-        };
+        const logEntry = { uid: currentUser.uid || 'offline-user', name: currentUser.displayName || currentUser.name || currentUser.identifier || "مستخدم", identifier: currentUser.identifier || currentUser.email || "غير محدد", role: roleName, device: isMobile ? "📱 هاتف محمول" : "💻 كمبيوتر", timestamp: now.toISOString(), formattedDate: now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG') };
         if (navigator.onLine && db) db.ref('login_logs').push(logEntry);
       };
 
@@ -562,6 +538,7 @@
         setNewRoleInput({ email: "", role: "engineer" }); showToast(`تم تعيين صلاحية (${newRoleInput.role}) بنجاح! 🛡️`);
       };
 
+      // الحسابات الخاصة بالعرض
       const currentProj = projects.find(p => cleanId(p?.id) === cleanId(selectedProjId)) || projects[0] || {};
       const projExpenses = expenses.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
       const projExtracts = extracts.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
@@ -580,8 +557,8 @@
       const centralCashRemaining = totalReceived - projDirectCashExp - projTotalAdvancesGiven - projTotalSuppPaid;
 
       const allEmpCustodyBalance = (settings?.employees || []).reduce((acc, emp) => {
-        const adv = projAdvances.filter(a => a?.employeeName === emp).reduce((sum, a) => sum + parseNum(a?.amount), 0);
-        const spent = projExpenses.filter(e => e?.paymentMethod === 'خصم من العهدة' && e?.custodyEmployee === emp).reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const adv = projAdvances.filter(a => String(a?.employeeName) === String(emp)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
+        const spent = projExpenses.filter(e => String(e?.paymentMethod) === 'خصم من العهدة' && String(e?.custodyEmployee) === String(emp)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
         return acc + Math.max(0, adv - spent);
       }, 0);
 
@@ -593,11 +570,11 @@
       const allPay = payments.reduce((sum, item) => sum + parseNum(item?.amount), 0);
 
       const projExpMap = {};
-      projExpenses.forEach(e => { const cat = e?.mainCategory || 'غير محدد'; projExpMap[cat] = (projExpMap[cat] || 0) + parseNum(e?.amount); });
+      projExpenses.forEach(e => { const cat = String(e?.mainCategory || 'غير محدد'); projExpMap[cat] = (projExpMap[cat] || 0) + parseNum(e?.amount); });
       const projExpLabels = Object.keys(projExpMap);
       const projExpData = Object.values(projExpMap);
 
-      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || e?.mainCategory === searchMainCat) && (searchSubCat === "" || e?.subCategory === searchSubCat) && (searchCostType === "" || e?.costType === searchCostType); });
+      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || String(e?.mainCategory) === searchMainCat) && (searchSubCat === "" || String(e?.subCategory) === searchSubCat) && (searchCostType === "" || String(e?.costType) === searchCostType); });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + parseNum(e?.amount), 0);
 
       const allSupplierNames = Array.from(new Set([...(settings?.suppliers || []), ...expenses.map(e => e?.supplier).filter(Boolean), ...supplierPayments.map(p => p?.supplier).filter(Boolean)])).map(s => String(s || '').trim()).filter(Boolean);
@@ -607,7 +584,7 @@
         const targetExp = suppScope === "project" ? projExpenses : expenses; const targetSuppPay = suppScope === "project" ? projSuppPayments : supplierPayments;
         const allInvoices = targetExp.filter(e => String(e?.supplier || '').trim() === supp);
         const totalPurchases = allInvoices.reduce((sum, e) => sum + parseNum(e?.amount), 0);
-        const creditPurchases = allInvoices.filter(e => (e?.billStatus || 'مدفوعة') === 'آجلة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const creditPurchases = allInvoices.filter(e => String(e?.billStatus || 'مدفوعة') === 'آجلة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
         const paidPurchases = totalPurchases - creditPurchases;
         const totalPaidToCreditor = targetSuppPay.filter(p => String(p?.supplier || '').trim() === supp).reduce((sum, p) => sum + parseNum(p?.amount), 0);
         const balance = totalPaidToCreditor - creditPurchases;
@@ -615,8 +592,8 @@
       }).filter(s => s.totalPurchases > 0 || s.totalPaid > 0);
 
       const getCustodyStats = (empName) => {
-        const empAdv = projAdvances.filter(a => a?.employeeName === empName).reduce((sum, a) => sum + parseNum(a?.amount), 0);
-        const empExp = projExpenses.filter(e => e?.paymentMethod === 'خصم من العهدة' && e?.custodyEmployee === empName).reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const empAdv = projAdvances.filter(a => String(a?.employeeName) === String(empName)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
+        const empExp = projExpenses.filter(e => String(e?.paymentMethod) === 'خصم من العهدة' && String(e?.custodyEmployee) === String(empName)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
         return { received: empAdv, spent: empExp, balance: empAdv - empExp };
       };
 
@@ -636,7 +613,7 @@
         ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
       ];
 
-      // شاشات التحميل والدخول المبدئية
+      // شاشات التحميل والدخول
       if (authLoading) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
@@ -682,12 +659,8 @@
                 <p className="text-slate-300 text-[11px] mt-1 mb-4 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
                 
                 <div className="flex bg-slate-900/50 p-1 rounded-xl mb-5 border border-white/10 pointer-events-auto">
-                  <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2 rounded-lg shadow-md text-xs">
-                    🏗️ الإنشاءات
-                  </button>
-                  <a href="survey.html" className="flex-1 text-slate-400 hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
-                    📐 المساحة
-                  </a>
+                  <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2 rounded-lg shadow-md text-xs">🏗️ الإنشاءات</button>
+                  <a href="survey.html" className="flex-1 text-slate-400 hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">📐 المساحة</a>
                 </div>
 
                 {accessDeniedMessage ? (
@@ -705,24 +678,18 @@
                         <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">🔒</span>
                         <input type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
                       </div>
-                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-2.5 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all text-xs">
-                        تسجيل الدخول
-                      </button>
+                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-2.5 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all text-xs">تسجيل الدخول</button>
                     </form>
 
                     <div className="flex items-center gap-2 mb-4">
-                      <div className="h-px bg-white/20 flex-1"></div>
-                      <span className="text-white/50 text-[10px] font-bold">أو بواسطة</span>
-                      <div className="h-px bg-white/20 flex-1"></div>
+                      <div className="h-px bg-white/20 flex-1"></div><span className="text-white/50 text-[10px] font-bold">أو بواسطة</span><div className="h-px bg-white/20 flex-1"></div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
                         <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
                       </button>
-                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
-                        📱 هاتف
-                      </button>
+                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">📱 هاتف</button>
                     </div>
                   </div>
                 )}
@@ -1067,10 +1034,10 @@
                     </form>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-x-auto custom-scroll text-xs">
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200/80 dark:border-slate-800 font-black">
+                        <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-800 font-black">
                           <th className="p-3">التاريخ</th>
                           <th className="p-3">الموظف</th>
                           <th className="p-3 text-center">المبلغ</th>
@@ -1078,7 +1045,7 @@
                           {canEditOrDelete && <th className="p-3 text-center">إجراءات</th>}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
+                      <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projAdvances.map(a => (
                           <tr key={String(a.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                             <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td>
@@ -1162,8 +1129,8 @@
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="font-black text-sm text-slate-900 dark:text-white">🚚 سداد دفعة نقدية لمورد</h3>
                       <div className="flex gap-1.5">
-                        <button onClick={()=>setSuppScope("project")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "project" ? "bg-amber-500 text-slate-900" : "bg-slate-100 dark:bg-slate-700"}`}>المشروع الحالي</button>
-                        <button onClick={()=>setSuppScope("company")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "company" ? "bg-amber-500 text-slate-900" : "bg-slate-100 dark:bg-slate-700"}`}>كل المشاريع</button>
+                        <button onClick={()=>setSuppScope("project")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "project" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800"}`}>المشروع الحالي</button>
+                        <button onClick={()=>setSuppScope("company")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "company" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800"}`}>كل المشاريع</button>
                       </div>
                     </div>
                     <form onSubmit={(e) => {
@@ -1467,6 +1434,14 @@
                         </select>
                         <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 py-2.5 font-black text-xs">تعيين</button>
                       </form>
+                    </div>
+                  )}
+
+                  {isSuperAdminExact && (
+                    <div className="pt-3 mt-4">
+                      <button onClick={()=>setActiveTab('audit_log')} className="w-full bg-amber-600 hover:bg-amber-500 text-white p-3 rounded-2xl text-xs font-black shadow-xs transition">
+                        🛡️ فتح سجل النشاطات والمراقبة
+                      </button>
                     </div>
                   )}
                 </div>
