@@ -38,6 +38,7 @@
     .dark .custom-scroll::-webkit-scrollbar-thumb { background: #475569; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    
     @media print {
       body * { visibility: hidden !important; }
       #printable-area, #printable-area * { visibility: visible !important; }
@@ -46,9 +47,11 @@
     }
     .pdf-render-mode { background: #ffffff !important; color: #0f172a !important; direction: rtl !important; font-family: 'Cairo', Arial, sans-serif !important; }
     .pdf-num { direction: ltr !important; unicode-bidi: isolate !important; display: inline-block !important; font-family: Arial, sans-serif !important; white-space: nowrap !important; }
+    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   </style>
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased transition-colors duration-200">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -87,7 +90,7 @@
       logo: ""
     };
 
-    // دوال الحماية الأساسية لمنع الشاشة البيضاء تماماً
+    // دوال الحماية الأساسية لمنع انهيار الموقع
     const cleanId = (id) => (id ? String(id).trim().toLowerCase().replace(/[.#$\[\]\/]/g, "-") : "");
     const parseNum = (val) => {
       if (typeof val === "number") return isNaN(val) ? 0 : val;
@@ -95,21 +98,20 @@
       const clean = String(val).replace(/,/g, '').replace(/،/g, '.').trim();
       const n = parseFloat(clean); return isNaN(n) ? 0 : n;
     };
+    
+    // فلتر الأمان للقوائم (يمنع الشاشة البيضاء عند عمل map)
+    const safeArray = (arr) => {
+      if (!arr) return [];
+      if (Array.isArray(arr)) return arr.filter(i => i !== null && typeof i !== 'object');
+      if (typeof arr === 'object') return Object.values(arr).filter(i => i !== null && typeof i !== 'object');
+      return [];
+    };
+
     const ensureArr = (data) => {
       if (!data) return [];
       if (Array.isArray(data)) return data;
       if (typeof data === 'object') return Object.values(data);
       return []; 
-    };
-    const safeStr = (val) => {
-      if (val === null || val === undefined) return '';
-      if (typeof val === 'object') return ''; // يمنع React من الانهيار إذا كان الحقل Object بالخطأ
-      return String(val);
-    };
-    const ensureStringArr = (data, fallback) => {
-      const arr = ensureArr(data);
-      const clean = arr.map(i => typeof i === 'string' ? i : (i && typeof i.name === 'string' ? i.name : String(i))).filter(i => i && i !== '[object Object]');
-      return clean.length > 0 ? Array.from(new Set(clean)) : fallback;
     };
 
     const constructionStorage = {
@@ -125,23 +127,6 @@
       }
     };
 
-    const generatePdfAndOpenWhatsApp = (elementId, filename, textMessage, targetPhone = ADMIN_WHATSAPP_NUMBER) => {
-      const element = document.getElementById(elementId);
-      if (!element) return;
-      const prevWidth = element.style.width; const prevMaxWidth = element.style.maxWidth; const prevPadding = element.style.padding;
-      element.style.width = '800px'; element.style.maxWidth = '800px'; element.style.padding = '24px';
-      element.classList.add('pdf-render-mode');
-      const opt = { margin: [8, 8, 8, 8], filename: filename || 'document.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, windowWidth: 1200, scrollX: 0, scrollY: 0 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
-      html2pdf().set(opt).from(element).save().then(() => {
-        element.style.width = prevWidth; element.style.maxWidth = prevMaxWidth; element.style.padding = prevPadding; element.classList.remove('pdf-render-mode');
-        const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
-        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMessage + "\n\n📎 (تم استخراج ملف الـ PDF)")}`, '_blank');
-      }).catch(err => {
-        element.style.width = prevWidth; element.style.maxWidth = prevMaxWidth; element.style.padding = prevPadding; element.classList.remove('pdf-render-mode');
-        window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}`, '_blank');
-      });
-    };
-
     function DashboardCharts({ allWork, allExp, allPay, projExpLabels, projExpData, projName }) {
       const chart1Ref = useRef(null); const chart2Ref = useRef(null); const chart1Instance = useRef(null); const chart2Instance = useRef(null);
       useEffect(() => {
@@ -150,14 +135,14 @@
         if (chart1Ref.current) {
           chart1Instance.current = new Chart(chart1Ref.current, {
             type: 'bar',
-            data: { labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'], datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#f59e0b', '#f43f5e', '#10b981'], borderRadius: 8 }] },
+            data: { labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'], datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#4f46e5', '#f43f5e', '#10b981'], borderRadius: 8 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
           });
         }
         if (chart2Ref.current) {
           chart2Instance.current = new Chart(chart2Ref.current, {
             type: 'doughnut',
-            data: { labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'], datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#f59e0b', '#10b981', '#6366f1', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }] },
+            data: { labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'], datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10, family: 'Cairo' } } } } }
           });
         }
@@ -196,16 +181,15 @@
       const [payments, setPayments] = useState(() => ensureArr(constructionStorage.get('payments', [])));
       const [advances, setAdvances] = useState(() => ensureArr(constructionStorage.get('advances', [])));
       const [supplierPayments, setSupplierPayments] = useState(() => ensureArr(constructionStorage.get('supplier_payments', [])));
-      const [loginLogs, setLoginLogs] = useState(() => ensureArr(constructionStorage.get('login_logs', [])));
       
       const [settings, setSettings] = useState(() => {
         const saved = constructionStorage.get('settings', {});
         return {
-          mainCategories: ensureStringArr(saved.mainCategories, initialSettings.mainCategories),
-          subCategories: ensureStringArr(saved.subCategories, initialSettings.subCategories),
-          costTypes: ensureStringArr(saved.costTypes, initialSettings.costTypes),
-          suppliers: ensureStringArr(saved.suppliers, initialSettings.suppliers),
-          employees: ensureStringArr(saved.employees, initialSettings.employees),
+          mainCategories: safeArray(saved.mainCategories).length ? safeArray(saved.mainCategories) : initialSettings.mainCategories,
+          subCategories: safeArray(saved.subCategories).length ? safeArray(saved.subCategories) : initialSettings.subCategories,
+          costTypes: safeArray(saved.costTypes).length ? safeArray(saved.costTypes) : initialSettings.costTypes,
+          suppliers: safeArray(saved.suppliers).length ? safeArray(saved.suppliers) : initialSettings.suppliers,
+          employees: safeArray(saved.employees).length ? safeArray(saved.employees) : initialSettings.employees,
           logo: typeof saved.logo === 'string' ? saved.logo : ""
         };
       });
@@ -225,8 +209,7 @@
       const [searchMainCat, setSearchMainCat] = useState("");
       const [searchSubCat, setSearchSubCat] = useState("");
       const [searchCostType, setSearchCostType] = useState("");
-      const [newRoleInput, setNewRoleInput] = useState({ email: "", role: "engineer" });
-
+      
       const [newProj, setNewProj] = useState({ id: "cons-01", name: "", location: "", budget: "", consultant: "", startDate: todayDate, deliveryDate: "", status: "جاري العمل" });
       const [newExp, setNewExp] = useState({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", billStatus: "مدفوعة", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: "", receiptImg: "" });
       const [newPay, setNewPay] = useState({ date: todayDate, amount: "", paymentMethod: "تحويل بنكي", notes: "" });
@@ -234,8 +217,8 @@
       const [newAdv, setNewAdv] = useState({ date: todayDate, employeeName: "", amount: "", notes: "" });
       const [newSuppPay, setNewSuppPay] = useState({ date: todayDate, supplier: "", amount: "", notes: "" });
 
-      // الصلاحيات 
-      const currentUserEmail = safeStr(user?.email || user?.identifier).toLowerCase();
+      // الصلاحيات
+      const currentUserEmail = String(user?.email || user?.identifier || "").trim().toLowerCase();
       const sanitizedEmailKey = currentUserEmail.replace(/\./g, '_');
 
       const isSuperAdminHardcoded = currentUserEmail === SUPER_ADMIN_EMAIL.toLowerCase() || currentUserEmail.includes("mohamedmohy676676");
@@ -270,7 +253,7 @@
 
       const nextSuggestedProjectId = useMemo(() => {
         const consNumbers = projects.map(p => { 
-          const m = safeStr(p?.id).match(/^cons-(\d+)$/i); 
+          const m = String(p?.id || '').match(/^cons-(\d+)$/i); 
           return m ? parseInt(m[1], 10) : 0; 
         }).filter(n => n > 0);
         const maxNum = consNumbers.length > 0 ? Math.max(...consNumbers) : 0;
@@ -293,33 +276,28 @@
 
       useEffect(() => {
         if (!auth) { setAuthLoading(false); return; }
-        const safetyTimer = setTimeout(() => { setAuthLoading(false); }, 3000);
-
         const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-          clearTimeout(safetyTimer);
           if (currentUser) {
-            const identifier = safeStr(currentUser.email || currentUser.phoneNumber).toLowerCase();
+            const identifier = String(currentUser.email || currentUser.phoneNumber || "").toLowerCase().trim();
             if (BLOCKED_CONSTRUCTION_EMAILS.some(b => identifier.includes(b.toLowerCase()))) {
               setAccessDeniedMessage("عفواً، حسابك مصرح له بالدخول لقطاع المساحة فقط.");
               auth.signOut(); setUser(null); setAuthLoading(false); return;
             }
             setAccessDeniedMessage("");
             setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email || currentUser.phoneNumber || "مستخدم موثق", email: currentUser.email || currentUser.phoneNumber || "", identifier });
-            try { localStorage.setItem('last_const_user_email', identifier); localStorage.setItem('last_const_user_name', safeStr(currentUser.displayName || identifier)); } catch(e) {}
+            try { localStorage.setItem('last_const_user_email', identifier); } catch(e) {}
           } else {
             try {
               const savedEmail = localStorage.getItem('last_const_user_email');
-              if (savedEmail && !navigator.onLine) {
-                setUser({ identifier: savedEmail, email: savedEmail, name: localStorage.getItem('last_const_user_name') || savedEmail });
-              } else { setUser(null); }
+              if (savedEmail && !navigator.onLine) { setUser({ identifier: savedEmail, email: savedEmail, name: savedEmail }); } 
+              else { setUser(null); }
             } catch(e) { setUser(null); }
           }
           setAuthLoading(false);
         });
-        return () => { clearTimeout(safetyTimer); unsubscribe(); };
+        return () => unsubscribe();
       }, []);
 
-      // جلب البيانات من السيرفر بشكل آمن وبسيط
       useEffect(() => {
         if (!db || !user) return;
         
@@ -330,16 +308,15 @@
           { path: 'payments', setter: (d) => { const arr = ensureArr(d).reverse(); setPayments(arr); constructionStorage.set('payments', arr); } },
           { path: 'advances', setter: (d) => { const arr = ensureArr(d).reverse(); setAdvances(arr); constructionStorage.set('advances', arr); } },
           { path: 'supplier_payments', setter: (d) => { const arr = ensureArr(d).reverse(); setSupplierPayments(arr); constructionStorage.set('supplier_payments', arr); } },
-          { path: 'login_logs', setter: (d) => { const arr = ensureArr(d).reverse(); setLoginLogs(arr); constructionStorage.set('login_logs', arr); } },
           { path: 'roles', setter: (d) => { const r = d || {}; setUserRolesMap(r); constructionStorage.set('roles', r); } },
           { path: 'settings', setter: (d) => { 
               const s = d || {};
               const finalSettings = {
-                mainCategories: ensureStringArr(s.mainCategories, initialSettings.mainCategories),
-                subCategories: ensureStringArr(s.subCategories, initialSettings.subCategories),
-                costTypes: ensureStringArr(s.costTypes, initialSettings.costTypes),
-                suppliers: ensureStringArr(s.suppliers, initialSettings.suppliers),
-                employees: ensureStringArr(s.employees, initialSettings.employees),
+                mainCategories: safeArray(s.mainCategories).length ? safeArray(s.mainCategories) : initialSettings.mainCategories,
+                subCategories: safeArray(s.subCategories).length ? safeArray(s.subCategories) : initialSettings.subCategories,
+                costTypes: safeArray(s.costTypes).length ? safeArray(s.costTypes) : initialSettings.costTypes,
+                suppliers: safeArray(s.suppliers).length ? safeArray(s.suppliers) : initialSettings.suppliers,
+                employees: safeArray(s.employees).length ? safeArray(s.employees) : initialSettings.employees,
                 logo: typeof s.logo === 'string' ? s.logo : ""
               };
               setSettings(finalSettings); constructionStorage.set('settings', finalSettings);
@@ -349,7 +326,7 @@
 
         listeners.forEach(({ path, setter }) => {
           db.ref(path).on('value', snap => {
-            try { setter(snap.val()); } catch(e) { console.error(`Error processing ${path}:`, e); }
+            try { setter(snap.val()); } catch(e) { console.error(`Error loading ${path}`); }
           });
         });
 
@@ -357,15 +334,7 @@
       }, [user]);
 
       useEffect(() => { if (!isAdmin && activeTab === 'dashboard') setActiveTab('projects'); }, [isAdmin, activeTab]);
-
-      useEffect(() => {
-        if (user && !sessionStorage.getItem('login_recorded')) {
-          recordLoginLog(user, userRoleTitle); sessionStorage.setItem('login_recorded', 'true');
-        }
-      }, [user, userRoleTitle]);
-
       useEffect(() => { setNewProj(prev => ({ ...prev, id: nextSuggestedProjectId })); }, [nextSuggestedProjectId]);
-      
       useEffect(() => { 
         if (myEmpName) {
           if (!newExp.custodyEmployee) setNewExp(prev => ({ ...prev, custodyEmployee: myEmpName }));
@@ -373,29 +342,20 @@
         }
       }, [myEmpName]);
 
-      const showToast = (message, type = "success") => { setToast({ show: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3200); };
-
-      const recordLoginLog = (currentUser, roleName) => {
-        if (!currentUser) return;
-        const now = new Date(); const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const logEntry = { uid: currentUser.uid || 'offline-user', name: safeStr(currentUser.displayName || currentUser.name || currentUser.identifier) || "مستخدم", identifier: safeStr(currentUser.identifier || currentUser.email) || "غير محدد", role: roleName, device: isMobile ? "📱 هاتف محمول" : "💻 كمبيوتر", timestamp: now.toISOString(), formattedDate: now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG') };
-        if (navigator.onLine && db) db.ref('login_logs').push(logEntry);
-      };
+      const showToast = (message, type = "success") => { setToast({ show: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3500); };
 
       const handleEmailLogin = (e) => {
-        e.preventDefault();
-        if (!loginEmail || !loginPassword) return;
-        setAuthLoading(true);
+        e.preventDefault(); if (!loginEmail || !loginPassword) return; setAuthLoading(true);
         auth.signInWithEmailAndPassword(loginEmail, loginPassword).catch(error => {
           setAuthLoading(false);
           if (error.code === 'auth/user-not-found') showToast("البريد غير مسجل بالنظام", "error");
           else if (error.code === 'auth/wrong-password') showToast("كلمة المرور غير صحيحة", "error");
-          else showToast("فشل تسجيل الدخول: " + error.message, "error");
+          else showToast("فشل تسجيل الدخول", "error");
         });
       };
 
-      const handleGoogleLogin = () => { setAuthLoading(true); auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch((error) => { setAuthLoading(false); showToast("تعذر الدخول: " + error.message, "error"); }); };
-      const handlePhoneLoginClick = () => { showToast("لتسجيل الدخول برقم الهاتف يجب تفعيل reCAPTCHA من لوحة تحكم Firebase أولاً.", "error"); };
+      const handleGoogleLogin = () => { setAuthLoading(true); auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(() => { setAuthLoading(false); showToast("تعذر الدخول بجوجل", "error"); }); };
+      const handlePhoneLoginClick = () => { showToast("برجاء الدخول بالبريد الإلكتروني حالياً", "error"); };
       const handleLogout = () => { auth.signOut(); setDrawerOpen(false); };
 
       const saveSafeConstructionData = (path, storageKey, data) => {
@@ -404,30 +364,48 @@
         else constructionStorage.addToQueue(path, data);
       };
 
-      // إضافة بند قائمة منسدلة
+      // إضافة بند قائمة منسدلة (المشكلة السابقة تم حلها هنا لعدم تلف القاعدة)
       const handleAddNewSettingItem = (settingKey, currentArray, title) => {
-        if (!isAdmin) { showToast("خاصية مقتصرة على الإدارة 🔒", "error"); return; }
+        if (!isAdmin) { showToast("خاصية للإدارة فقط 🔒", "error"); return; }
         const newVal = window.prompt(`أدخل [${title}] جديد لإضافته للقائمة:`, "");
         if (newVal && newVal.trim() !== "") {
           const cleanVal = newVal.trim();
-          if (currentArray.includes(cleanVal)) { showToast("هذا البند موجود مسبقاً!", "error"); return; }
-          const updatedArray = [...currentArray, cleanVal]; 
+          if (safeArray(currentArray).includes(cleanVal)) { showToast("هذا البند موجود مسبقاً!", "error"); return; }
+          const updatedArray = [...safeArray(currentArray), cleanVal]; 
           const newSettings = { ...settings, [settingKey]: updatedArray };
           setSettings(newSettings); 
           saveSafeConstructionData('settings', 'settings', newSettings);
-          showToast(`تمت إضافة "${cleanVal}" بنجاح!`);
+          showToast(`تمت الإضافة بنجاح!`);
         }
       };
 
+      // 🖼️ معالج ضغط وتصغير الصور الذكي (يمنع الهاتف من التشنج والخروج) 🖼️
       const handleReceiptUpload = (e) => {
         const file = e.target.files && e.target.files[0]; 
         if (!file) return;
-        const reader = new FileReader(); reader.onload = (evt) => { setNewExp(prev => ({ ...prev, receiptImg: evt.target.result })); showToast("تم إرفاق صورة الفاتورة 📸"); };
+        const reader = new FileReader(); 
+        reader.onload = (evt) => { 
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1000; const MAX_HEIGHT = 1000;
+            let width = img.width; let height = img.height;
+            if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } 
+            else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
+            canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // ضغط الصورة لـ 60%
+            setNewExp(prev => ({ ...prev, receiptImg: dataUrl })); 
+            showToast("تم إرفاق وتصغير صورة الفاتورة 📸"); 
+          };
+          img.src = evt.target.result;
+        };
         reader.readAsDataURL(file);
       };
 
       const deleteItem = (path, id, list) => {
-        if (!isAdmin && !isAccountant) { showToast("الحذف مصرح للإدارة والمحاسب فقط 🔒", "error"); return; }
+        if (!isAdmin && !isAccountant) { showToast("الحذف للإدارة فقط 🔒", "error"); return; }
         if (window.confirm("تأكيد الحذف نهائياً؟")) {
           const newList = list.filter(item => item.id !== id); saveSafeConstructionData(path, path, newList);
           if (path === 'expenses') setExpenses(newList); if (path === 'extracts') setExtracts(newList); if (path === 'payments') setPayments(newList); 
@@ -451,34 +429,18 @@
       };
 
       const exportToExcel = () => {
-        if (typeof XLSX === 'undefined') { showToast("المكتبة غير متوفرة حالياً", "error"); return; }
+        if (typeof XLSX === 'undefined') { showToast("المكتبة غير متوفرة", "error"); return; }
         const wb = XLSX.utils.book_new();
-        const wsProjects = XLSX.utils.json_to_sheet(projects); XLSX.utils.book_append_sheet(wb, wsProjects, "المشاريع");
-        const wsExpenses = XLSX.utils.json_to_sheet(expenses); XLSX.utils.book_append_sheet(wb, wsExpenses, "المصروفات");
-        const wsAdvances = XLSX.utils.json_to_sheet(advances); XLSX.utils.book_append_sheet(wb, wsAdvances, "العهد");
-        const wsExtracts = XLSX.utils.json_to_sheet(extracts); XLSX.utils.book_append_sheet(wb, wsExtracts, "المستخلصات");
-        const wsPayments = XLSX.utils.json_to_sheet(payments); XLSX.utils.book_append_sheet(wb, wsPayments, "التحصيلات");
-        const wsSupplierPay = XLSX.utils.json_to_sheet(supplierPayments); XLSX.utils.book_append_sheet(wb, wsSupplierPay, "دفعات_الموردين");
-        XLSX.writeFile(wb, `MOMOHY_ERP_${todayDate}.xlsx`); showToast("تم تصدير ملف الإكسيل! 📥");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(projects), "المشاريع");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expenses), "المصروفات");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(advances), "العهد");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(extracts), "المستخلصات");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payments), "التحصيلات");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(supplierPayments), "دفعات_الموردين");
+        XLSX.writeFile(wb, `Construction_ERP_${todayDate}.xlsx`); showToast("تم تصدير الإكسيل! 📥");
       };
 
-      const exportJsonBackup = () => {
-        const fullBackup = { projects, expenses, extracts, payments, advances, supplier_payments: supplierPayments, settings, roles: userRolesMap, exportDate: new Date().toISOString() };
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup, null, 2));
-        const downloadAnchor = document.createElement('a'); downloadAnchor.setAttribute("href", dataStr); downloadAnchor.setAttribute("download", `Construction_FullBackup_${todayDate}.json`);
-        document.body.appendChild(downloadAnchor); downloadAnchor.click(); downloadAnchor.remove(); showToast("تم تحميل النسخة الاحتياطية (JSON)! 💾");
-      };
-
-      const handleSaveRole = (e) => {
-        e.preventDefault(); if (!isAdmin) return;
-        const cleanEmail = newRoleInput.email.trim().toLowerCase(); if (!cleanEmail) return;
-        const key = cleanEmail.replace(/\./g, '_');
-        const updated = { ...userRolesMap, [key]: newRoleInput.role };
-        setUserRolesMap(updated); saveSafeConstructionData('roles', 'roles', updated);
-        setNewRoleInput({ email: "", role: "engineer" }); showToast(`تم تعيين صلاحية (${newRoleInput.role}) بنجاح! 🛡️`);
-      };
-
-      // الحسابات الخاصة بالعرض
+      // الحسابات العامة للمشروع
       const currentProj = projects.find(p => cleanId(p?.id) === cleanId(selectedProjId)) || projects[0] || {};
       const projExpenses = expenses.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
       const projExtracts = extracts.filter(e => cleanId(e?.projectId) === cleanId(currentProj?.id));
@@ -491,14 +453,14 @@
       const totalReceived = projPayments.reduce((sum, item) => sum + parseNum(item?.amount), 0);
       const netProfit = totalWorkNet - totalCost;
 
-      const projDirectCashExp = projExpenses.filter(e => safeStr(e?.paymentMethod) !== 'خصم من العهدة' && safeStr(e?.billStatus || 'مدفوعة') === 'مدفوعة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
+      const projDirectCashExp = projExpenses.filter(e => String(e?.paymentMethod) !== 'خصم من العهدة' && String(e?.billStatus || 'مدفوعة') === 'مدفوعة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
       const projTotalAdvancesGiven = projAdvances.reduce((sum, a) => sum + parseNum(a?.amount), 0);
       const projTotalSuppPaid = projSuppPayments.reduce((sum, p) => sum + parseNum(p?.amount), 0);
       const centralCashRemaining = totalReceived - projDirectCashExp - projTotalAdvancesGiven - projTotalSuppPaid;
 
-      const allEmpCustodyBalance = (settings?.employees || []).reduce((acc, emp) => {
-        const adv = projAdvances.filter(a => safeStr(a?.employeeName) === safeStr(emp)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
-        const spent = projExpenses.filter(e => safeStr(e?.paymentMethod) === 'خصم من العهدة' && safeStr(e?.custodyEmployee) === safeStr(emp)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
+      const allEmpCustodyBalance = safeArray(settings?.employees).reduce((acc, emp) => {
+        const adv = projAdvances.filter(a => String(a?.employeeName) === String(emp)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
+        const spent = projExpenses.filter(e => String(e?.paymentMethod) === 'خصم من العهدة' && String(e?.custodyEmployee) === String(emp)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
         return acc + Math.max(0, adv - spent);
       }, 0);
 
@@ -510,34 +472,34 @@
       const allPay = payments.reduce((sum, item) => sum + parseNum(item?.amount), 0);
 
       const projExpMap = {};
-      projExpenses.forEach(e => { const cat = safeStr(e?.mainCategory || 'غير محدد'); projExpMap[cat] = (projExpMap[cat] || 0) + parseNum(e?.amount); });
+      projExpenses.forEach(e => { const cat = String(e?.mainCategory || 'غير محدد'); projExpMap[cat] = (projExpMap[cat] || 0) + parseNum(e?.amount); });
       const projExpLabels = Object.keys(projExpMap);
       const projExpData = Object.values(projExpMap);
 
-      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || safeStr(e?.mainCategory) === searchMainCat) && (searchSubCat === "" || safeStr(e?.subCategory) === searchSubCat) && (searchCostType === "" || safeStr(e?.costType) === searchCostType); });
+      const filteredSearchExpenses = projExpenses.filter(e => { return (searchMainCat === "" || String(e?.mainCategory) === searchMainCat) && (searchSubCat === "" || String(e?.subCategory) === searchSubCat) && (searchCostType === "" || String(e?.costType) === searchCostType); });
       const filteredSearchTotal = filteredSearchExpenses.reduce((s, e) => s + parseNum(e?.amount), 0);
 
-      const allSupplierNames = Array.from(new Set([...(settings?.suppliers || []), ...expenses.map(e => e?.supplier).filter(Boolean), ...supplierPayments.map(p => p?.supplier).filter(Boolean)])).map(s => safeStr(s).trim()).filter(Boolean);
+      const allSupplierNames = Array.from(new Set([...safeArray(settings?.suppliers), ...expenses.map(e => String(e?.supplier)), ...supplierPayments.map(p => String(p?.supplier))])).map(s => String(s).trim()).filter(Boolean);
       const cleanSuppliersList = Array.from(new Set(allSupplierNames));
 
       const suppliersLedger = cleanSuppliersList.map(supp => {
         const targetExp = suppScope === "project" ? projExpenses : expenses; const targetSuppPay = suppScope === "project" ? projSuppPayments : supplierPayments;
-        const allInvoices = targetExp.filter(e => safeStr(e?.supplier).trim() === supp);
+        const allInvoices = targetExp.filter(e => String(e?.supplier).trim() === supp);
         const totalPurchases = allInvoices.reduce((sum, e) => sum + parseNum(e?.amount), 0);
-        const creditPurchases = allInvoices.filter(e => safeStr(e?.billStatus || 'مدفوعة') === 'آجلة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const creditPurchases = allInvoices.filter(e => String(e?.billStatus || 'مدفوعة') === 'آجلة').reduce((sum, e) => sum + parseNum(e?.amount), 0);
         const paidPurchases = totalPurchases - creditPurchases;
-        const totalPaidToCreditor = targetSuppPay.filter(p => safeStr(p?.supplier).trim() === supp).reduce((sum, p) => sum + parseNum(p?.amount), 0);
+        const totalPaidToCreditor = targetSuppPay.filter(p => String(p?.supplier).trim() === supp).reduce((sum, p) => sum + parseNum(p?.amount), 0);
         const balance = totalPaidToCreditor - creditPurchases;
         return { name: supp, totalPurchases, creditPurchases, paidPurchases, totalPaid: totalPaidToCreditor, balance };
       }).filter(s => s.totalPurchases > 0 || s.totalPaid > 0);
 
       const getCustodyStats = (empName) => {
-        const empAdv = projAdvances.filter(a => safeStr(a?.employeeName) === safeStr(empName)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
-        const empExp = projExpenses.filter(e => safeStr(e?.paymentMethod) === 'خصم من العهدة' && safeStr(e?.custodyEmployee) === safeStr(empName)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
+        const empAdv = projAdvances.filter(a => String(a?.employeeName) === String(empName)).reduce((sum, a) => sum + parseNum(a?.amount), 0);
+        const empExp = projExpenses.filter(e => String(e?.paymentMethod) === 'خصم من العهدة' && String(e?.custodyEmployee) === String(empName)).reduce((sum, e) => sum + parseNum(e?.amount), 0);
         return { received: empAdv, spent: empExp, balance: empAdv - empExp };
       };
 
-      const activeEmployeesCustody = (settings?.employees || []).map(emp => ({ name: safeStr(emp), ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
+      const activeEmployeesCustody = safeArray(settings?.employees).map(emp => ({ name: String(emp), ...getCustodyStats(emp) })).filter(s => s.received > 0 || s.spent > 0);
 
       const navTabs = [
         ...(isAdmin ? [{ id: "dashboard", label: "الرئيسية", icon: "📊" }] : [{ id: "my_custody", label: "عهدتي", icon: "💼" }]),
@@ -549,7 +511,6 @@
         ...(isAdmin || isAccountant ? [{ id: "suppliers", label: "الموردين", icon: "🚚" }] : []),
         ...(isAdmin ? [{ id: "statement", label: "كشف حساب", icon: "📑" }] : []),
         ...(isAdmin || isAccountant ? [{ id: "extracts", label: "المستخلصات", icon: "📄" }] : []),
-        ...(isSuperAdminExact ? [{ id: "audit_log", label: "الدخول", icon: "🛡️" }] : []),
         ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
       ];
 
@@ -610,7 +571,7 @@
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
           
-          {!isOnline && (<div className="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs"><span>📡</span><span>أنت متصل محلياً بدون إنترنت. يتم حفظ السجلات بالجهاز وترفع فور عودة الشبكة.</span></div>)}
+          {!isOnline && (<div className="bg-rose-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs"><span>📡</span><span>أنت متصل محلياً بدون إنترنت. يتم حفظ السجلات بالجهاز وترفع فور عودة الشبكة.</span></div>)}
 
           <header className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div className="flex items-center gap-2">
@@ -628,7 +589,7 @@
               <button onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
               {/* ✨ زر التبديل الفخم في الترويسة العلوية ✨ */}
               <a href="survey.html" className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs transition">
-                <span>📐</span> <span className="hidden sm:inline">قطاع المساحة</span>
+                <span>📐</span> <span className="hidden sm:inline">الانتقال للمساحة</span>
               </a>
               <button onClick={()=>setDrawerOpen(true)} className="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">☰</button>
             </div>
@@ -643,7 +604,10 @@
                   </button>
                 ))}
               </div>
-              <div className="p-3 border-t border-slate-800 text-[11px] text-center"><div className="truncate text-slate-400 mb-2 font-mono">{user.email}</div><button onClick={handleLogout} className="w-full bg-rose-600/20 text-rose-400 py-2 rounded-xl font-bold">تسجيل الخروج</button></div>
+              <div className="p-3 border-t border-slate-800 text-[11px] text-center">
+                <div className="truncate text-slate-400 mb-2 font-mono">{user.email}</div>
+                <button onClick={handleLogout} className="w-full bg-rose-600/20 text-rose-400 py-2 rounded-xl font-bold">تسجيل الخروج</button>
+              </div>
             </aside>
 
             {drawerOpen && (
@@ -651,10 +615,22 @@
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={()=>setDrawerOpen(false)}></div>
                 <div className="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-4 flex flex-col justify-between">
                   <div>
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-3"><div><span className="font-black text-sm">أقسام الإنشاءات</span><span className="block text-[10px] text-amber-400 font-bold mt-1">{userRoleTitle}</span></div><button onClick={()=>setDrawerOpen(false)} className="text-slate-400 hover:text-white text-lg">✕</button></div>
-                    <nav className="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">{navTabs.map(t => (<button key={t.id} onClick={() => { setActiveTab(t.id); setDrawerOpen(false); }} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl ${activeTab===t.id ? 'bg-amber-500 text-slate-900 font-black' : 'text-slate-300 hover:bg-slate-800'}`}><span>{t.icon}</span> <span>{t.label}</span></button>))}</nav>
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
+                      <div><span className="font-black text-sm">أقسام الإنشاءات</span><span className="block text-[10px] text-amber-400 font-bold mt-1">{userRoleTitle}</span></div>
+                      <button onClick={()=>setDrawerOpen(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
+                    </div>
+                    <nav className="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">
+                      {navTabs.map(t => (
+                        <button key={t.id} onClick={() => { setActiveTab(t.id); setDrawerOpen(false); }} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl ${activeTab===t.id ? 'bg-amber-500 text-slate-900 font-black' : 'text-slate-300 hover:bg-slate-800'}`}>
+                          <span>{t.icon}</span> <span>{t.label}</span>
+                        </button>
+                      ))}
+                    </nav>
                   </div>
-                  <div className="pt-3 border-t border-slate-800 text-xs text-center"><div className="truncate text-slate-400 font-mono mb-2">{user.email}</div><button onClick={handleLogout} className="w-full bg-rose-600/20 text-rose-400 py-2.5 rounded-xl font-bold">تسجيل الخروج</button></div>
+                  <div className="pt-3 border-t border-slate-800 text-xs text-center">
+                    <div className="truncate text-slate-400 font-mono mb-2">{user.email}</div>
+                    <button onClick={handleLogout} className="w-full bg-rose-600/20 text-rose-400 py-2.5 rounded-xl font-bold">تسجيل الخروج</button>
+                  </div>
                 </div>
               </div>
             )}
@@ -665,7 +641,7 @@
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <span className="font-extrabold text-slate-600 dark:text-slate-400 whitespace-nowrap">المشروع:</span>
                   <select value={selectedProjId} onChange={(e) => setSelectedProjId(e.target.value)} className="w-full sm:w-72 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 font-extrabold text-indigo-700 dark:text-indigo-400 rounded-xl px-3 py-2 outline-none">
-                    {projects.map(p => <option key={String(p.id)} value={String(p.id)}>{String(p.id)} - {safeStr(p.name)}</option>)}
+                    {projects.map(p => <option key={String(p.id)} value={String(p.id)}>{String(p.id)} - {String(p.name)}</option>)}
                   </select>
                 </div>
               </div>
@@ -685,7 +661,7 @@
                     <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي المصروفات</span><strong className="text-rose-600 text-sm sm:text-base font-black">{totalCost.toLocaleString()} ج.م</strong></div>
                     <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3 sm:p-4 rounded-2xl shadow-xs"><span className="text-amber-900 dark:text-amber-200 font-bold block text-[10px]">سيولة الخزينة</span><strong className="text-amber-700 dark:text-amber-400 text-base sm:text-lg font-black">{centralCashRemaining.toLocaleString()} ج.م</strong></div>
                   </div>
-                  <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={safeStr(currentProj.name) || 'المشروع'} />
+                  <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
                 </div>
               )}
 
@@ -693,7 +669,7 @@
                 <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-700 shadow-xs space-y-4 text-xs">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b dark:border-slate-700">
                     <div><h2 className="text-base font-black text-slate-900 dark:text-white">💼 متابعة عهدتي الشخصية</h2><p className="text-slate-500 text-[11px] mt-0.5">متابعة المبالغ المستلمة والمنصرفة والرصيد المتبقي معك.</p></div>
-                    <div className="w-full sm:w-60"><select value={myEmpName} onChange={(e) => { setMyEmpName(e.target.value); localStorage.setItem('myEmpName', e.target.value); }} className="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 font-bold p-2.5 rounded-xl outline-none"><option value="">اختر اسمك...</option>{settings.employees.map((emp, idx) => <option key={idx} value={String(emp)}>{String(emp)}</option>)}</select></div>
+                    <div className="w-full sm:w-60"><select value={myEmpName} onChange={(e) => { setMyEmpName(e.target.value); localStorage.setItem('myEmpName', e.target.value); }} className="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 font-bold p-2.5 rounded-xl outline-none"><option value="">اختر اسمك...</option>{safeArray(settings.employees).map((emp, idx) => <option key={idx} value={String(emp)}>{String(emp)}</option>)}</select></div>
                   </div>
                   {myEmpName ? (() => {
                     const myStats = getCustodyStats(myEmpName);
@@ -735,7 +711,7 @@
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projects.map(p => (
                           <tr key={String(p.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 font-bold text-amber-600 font-mono">{String(p.id)}</td><td className="p-3 font-bold text-slate-900 dark:text-white">{safeStr(p.name)}</td><td className="p-3 text-slate-500">{safeStr(p.consultant) || '-'}</td><td className="p-3 text-slate-500">{safeStr(p.location) || '-'}</td><td className="p-3 font-mono font-bold">{isAdmin || isAccountant ? `${parseNum(p.budget).toLocaleString()} ج.م` : '🔒 محجوب'}</td><td className="p-3"><span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold">{safeStr(p.status) || 'جاري'}</span></td>
+                            <td className="p-3 font-bold text-amber-600 font-mono">{String(p.id)}</td><td className="p-3 font-bold text-slate-900 dark:text-white">{String(p.name)}</td><td className="p-3 text-slate-500">{p.consultant ? String(p.consultant) : '-'}</td><td className="p-3 text-slate-500">{p.location ? String(p.location) : '-'}</td><td className="p-3 font-mono font-bold">{isAdmin || isAccountant ? `${parseNum(p.budget).toLocaleString()} ج.م` : '🔒 محجوب'}</td><td className="p-3"><span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold">{String(p.status || 'جاري')}</span></td>
                             {isAdmin && (<td className="p-3 text-center"><div className="inline-flex items-center gap-1.5"><button onClick={()=>setEditItemData({ type: 'project', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button><button onClick={()=>deleteItem('projects', p.id, projects)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button></div></td>)}
                           </tr>
                         ))}
@@ -745,26 +721,36 @@
                 </div>
               )}
 
-              {/* ⚠️ تبويب إدخال الفاتورة المحصن ⚠️ */}
+              {/* ⚠️ تبويب إضافة فاتورة الآمن ⚠️ */}
               {activeTab === "add_data" && (
                 <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
                   <h3 className="font-black text-sm text-slate-900 dark:text-white mb-4 pb-2 border-b dark:border-slate-700 flex items-center gap-2"><span>💸</span> تسجيل فاتورة ومصروف جديد</h3>
                   <form onSubmit={(e) => {
                     e.preventDefault();
-                    if(parseNum(newExp.unitPrice) <= 0 || parseNum(newExp.quantity) <= 0) { showToast("عفواً، الكمية وسعر الوحدة يجب أن يكونا أكبر من صفر!", "error"); return; }
-                    if(newExp.paymentMethod === 'خصم من العهدة' && !newExp.custodyEmployee) { showToast("يرجى اختيار اسم صاحب العهدة", "error"); return; }
-                    const totalAmt = parseNum(newExp.quantity) * parseNum(newExp.unitPrice);
-                    const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newExp, quantity: parseNum(newExp.quantity), unitPrice: parseNum(newExp.unitPrice), amount: totalAmt, createdBy: user?.name || 'مستخدم' };
-                    const updated = [newItem, ...expenses]; setExpenses(updated); saveSafeConstructionData('expenses', 'expenses', updated);
-                    setNewExp({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", billStatus: "مدفوعة", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: myEmpName || "", receiptImg: "" });
-                    const fileInput = document.getElementById('receipt-upload-input'); if(fileInput) fileInput.value = "";
-                    showToast("تم حفظ الفاتورة بنجاح! ✅");
+                    try {
+                      if(parseNum(newExp.unitPrice) <= 0 || parseNum(newExp.quantity) <= 0) { showToast("عفواً، الكمية وسعر الوحدة يجب أن يكونا أكبر من صفر!", "error"); return; }
+                      if(newExp.paymentMethod === 'خصم من العهدة' && !newExp.custodyEmployee) { showToast("يرجى اختيار اسم صاحب العهدة", "error"); return; }
+                      
+                      const totalAmt = parseNum(newExp.quantity) * parseNum(newExp.unitPrice);
+                      const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newExp, quantity: parseNum(newExp.quantity), unitPrice: parseNum(newExp.unitPrice), amount: totalAmt, createdBy: user?.name || 'مستخدم' };
+                      
+                      const updated = [newItem, ...expenses]; 
+                      setExpenses(updated); 
+                      saveSafeConstructionData('expenses', 'expenses', updated);
+                      
+                      setNewExp({ date: todayDate, mainCategory: "", subCategory: "", costType: "", supplier: "", billStatus: "مدفوعة", quantity: 1, unitPrice: "", description: "", paymentMethod: "خصم من العهدة", custodyEmployee: myEmpName || "", receiptImg: "" });
+                      const fileInput = document.getElementById('receipt-upload-input'); if(fileInput) fileInput.value = "";
+                      
+                      showToast("تم حفظ الفاتورة بنجاح! ✅");
+                    } catch (err) {
+                      showToast("حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى.", "error");
+                    }
                   }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div><label className="block font-bold mb-1">التاريخ</label><input type="date" value={newExp.date} onChange={e=>setNewExp({...newExp, date: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required/></div>
                     <div><label className="block font-bold mb-1">البند الرئيسي</label>
                       <div className="flex gap-1">
                         <select value={newExp.mainCategory} onChange={e=>setNewExp({...newExp, mainCategory: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required>
-                          <option value="">اختر...</option>{settings.mainCategories.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
+                          <option value="">اختر...</option>{safeArray(settings.mainCategories).map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
                         </select>
                         {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('mainCategories', settings.mainCategories, 'بند رئيسي')} className="px-2.5 bg-slate-200 dark:bg-slate-600 rounded-xl font-bold">+</button>}
                       </div>
@@ -772,7 +758,7 @@
                     <div><label className="block font-bold mb-1">البند الفرعي</label>
                       <div className="flex gap-1">
                         <select value={newExp.subCategory} onChange={e=>setNewExp({...newExp, subCategory: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold" required>
-                          <option value="">اختر...</option>{settings.subCategories.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
+                          <option value="">اختر...</option>{safeArray(settings.subCategories).map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
                         </select>
                         {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('subCategories', settings.subCategories, 'بند فرعي')} className="px-2.5 bg-slate-200 dark:bg-slate-600 rounded-xl font-bold">+</button>}
                       </div>
@@ -780,7 +766,7 @@
                     <div><label className="block font-bold mb-1">نوع التكلفة</label>
                       <div className="flex gap-1">
                         <select value={newExp.costType} onChange={e=>setNewExp({...newExp, costType: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold">
-                          <option value="">اختر...</option>{settings.costTypes.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
+                          <option value="">اختر...</option>{safeArray(settings.costTypes).map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
                         </select>
                         {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('costTypes', settings.costTypes, 'نوع تكلفة')} className="px-2.5 bg-slate-200 dark:bg-slate-600 rounded-xl font-bold">+</button>}
                       </div>
@@ -788,7 +774,7 @@
                     <div><label className="block font-bold mb-1">المورد / الجهة</label>
                       <div className="flex gap-1">
                         <select value={newExp.supplier} onChange={e=>setNewExp({...newExp, supplier: e.target.value})} className="w-full border dark:border-slate-600 rounded-xl p-2.5 dark:bg-slate-700 font-bold">
-                          <option value="">اختر...</option>{settings.suppliers.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
+                          <option value="">اختر...</option>{safeArray(settings.suppliers).map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
                         </select>
                         {isAdmin && <button type="button" onClick={()=>handleAddNewSettingItem('suppliers', settings.suppliers, 'مورد')} className="px-2.5 bg-slate-200 dark:bg-slate-600 rounded-xl font-bold">+</button>}
                       </div>
@@ -798,7 +784,7 @@
                     {newExp.paymentMethod === 'خصم من العهدة' && (
                       <div><label className="block font-bold mb-1 text-rose-600">صاحب العهدة:</label>
                         <select value={newExp.custodyEmployee || ""} onChange={e=>setNewExp({...newExp, custodyEmployee: e.target.value})} className="w-full border border-rose-300 dark:border-rose-900/60 bg-rose-50/50 dark:bg-slate-700 rounded-xl p-2.5 font-bold" required>
-                          <option value="">اختر الموظف...</option>{settings.employees.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
+                          <option value="">اختر الموظف...</option>{safeArray(settings.employees).map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}
                         </select>
                       </div>
                     )}
@@ -815,8 +801,8 @@
               {activeTab === "expenses" && (
                 <div className="space-y-3">
                   <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-2.5 text-xs">
-                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} className="border dark:border-slate-600 rounded-xl p-2 bg-slate-50 dark:bg-slate-700 font-bold"><option value="">كل البنود الرئيسية</option>{settings.mainCategories.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
-                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} className="border dark:border-slate-600 rounded-xl p-2 bg-slate-50 dark:bg-slate-700 font-bold"><option value="">كل البنود الفرعية</option>{settings.subCategories.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
+                    <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} className="border dark:border-slate-600 rounded-xl p-2 bg-slate-50 dark:bg-slate-700 font-bold"><option value="">كل البنود الرئيسية</option>{safeArray(settings.mainCategories).map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
+                    <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} className="border dark:border-slate-600 rounded-xl p-2 bg-slate-50 dark:bg-slate-700 font-bold"><option value="">كل البنود الفرعية</option>{safeArray(settings.subCategories).map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
                     <div className="sm:mr-auto flex items-center justify-between font-bold bg-amber-50 dark:bg-amber-950/40 px-3 py-2 rounded-xl text-amber-900 dark:text-amber-300"><span>الإجمالي:</span><span className="font-black mr-2"><span className="pdf-num">{filteredSearchTotal.toLocaleString('en-US')}</span> ج.م</span></div>
                   </div>
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
@@ -831,13 +817,13 @@
                           filteredSearchExpenses.map((e) => (
                             <tr key={String(e.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50 transition">
                               <td className="p-3 text-slate-500 font-mono text-[11px]">{e.date}</td>
-                              <td className="p-3 font-bold text-slate-900 dark:text-white">{safeStr(e.mainCategory)} - {safeStr(e.subCategory)}</td>
-                              <td className="p-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">{safeStr(e.description) || '-'}</td>
-                              <td className="p-3 text-slate-600 dark:text-slate-400">{e.supplier ? safeStr(e.supplier) : '-'}</td>
+                              <td className="p-3 font-bold text-slate-900 dark:text-white">{String(e.mainCategory)} - {String(e.subCategory)}</td>
+                              <td className="p-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">{e.description || '-'}</td>
+                              <td className="p-3 text-slate-600 dark:text-slate-400">{e.supplier ? String(e.supplier) : '-'}</td>
                               <td className="p-3 text-center">{parseNum(e.quantity)}</td>
                               <td className="p-3 text-center font-mono">{parseNum(e.unitPrice).toLocaleString()}</td>
                               <td className="p-3 text-center font-black text-rose-600 font-mono">{parseNum(e.amount).toLocaleString()}</td>
-                              <td className="p-3"><span className="text-[10px] bg-slate-100 dark:bg-slate-600 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-300">{safeStr(e.paymentMethod)}</span></td>
+                              <td className="p-3"><span className="text-[10px] bg-slate-100 dark:bg-slate-600 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-300">{e.paymentMethod}</span></td>
                               <td className="p-3 text-center">{e.receiptImg ? (<button onClick={()=>setActiveInvoiceModal(e.receiptImg)} className="text-indigo-600 hover:underline font-bold text-[11px]">معاينة</button>) : <span className="text-slate-400">-</span>}</td>
                               <td className="p-3 text-center"><button onClick={() => { const msg = `🏢 *إشعار فاتورة توريد*\n🏗️ *المشروع:* ${currentProj.name}\n📌 *البند:* ${e.mainCategory} - ${e.subCategory}\n💰 *المبلغ:* ${parseNum(e.amount).toLocaleString()} ج.م\n🗓 *التاريخ:* ${e.date}`; window.open(`https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank'); }} className="text-emerald-600 hover:text-emerald-700 text-xs">📲</button></td>
                               {canEditOrDelete && (
@@ -868,7 +854,7 @@
                       setNewAdv({ date: todayDate, employeeName: myEmpName || "", amount: "", notes: "" }); showToast("تم تسجيل العهدة بنجاح! 💵");
                     }} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                       <input type="date" value={newAdv.date} onChange={e=>setNewAdv({...newAdv, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required><option value="">اختر الموظف...</option>{settings.employees.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
+                      <select value={newAdv.employeeName} onChange={e=>setNewAdv({...newAdv, employeeName: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required><option value="">اختر الموظف...</option>{safeArray(settings.employees).map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
                       <input type="number" step="any" value={newAdv.amount} onChange={e=>setNewAdv({...newAdv, amount: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-black text-emerald-600" placeholder="المبلغ..." required/>
                       <input type="text" value={newAdv.notes} onChange={e=>setNewAdv({...newAdv, notes: e.target.value})} placeholder="البيان..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700"/>
                       <button type="submit" className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ العهدة</button>
@@ -876,11 +862,11 @@
                   </div>
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
-                      <thead><tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">التاريخ</th><th className="p-3">الموظف</th><th className="p-3 text-center">المبلغ</th><th className="p-3">البيان</th>{canEditOrDelete && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
+                      <thead><tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black"><th className="p-3">التاريخ</th><th className="p-3">الموظف</th><th className="p-3 text-center">المبلغ</th><th className="p-3">البيان</th>{canEditOrDelete && <th className="p-3 text-center">إجراءات</th>}</tr></thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projAdvances.map(a => (
                           <tr key={String(a.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td><td className="p-3 font-bold text-slate-900 dark:text-white">{safeStr(a.employeeName)}</td><td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td><td className="p-3 text-slate-500">{safeStr(a.notes) || '-'}</td>
+                            <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td><td className="p-3 font-bold text-slate-900 dark:text-white">{String(a.employeeName)}</td><td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td><td className="p-3 text-slate-500">{a.notes || '-'}</td>
                             {canEditOrDelete && (
                               <td className="p-3 text-center">
                                 <div className="inline-flex items-center gap-1.5">
@@ -920,7 +906,7 @@
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projPayments.map(p => (
                           <tr key={String(p.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-2.5 whitespace-nowrap text-slate-500 font-mono">{p.date}</td><td className="p-2.5 font-bold text-indigo-600">{p.projectId}</td><td className="p-2.5 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td><td className="p-2.5 text-slate-500">{safeStr(p.notes) || '-'}</td>
+                            <td className="p-2.5 whitespace-nowrap text-slate-500 font-mono">{p.date}</td><td className="p-2.5 font-bold text-indigo-600">{p.projectId}</td><td className="p-2.5 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td><td className="p-2.5 text-slate-500">{p.notes || '-'}</td>
                             {isAdmin && (
                               <td className="p-2.5 text-center">
                                 <div className="inline-flex items-center gap-1.5">
@@ -948,14 +934,13 @@
                       </div>
                     </div>
                     <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
+                      e.preventDefault(); if(!newSuppPay.supplier || parseNum(newSuppPay.amount) <= 0) return;
                       const newItem = { id: Date.now(), projectId: cleanId(selectedProjId), ...newSuppPay, amount: parseNum(newSuppPay.amount), createdBy: user?.name || 'مستخدم' };
                       const updated = [newItem, ...supplierPayments]; setSupplierPayments(updated); saveSafeConstructionData('supplier_payments', 'supplier_payments', updated);
                       setNewSuppPay({ date: todayDate, supplier: "", amount: "", notes: "" }); showToast("تم تسجيل الدفعة للمورد بنجاح! 🚚");
                     }} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                       <input type="date" value={newSuppPay.date} onChange={e=>setNewSuppPay({...newSuppPay, date: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required/>
-                      <select value={newSuppPay.supplier} onChange={e=>setNewSuppPay({...newSuppPay, supplier: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required><option value="">اختر المورد...</option>{settings.suppliers.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
+                      <select value={newSuppPay.supplier} onChange={e=>setNewSuppPay({...newSuppPay, supplier: e.target.value})} className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-bold" required><option value="">اختر المورد...</option>{safeArray(settings.suppliers).map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
                       <input type="number" step="any" value={newSuppPay.amount} onChange={e=>setNewSuppPay({...newSuppPay, amount: e.target.value})} placeholder="المبلغ..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700 font-black text-emerald-600" required/>
                       <input type="text" value={newSuppPay.notes} onChange={e=>setNewSuppPay({...newSuppPay, notes: e.target.value})} placeholder="البيان أو رقم الشيك..." className="border dark:border-slate-600 p-2.5 rounded-xl dark:bg-slate-700"/>
                       <button type="submit" className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">قيد الدفعة للمورد</button>
@@ -1022,7 +1007,7 @@
                         <h4 className="font-bold text-slate-700 mb-1.5 border-b pb-1">2. التحصيلات المستلمة</h4>
                         <table className="w-full text-right border" style={{ tableLayout: 'fixed' }}>
                           <thead><tr className="bg-slate-100"><th className="p-1.5 border w-24">التاريخ</th><th className="p-1.5 border">البيان</th><th className="p-1.5 border text-center w-24">المبلغ</th></tr></thead>
-                          <tbody>{projPayments.map(p => <tr key={String(p.id)}><td className="p-1.5 border whitespace-nowrap"><span className="pdf-num text-[11px]">{p.date}</span></td><td className="p-1.5 border">{safeStr(p.notes) || 'تحصيل'}</td><td className="p-1.5 border text-center font-bold text-emerald-600"><span className="pdf-num">{parseNum(p.amount).toLocaleString('en-US')}</span></td></tr>)}</tbody>
+                          <tbody>{projPayments.map(p => <tr key={String(p.id)}><td className="p-1.5 border whitespace-nowrap"><span className="pdf-num text-[11px]">{p.date}</span></td><td className="p-1.5 border">{p.notes || 'تحصيل'}</td><td className="p-1.5 border text-center font-bold text-emerald-600"><span className="pdf-num">{parseNum(p.amount).toLocaleString('en-US')}</span></td></tr>)}</tbody>
                         </table>
                       </div>
                     </div>
