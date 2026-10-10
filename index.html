@@ -38,11 +38,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   
   <style>
-    body { 
-      font-family: 'Cairo', sans-serif; 
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
+    body { font-family: 'Cairo', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
     .custom-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
     .custom-scroll::-webkit-scrollbar-track { background: transparent; }
     .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
@@ -57,31 +53,13 @@
         position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 10mm !important; box-shadow: none !important; border: none !important; background: white !important; color: black !important;
       }
       .print-hidden { display: none !important; }
-      .print-break-inside { page-break-inside: avoid; }
     }
-
     .pdf-render-mode { background: #ffffff !important; color: #0f172a !important; direction: rtl !important; font-family: 'Cairo', Arial, sans-serif !important; }
     .pdf-render-mode * { letter-spacing: 0 !important; word-spacing: normal !important; }
-    .pdf-render-mode input, .pdf-render-mode select { border: none !important; background: transparent !important; box-shadow: none !important; appearance: none !important; -webkit-appearance: none !important; font-weight: 800 !important; padding: 0 !important; }
-    .pdf-render-mode table { table-layout: fixed !important; width: 100% !important; }
-    .pdf-num { direction: ltr !important; unicode-bidi: isolate !important; display: inline-block !important; font-family: Arial, sans-serif !important; white-space: nowrap !important; }
-
-    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .toast-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-    .bike-container { width: 150px; height: 150px; position: relative; margin: 0 auto; }
-    .bike-svg { width: 100%; height: 100%; overflow: visible; }
-    .wheel { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
-    .pedal { transform-origin: center; transform-box: fill-box; animation: spin 1.2s linear infinite; }
-    .body-bounce { animation: bounce 0.6s ease-in-out infinite alternate; }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    @keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-4px); } }
-    .loading-text { font-family: 'Courier New', Courier, monospace; font-weight: bold; letter-spacing: 2px; color: #f59e0b; font-size: 1.2rem; margin-top: 15px; text-align: center; }
-    .loading-text::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
-    @keyframes dots { 0%, 20% { content: ''; } 40% { content: '.'; } 60% { content: '..'; } 80%, 100% { content: '...'; } }
+    .pdf-num { direction: ltr !important; unicode-bidi: isolate !important; display: inline-block !important; font-family: Arial, sans-serif !important; }
   </style>
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+<body className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased transition-colors duration-200">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -130,32 +108,21 @@
       const n = parseFloat(clean); return isNaN(n) ? 0 : n;
     };
 
-    // 🛡️ فلاتر الحماية الصارمة لمعالجة أي بيانات تالفة قادمة من Firebase 🛡️
-    const parseDataArr = (d) => {
-      if (!d) return [];
-      let arr = Array.isArray(d) ? d : (typeof d === 'object' ? Object.values(d) : []);
-      // إجبار الكود على قبول الكائنات (Objects) الصحيحة فقط وتجاهل أي نصوص تالفة مسجلة كعمليات
-      return arr.filter(item => item !== null && typeof item === 'object' && !Array.isArray(item));
+    // فلاتر حماية البيانات الكلاسيكية
+    const ensureArr = (data) => {
+      if (!data) return [];
+      if (Array.isArray(data)) return data;
+      if (typeof data === 'object') return Object.values(data);
+      return []; 
     };
 
-    const parseSettingsArr = (val, fallback) => {
+    const safeStringArray = (val, fallback) => {
       if (!val) return fallback;
-      let arr = Array.isArray(val) ? val : (typeof val === 'object' ? Object.values(val) : [val]);
-      // إجبار الكود على استخراج النصوص فقط للقوائم المنسدلة وتجاهل أي كائنات (Objects) مدمرة
-      const clean = arr.map(i => typeof i === 'object' ? JSON.stringify(i) : String(i)).filter(s => s.trim() !== '');
-      return clean.length > 0 ? Array.from(new Set(clean)) : fallback;
-    };
-
-    const parseSettingsObj = (s) => {
-      if (!s || typeof s !== 'object') return initialSettings;
-      return {
-        mainCategories: parseSettingsArr(s.mainCategories, initialSettings.mainCategories),
-        subCategories: parseSettingsArr(s.subCategories, initialSettings.subCategories),
-        costTypes: parseSettingsArr(s.costTypes, initialSettings.costTypes),
-        suppliers: parseSettingsArr(s.suppliers, initialSettings.suppliers),
-        employees: parseSettingsArr(s.employees, initialSettings.employees),
-        logo: typeof s.logo === 'string' ? s.logo : ""
-      };
+      try {
+        let arr = Array.isArray(val) ? val : (typeof val === 'object' ? Object.values(val) : [val]);
+        const clean = arr.map(i => typeof i === 'object' ? '' : String(i)).filter(i => i.trim() !== '');
+        return clean.length > 0 ? Array.from(new Set(clean)) : fallback;
+      } catch (e) { return fallback; }
     };
 
     const constructionStorage = {
@@ -171,47 +138,6 @@
       }
     };
 
-    const generatePdfAndOpenWhatsApp = (elementId, filename, textMessage, targetPhone = ADMIN_WHATSAPP_NUMBER) => {
-      const element = document.getElementById(elementId);
-      if (!element) return;
-      const prevWidth = element.style.width; const prevMaxWidth = element.style.maxWidth; const prevPadding = element.style.padding;
-      element.style.width = '800px'; element.style.maxWidth = '800px'; element.style.padding = '24px';
-      element.classList.add('pdf-render-mode');
-      const opt = { margin: [8, 8, 8, 8], filename: filename || 'document.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, windowWidth: 1200, scrollX: 0, scrollY: 0 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
-      html2pdf().set(opt).from(element).save().then(() => {
-        element.style.width = prevWidth; element.style.maxWidth = prevMaxWidth; element.style.padding = prevPadding; element.classList.remove('pdf-render-mode');
-        const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
-        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMessage + "\n\n📎 (تم استخراج ملف الـ PDF)")}`, '_blank');
-      }).catch(err => {
-        element.style.width = prevWidth; element.style.maxWidth = prevMaxWidth; element.style.padding = prevPadding; element.classList.remove('pdf-render-mode');
-        window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(textMessage)}`, '_blank');
-      });
-    };
-
-    class ErrorBoundary extends React.Component {
-      constructor(props) { super(props); this.state = { hasError: false }; }
-      static getDerivedStateFromError(error) { return { hasError: true }; }
-      render() {
-        if (this.state.hasError) {
-          return (
-            <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-white text-center font-sans">
-              <div className="text-4xl mb-4">⚠️</div>
-              <h2 className="text-lg font-black mb-2 text-amber-400">تم حماية النظام من الانهيار</h2>
-              <p className="text-xs text-slate-400 mb-6 max-w-md leading-relaxed">اكتشفنا بيانات تالفة قادمة من السحابة بسبب عمليات سابقة خاطئة. قمنا بإيقاف الإغلاق للحفاظ على استقرار التطبيق. اضغط أدناه لتدمير البيانات التالفة وإعادة التحميل:</p>
-              <button onClick={() => { 
-                localStorage.clear(); 
-                if (window.confirm("هل أنت متأكد من رغبتك في تنظيف قاعدة إعدادات القوائم المنسدلة لحل المشكلة نهائياً؟ (هذا لن يحذف فواتيرك)")) {
-                  if (db) db.ref('settings').set(initialSettings);
-                }
-                window.location.reload(); 
-              }} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-6 py-3 rounded-2xl text-xs transition shadow-lg">إصلاح الذاكرة وقاعدة البيانات 🔄</button>
-            </div>
-          );
-        }
-        return this.props.children;
-      }
-    }
-
     function DashboardCharts({ allWork, allExp, allPay, projExpLabels, projExpData, projName }) {
       const chart1Ref = useRef(null); const chart2Ref = useRef(null); const chart1Instance = useRef(null); const chart2Instance = useRef(null);
       useEffect(() => {
@@ -220,14 +146,14 @@
         if (chart1Ref.current) {
           chart1Instance.current = new Chart(chart1Ref.current, {
             type: 'bar',
-            data: { labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'], datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#f59e0b', '#f43f5e', '#10b981'], borderRadius: 8 }] },
+            data: { labels: ['قيمة الأعمال', 'المصروفات', 'التحصيلات'], datasets: [{ label: 'الموقف المالي العام', data: [allWork, allExp, allPay], backgroundColor: ['#4f46e5', '#f43f5e', '#10b981'], borderRadius: 8 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
           });
         }
         if (chart2Ref.current) {
           chart2Instance.current = new Chart(chart2Ref.current, {
             type: 'doughnut',
-            data: { labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'], datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#f59e0b', '#10b981', '#6366f1', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }] },
+            data: { labels: projExpLabels.length ? projExpLabels : ['لا توجد مصروفات'], datasets: [{ data: projExpData.length ? projExpData : [1], backgroundColor: projExpData.length ? ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'] : ['#e2e8f0'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10, family: 'Cairo' } } } } }
           });
         }
@@ -257,18 +183,28 @@
       const [isOnline, setIsOnline] = useState(navigator.onLine);
       const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
       
-      const [isLampOn, setIsLampOn] = useState(true);
       const [loginEmail, setLoginEmail] = useState("");
       const [loginPassword, setLoginPassword] = useState("");
 
-      const [projects, setProjects] = useState(() => parseDataArr(constructionStorage.get('projects', initialProjects)));
-      const [expenses, setExpenses] = useState(() => parseDataArr(constructionStorage.get('expenses', [])));
-      const [extracts, setExtracts] = useState(() => parseDataArr(constructionStorage.get('extracts', [])));
-      const [payments, setPayments] = useState(() => parseDataArr(constructionStorage.get('payments', [])));
-      const [advances, setAdvances] = useState(() => parseDataArr(constructionStorage.get('advances', [])));
-      const [supplierPayments, setSupplierPayments] = useState(() => parseDataArr(constructionStorage.get('supplier_payments', [])));
-      const [loginLogs, setLoginLogs] = useState(() => parseDataArr(constructionStorage.get('login_logs', [])));
-      const [settings, setSettings] = useState(() => parseSettingsObj(constructionStorage.get('settings', initialSettings)));
+      const [projects, setProjects] = useState(() => ensureArr(constructionStorage.get('projects', initialProjects)).filter(p => p && typeof p === 'object'));
+      const [expenses, setExpenses] = useState(() => ensureArr(constructionStorage.get('expenses', [])).filter(e => e && typeof e === 'object'));
+      const [extracts, setExtracts] = useState(() => ensureArr(constructionStorage.get('extracts', [])).filter(e => e && typeof e === 'object'));
+      const [payments, setPayments] = useState(() => ensureArr(constructionStorage.get('payments', [])).filter(p => p && typeof p === 'object'));
+      const [advances, setAdvances] = useState(() => ensureArr(constructionStorage.get('advances', [])).filter(a => a && typeof a === 'object'));
+      const [supplierPayments, setSupplierPayments] = useState(() => ensureArr(constructionStorage.get('supplier_payments', [])).filter(p => p && typeof p === 'object'));
+      const [loginLogs, setLoginLogs] = useState(() => ensureArr(constructionStorage.get('login_logs', [])).filter(l => l && typeof l === 'object'));
+      
+      const [settings, setSettings] = useState(() => {
+        const saved = constructionStorage.get('settings', {});
+        return {
+          mainCategories: safeStringArray(saved.mainCategories, initialSettings.mainCategories),
+          subCategories: safeStringArray(saved.subCategories, initialSettings.subCategories),
+          costTypes: safeStringArray(saved.costTypes, initialSettings.costTypes),
+          suppliers: safeStringArray(saved.suppliers, initialSettings.suppliers),
+          employees: safeStringArray(saved.employees, initialSettings.employees),
+          logo: typeof saved.logo === 'string' ? saved.logo : ""
+        };
+      });
 
       const [userRolesMap, setUserRolesMap] = useState(() => constructionStorage.get('roles', {}));
       const [selectedProjId, setSelectedProjId] = useState("cons-01");
@@ -383,21 +319,28 @@
         return () => { clearTimeout(safetyTimer); unsubscribe(); };
       }, []);
 
-      // 🛡️ المزامنة مع فلاتر حماية البيانات التالفة 🛡️
       useEffect(() => {
         if (!db || !user) return;
         
         const listeners = [
-          { path: 'projects', setter: (d) => { const arr = parseDataArr(d); const f = arr.length ? arr : initialProjects; setProjects(f); constructionStorage.set('projects', f); } },
-          { path: 'expenses', setter: (d) => { const arr = parseDataArr(d).reverse(); setExpenses(arr); constructionStorage.set('expenses', arr); } },
-          { path: 'extracts', setter: (d) => { const arr = parseDataArr(d).reverse(); setExtracts(arr); constructionStorage.set('extracts', arr); } },
-          { path: 'payments', setter: (d) => { const arr = parseDataArr(d).reverse(); setPayments(arr); constructionStorage.set('payments', arr); } },
-          { path: 'advances', setter: (d) => { const arr = parseDataArr(d).reverse(); setAdvances(arr); constructionStorage.set('advances', arr); } },
-          { path: 'supplier_payments', setter: (d) => { const arr = parseDataArr(d).reverse(); setSupplierPayments(arr); constructionStorage.set('supplier_payments', arr); } },
-          { path: 'login_logs', setter: (d) => { const arr = parseDataArr(d).reverse(); setLoginLogs(arr); constructionStorage.set('login_logs', arr); } },
+          { path: 'projects', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object'); const f = arr.length ? arr : initialProjects; setProjects(f); constructionStorage.set('projects', f); } },
+          { path: 'expenses', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setExpenses(arr); constructionStorage.set('expenses', arr); } },
+          { path: 'extracts', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setExtracts(arr); constructionStorage.set('extracts', arr); } },
+          { path: 'payments', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setPayments(arr); constructionStorage.set('payments', arr); } },
+          { path: 'advances', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setAdvances(arr); constructionStorage.set('advances', arr); } },
+          { path: 'supplier_payments', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setSupplierPayments(arr); constructionStorage.set('supplier_payments', arr); } },
+          { path: 'login_logs', setter: (d) => { const arr = ensureArr(d).filter(i=>i&&typeof i==='object').reverse(); setLoginLogs(arr); constructionStorage.set('login_logs', arr); } },
           { path: 'roles', setter: (d) => { const r = d || {}; setUserRolesMap(r); constructionStorage.set('roles', r); } },
           { path: 'settings', setter: (d) => { 
-              const finalSettings = parseSettingsObj(d);
+              const s = d || {};
+              const finalSettings = {
+                mainCategories: safeStringArray(s.mainCategories, initialSettings.mainCategories),
+                subCategories: safeStringArray(s.subCategories, initialSettings.subCategories),
+                costTypes: safeStringArray(s.costTypes, initialSettings.costTypes),
+                suppliers: safeStringArray(s.suppliers, initialSettings.suppliers),
+                employees: safeStringArray(s.employees, initialSettings.employees),
+                logo: typeof s.logo === 'string' ? s.logo : ""
+              };
               setSettings(finalSettings); constructionStorage.set('settings', finalSettings);
             } 
           }
@@ -613,87 +556,52 @@
         ...(isAdmin ? [{ id: "settings", label: "الإعدادات", icon: "⚙️" }] : [])
       ];
 
-      // شاشات التحميل والدخول
+      // شاشات التحميل والدخول المبدئية
       if (authLoading) {
         return (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950">
-            <div className="bike-container">
-              <svg className="bike-svg" viewBox="0 0 100 100" fill="none" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <g className="body-bounce">
-                  <polyline points="30,60 45,35 75,35 60,60 30,60" />
-                  <line x1="45" y1="35" x2="40" y2="25" />
-                  <line x1="35" y1="25" x2="45" y2="25" />
-                  <line x1="75" y1="35" x2="70" y2="20" />
-                  <path d="M70,20 Q80,15 85,25" />
-                </g>
-                <g transform="translate(30, 60)"><circle cx="0" cy="0" r="15" className="wheel" /><circle cx="0" cy="0" r="2" fill="#f59e0b" /><line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" /><line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" /></g>
-                <g transform="translate(75, 60)"><circle cx="0" cy="0" r="15" className="wheel" /><circle cx="0" cy="0" r="2" fill="#f59e0b" /><line x1="0" y1="-15" x2="0" y2="15" className="wheel" strokeWidth="1" /><line x1="-15" y1="0" x2="15" y2="0" className="wheel" strokeWidth="1" /></g>
-                <g transform="translate(60, 60)" className="pedal"><circle cx="0" cy="0" r="4" fill="#f59e0b" /><line x1="0" y1="-8" x2="0" y2="8" strokeWidth="2" /></g>
-              </svg>
-            </div>
-            <div className="loading-text text-amber-500">Loading</div>
-            <div className="text-[10px] text-slate-500 font-bold mt-2 font-cairo">جاري تأمين وربط الاتصال...</div>
+          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-900">
+            <div className="animate-spin text-5xl mb-4">⚙️</div>
+            <div className="loading-text text-indigo-500 font-bold">جاري تحميل النظام</div>
           </div>
         );
       }
 
       if (!user) {
         return (
-          <div className={`min-h-screen flex flex-col md:flex-row items-center justify-center px-4 transition-colors duration-1000 ${isLampOn ? 'bg-slate-900' : 'bg-slate-950'}`}>
-            <div className="relative flex flex-col items-center mb-10 md:mb-0 md:ml-16 z-20">
-              <div className={`w-40 h-20 rounded-t-full transition-all duration-700 ${isLampOn ? 'bg-amber-100 shadow-[0_0_80px_rgba(253,230,138,0.8)]' : 'bg-slate-800'}`}></div>
-              <div className={`w-3 h-32 transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-              <div className={`w-24 h-4 rounded-t-lg transition-colors duration-700 ${isLampOn ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
-              <div onClick={() => setIsLampOn(!isLampOn)} className="absolute top-16 left-1/2 ml-8 cursor-pointer flex flex-col items-center group" title="اضغط لإضاءة النظام">
-                <div className={`w-0.5 bg-amber-500/60 transition-all duration-300 ${isLampOn ? 'h-16' : 'h-10'}`}></div>
-                <div className="w-4 h-4 bg-amber-500 rounded-full group-hover:scale-125 group-active:scale-90 transition-transform shadow-lg"></div>
-              </div>
-            </div>
-
-            <div className={`relative transition-all duration-1000 transform ${isLampOn ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95 pointer-events-none'}`}>
-              {isLampOn && <div className="absolute -inset-4 bg-amber-400/10 blur-2xl rounded-[3rem] z-0"></div>}
+          <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4">
+            <div className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] shadow-xl w-full max-w-md text-center">
+              <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🏗️</div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white">مكتب مساحة</h2>
+              <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-1 mb-6">نظام إدارة الإنشاءات والمشروعات</p>
               
-              <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center relative z-10">
-                <div className="w-14 h-14 bg-white/20 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl shadow-inner">🏗️</div>
-                <h2 className="text-xl font-black text-white">مكتب مساحة</h2>
-                <p className="text-slate-300 text-[11px] mt-1 mb-4 font-semibold">بوابة قطاع الإنشاءات وإدارة المشروعات</p>
-                
-                <div className="flex bg-slate-900/50 p-1 rounded-xl mb-5 border border-white/10 pointer-events-auto">
-                  <button className="flex-1 bg-amber-500 text-slate-900 font-black py-2 rounded-lg shadow-md text-xs">🏗️ الإنشاءات</button>
-                  <a href="survey.html" className="flex-1 text-slate-400 hover:text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">📐 المساحة</a>
+              {accessDeniedMessage && (
+                <div className="bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 p-3 rounded-xl text-xs font-bold mb-4">
+                  ⚠️ {accessDeniedMessage}
                 </div>
+              )}
 
-                {accessDeniedMessage ? (
-                  <div className="space-y-3 pointer-events-auto">
-                    <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-xs font-bold leading-relaxed">⚠️ {accessDeniedMessage}</div>
+              <form onSubmit={handleEmailLogin} className="space-y-4">
+                <div>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">✉️</span>
+                    <input type="email" placeholder="البريد الإلكتروني..." value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-indigo-500 transition text-sm font-bold" required />
                   </div>
-                ) : (
-                  <div className="pointer-events-auto">
-                    <form onSubmit={handleEmailLogin} className="space-y-3 mb-4">
-                      <div className="relative">
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">✉️</span>
-                        <input type="email" placeholder="البريد الإلكتروني..." value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
-                      </div>
-                      <div className="relative">
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-white/50">🔒</span>
-                        <input type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} className="w-full bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 pr-9 pl-4 py-2.5 rounded-xl outline-none focus:border-amber-400 transition text-xs font-bold" required />
-                      </div>
-                      <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-2.5 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all text-xs">تسجيل الدخول</button>
-                    </form>
-
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="h-px bg-white/20 flex-1"></div><span className="text-white/50 text-[10px] font-bold">أو بواسطة</span><div className="h-px bg-white/20 flex-1"></div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={handleGoogleLogin} type="button" className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">
-                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
-                      </button>
-                      <button onClick={handlePhoneLoginClick} type="button" className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-[11px]">📱 هاتف</button>
-                    </div>
+                </div>
+                <div>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">🔒</span>
+                    <input type="password" placeholder="الرقم السري..." value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 pr-10 pl-4 py-3 rounded-xl outline-none focus:border-indigo-500 transition text-sm font-bold" required />
                   </div>
-                )}
+                </div>
+                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl shadow-md transition-all text-sm mt-2">تسجيل الدخول</button>
+              </form>
+
+              <div className="flex items-center gap-3 my-5">
+                <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div><span className="text-slate-400 text-[10px] font-bold">أو الدخول بواسطة</span><div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
               </div>
+              <button onClick={handleGoogleLogin} type="button" className="w-full flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold py-2.5 rounded-xl shadow-sm transition-all text-xs">
+                <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google
+              </button>
             </div>
           </div>
         );
@@ -704,18 +612,18 @@
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 pb-20 md:pb-0 transition-colors duration-300">
           
           {!isOnline && (
-            <div className="bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
+            <div className="bg-rose-600 text-white text-[11px] font-bold text-center py-1.5 px-3 flex items-center justify-center gap-1.5 sticky top-0 z-40 shadow-xs">
               <span>📡</span><span>أنت متصل محلياً بدون إنترنت. يتم حفظ السجلات بالجهاز وترفع فور عودة الشبكة.</span>
             </div>
           )}
 
           <header className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs print-hidden">
             <div className="flex items-center gap-2">
-              <span className="text-2xl p-1 bg-amber-50 dark:bg-amber-900/30 rounded-xl">🏗️</span>
+              <span className="text-2xl p-1 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl text-indigo-600">🏗️</span>
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-sm font-black text-slate-900 dark:text-white">مكتب مساحة</h1>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs text-white ${userRoleKey === 'superadmin' ? 'bg-amber-500 text-slate-900' : userRoleKey === 'executive' || userRoleKey === 'pm' ? 'bg-indigo-600' : userRoleKey === 'accountant' ? 'bg-emerald-600' : userRoleKey === 'admin' ? 'bg-amber-500 text-slate-900' : 'bg-blue-600'}`}>
+                  <span className="bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs">
                     {userRoleTitle}
                   </span>
                 </div>
@@ -724,8 +632,7 @@
             </div>
 
             <div className="flex items-center gap-2">
-              <button onClick={toggleTheme} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
-              <a href="survey.html" className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition"><span>📐</span> <span className="hidden sm:inline">قطاع المساحة</span></a>
+              <button onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-base">☀️/🌙</button>
               <button onClick={()=>setDrawerOpen(true)} className="bg-slate-800 text-slate-200 p-2 rounded-xl text-xs font-bold md:hidden">☰</button>
             </div>
           </header>
@@ -734,7 +641,7 @@
             <aside className="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col justify-between shrink-0 border-l border-slate-800 print-hidden">
               <div className="p-3 overflow-y-auto space-y-1 text-xs font-bold custom-scroll">
                 {navTabs.map(t => (
-                  <button key={t.id} onClick={() => setActiveTab(t.id)} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl transition ${activeTab===t.id ? 'bg-amber-500 text-slate-900 shadow' : 'hover:bg-slate-800'}`}>
+                  <button key={t.id} onClick={() => setActiveTab(t.id)} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl transition ${activeTab===t.id ? 'bg-indigo-600 text-white shadow' : 'hover:bg-slate-800'}`}>
                     <span className="text-base">{t.icon}</span> <span>{t.label}</span>
                   </button>
                 ))}
@@ -751,12 +658,12 @@
                 <div className="relative w-72 max-w-[80%] bg-slate-900 text-white h-full shadow-2xl z-50 p-4 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-                      <div><span className="font-black text-sm">أقسام الإنشاءات</span><span className="block text-[10px] text-amber-400 font-bold mt-1">{userRoleTitle}</span></div>
+                      <div><span className="font-black text-sm">أقسام الإنشاءات</span><span className="block text-[10px] text-indigo-400 font-bold mt-1">{userRoleTitle}</span></div>
                       <button onClick={()=>setDrawerOpen(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
                     </div>
                     <nav className="space-y-1 text-xs font-bold max-h-[70vh] overflow-y-auto scrollbar-hide">
                       {navTabs.map(t => (
-                        <button key={t.id} onClick={() => { setActiveTab(t.id); setDrawerOpen(false); }} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl ${activeTab===t.id ? 'bg-amber-500 text-slate-900 font-black' : 'text-slate-300 hover:bg-slate-800'}`}>
+                        <button key={t.id} onClick={() => { setActiveTab(t.id); setDrawerOpen(false); }} className={`w-full text-right flex items-center gap-2.5 p-3 rounded-xl ${activeTab===t.id ? 'bg-indigo-600 text-white font-black' : 'text-slate-300 hover:bg-slate-800'}`}>
                           <span>{t.icon}</span> <span>{t.label}</span>
                         </button>
                       ))}
@@ -790,7 +697,7 @@
                     <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي المستخلصات</span><strong className="text-indigo-600 dark:text-indigo-400 text-sm sm:text-base font-black">{totalWorkNet.toLocaleString()} ج.م</strong></div>
                     <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي التحصيلات</span><strong className="text-emerald-600 text-sm sm:text-base font-black">{totalReceived.toLocaleString()} ج.م</strong></div>
                     <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl border dark:border-slate-700 shadow-xs"><span className="text-slate-500 font-bold block text-[10px]">إجمالي المصروفات</span><strong className="text-rose-600 text-sm sm:text-base font-black">{totalCost.toLocaleString()} ج.م</strong></div>
-                    <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3 sm:p-4 rounded-2xl shadow-xs"><span className="text-amber-900 dark:text-amber-200 font-bold block text-[10px]">سيولة الخزينة</span><strong className="text-amber-700 dark:text-amber-400 text-base sm:text-lg font-black">{centralCashRemaining.toLocaleString()} ج.م</strong></div>
+                    <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 p-3 sm:p-4 rounded-2xl shadow-xs"><span className="text-indigo-900 dark:text-indigo-200 font-bold block text-[10px]">سيولة الخزينة</span><strong className="text-indigo-700 dark:text-indigo-400 text-base sm:text-lg font-black">{centralCashRemaining.toLocaleString()} ج.م</strong></div>
                   </div>
                   <DashboardCharts allWork={allWork} allExp={allExp} allPay={allPay} projExpLabels={projExpLabels} projExpData={projExpData} projName={currentProj.name || 'المشروع'} />
                 </div>
@@ -848,7 +755,7 @@
                         <div><label className="block font-bold mb-1">المكتب الاستشاري</label><input type="text" value={newProj.consultant} onChange={e=>setNewProj({...newProj, consultant: e.target.value})} className="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" /></div>
                         <div><label className="block font-bold mb-1">الموقع</label><input type="text" value={newProj.location} onChange={e=>setNewProj({...newProj, location: e.target.value})} className="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" /></div>
                         <div><label className="block font-bold mb-1">الميزانية التقديرية</label><input type="number" value={newProj.budget} onChange={e=>setNewProj({...newProj, budget: e.target.value})} className="w-full border dark:border-slate-700 rounded-xl p-2 dark:bg-slate-800 font-bold" /></div>
-                        <div><button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-2.5 rounded-xl shadow-xs transition">حفظ المشروع</button></div>
+                        <div><button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 rounded-xl shadow-xs transition">حفظ المشروع</button></div>
                       </form>
                     </div>
                   )}
@@ -862,7 +769,7 @@
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projects.map(p => (
                           <tr key={String(p.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
-                            <td className="p-3 font-bold text-amber-600 font-mono">{String(p.id)}</td>
+                            <td className="p-3 font-bold text-indigo-600 font-mono">{String(p.id)}</td>
                             <td className="p-3 font-bold text-slate-900 dark:text-white">{String(p.name)}</td>
                             <td className="p-3 text-slate-500">{p.consultant ? String(p.consultant) : '-'}</td>
                             <td className="p-3 text-slate-500">{p.location ? String(p.location) : '-'}</td>
@@ -958,8 +865,8 @@
                     <div className="sm:col-span-2"><label className="block font-bold mb-1">📸 إرفاق صورة الفاتورة</label>
                       <input id="receipt-upload-input" type="file" accept="image/*" onChange={handleReceiptUpload} className="w-full text-xs border border-dashed dark:border-slate-600 p-2 rounded-xl dark:bg-slate-700"/>
                     </div>
-                    <div className="sm:col-span-2 bg-amber-50 dark:bg-amber-950/30 p-3 rounded-2xl flex justify-between items-center font-bold"><span>إجمالي الفاتورة:</span><span className="text-sm font-black text-amber-700 dark:text-amber-400">{(parseNum(newExp.quantity) * parseNum(newExp.unitPrice)).toLocaleString()} ج.م</span></div>
-                    <div className="sm:col-span-4 mt-2"><button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-3 rounded-2xl shadow-sm transition">حفظ وتسجيل الفاتورة</button></div>
+                    <div className="sm:col-span-2 bg-indigo-50 dark:bg-indigo-950/30 p-3 rounded-2xl flex justify-between items-center font-bold"><span>إجمالي الفاتورة:</span><span className="text-sm font-black text-indigo-700 dark:text-indigo-400">{(parseNum(newExp.quantity) * parseNum(newExp.unitPrice)).toLocaleString()} ج.م</span></div>
+                    <div className="sm:col-span-4 mt-2"><button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-2xl shadow-sm transition">حفظ وتسجيل الفاتورة</button></div>
                   </form>
                 </div>
               )}
@@ -969,7 +876,7 @@
                   <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border dark:border-slate-700 shadow-xs flex flex-col sm:flex-row gap-2.5 text-xs">
                     <select value={searchMainCat} onChange={e=>setSearchMainCat(e.target.value)} className="border dark:border-slate-600 rounded-xl p-2 bg-slate-50 dark:bg-slate-700 font-bold"><option value="">كل البنود الرئيسية</option>{settings.mainCategories.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
                     <select value={searchSubCat} onChange={e=>setSearchSubCat(e.target.value)} className="border dark:border-slate-600 rounded-xl p-2 bg-slate-50 dark:bg-slate-700 font-bold"><option value="">كل البنود الفرعية</option>{settings.subCategories.map((c, i) => <option key={i} value={String(c)}>{String(c)}</option>)}</select>
-                    <div className="sm:mr-auto flex items-center justify-between font-bold bg-amber-50 dark:bg-amber-950/40 px-3 py-2 rounded-xl text-amber-900 dark:text-amber-300"><span>الإجمالي:</span><span className="font-black mr-2"><span className="pdf-num">{filteredSearchTotal.toLocaleString('en-US')}</span> ج.م</span></div>
+                    <div className="sm:mr-auto flex items-center justify-between font-bold bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 rounded-xl text-indigo-900 dark:text-indigo-300"><span>الإجمالي:</span><span className="font-black mr-2"><span className="pdf-num">{filteredSearchTotal.toLocaleString('en-US')}</span> ج.م</span></div>
                   </div>
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
@@ -1034,10 +941,10 @@
                     </form>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-800 font-black">
+                        <tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black">
                           <th className="p-3">التاريخ</th>
                           <th className="p-3">الموظف</th>
                           <th className="p-3 text-center">المبلغ</th>
@@ -1047,7 +954,7 @@
                       </thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projAdvances.map(a => (
-                          <tr key={String(a.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <tr key={String(a.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
                             <td className="p-3 text-slate-500 font-mono text-[11px]">{a.date}</td>
                             <td className="p-3 font-bold text-slate-900 dark:text-white">{String(a.employeeName)}</td>
                             <td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(a.amount).toLocaleString()} ج.م</td>
@@ -1055,8 +962,8 @@
                             {canEditOrDelete && (
                               <td className="p-3 text-center">
                                 <div className="inline-flex items-center gap-1.5">
-                                  <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} className="bg-indigo-50 dark:bg-slate-800 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
-                                  {isAdmin && <button onClick={() => deleteItem('advances', a.id, advances)} className="bg-rose-50 dark:bg-slate-800 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>}
+                                  <button onClick={() => setEditItemData({ type: 'advance', data: { ...a } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
+                                  {isAdmin && <button onClick={() => deleteItem('advances', a.id, advances)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>}
                                 </div>
                               </td>
                             )}
@@ -1070,7 +977,7 @@
 
               {activeTab === "payments" && (isAdmin || isAccountant) && (
                 <div className="space-y-4">
-                  <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
+                  <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
                     <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">💰 تسجيل تحصيل ودفعة من العميل</h3>
                     <form onSubmit={(e) => {
                       e.preventDefault();
@@ -1089,10 +996,10 @@
                     </form>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-800 font-black">
+                        <tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black">
                           <th className="p-3">التاريخ</th>
                           <th className="p-3">المشروع</th>
                           <th className="p-3 text-center">المبلغ</th>
@@ -1102,7 +1009,7 @@
                       </thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {projPayments.map(p => (
-                          <tr key={String(p.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <tr key={String(p.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
                             <td className="p-3 text-slate-500 font-mono text-[11px]">{p.date}</td>
                             <td className="p-3 font-bold text-indigo-600">{p.projectId}</td>
                             <td className="p-3 text-center font-black text-emerald-600 font-mono">{parseNum(p.amount).toLocaleString()} ج.م</td>
@@ -1110,8 +1017,8 @@
                             {isAdmin && (
                               <td className="p-3 text-center">
                                 <div className="inline-flex items-center gap-1.5">
-                                  <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-800 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
-                                  <button onClick={()=>deleteItem('payments', p.id, payments)} className="bg-rose-50 dark:bg-slate-800 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
+                                  <button onClick={()=>setEditItemData({ type: 'payment', data: { ...p } })} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">تعديل</button>
+                                  <button onClick={()=>deleteItem('payments', p.id, payments)} className="bg-rose-50 dark:bg-slate-700 text-rose-600 px-2.5 py-1 rounded-lg font-bold text-[11px]">حذف</button>
                                 </div>
                               </td>
                             )}
@@ -1125,12 +1032,12 @@
 
               {activeTab === "suppliers" && (isAdmin || isAccountant) && (
                 <div className="space-y-4">
-                  <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
+                  <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="font-black text-sm text-slate-900 dark:text-white">🚚 سداد دفعة نقدية لمورد</h3>
                       <div className="flex gap-1.5">
-                        <button onClick={()=>setSuppScope("project")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "project" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800"}`}>المشروع الحالي</button>
-                        <button onClick={()=>setSuppScope("company")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "company" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800"}`}>كل المشاريع</button>
+                        <button onClick={()=>setSuppScope("project")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "project" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-700"}`}>المشروع الحالي</button>
+                        <button onClick={()=>setSuppScope("company")} className={`px-2.5 py-1 rounded-xl font-bold text-[11px] ${suppScope === "company" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-700"}`}>كل المشاريع</button>
                       </div>
                     </div>
                     <form onSubmit={(e) => {
@@ -1154,10 +1061,10 @@
                     </form>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-xs overflow-x-auto custom-scroll text-xs">
                     <table className="w-full text-right border-collapse whitespace-nowrap">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b dark:border-slate-800 font-black">
+                        <tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b dark:border-slate-600 font-black">
                           <th className="p-3">المورد</th>
                           <th className="p-3 text-center">إجمالي المسحوبات</th>
                           <th className="p-3 text-center text-amber-600">فواتير آجلة</th>
@@ -1168,7 +1075,7 @@
                       </thead>
                       <tbody className="divide-y dark:divide-slate-700 font-semibold">
                         {suppliersLedger.map((s, i) => (
-                          <tr key={i} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                          <tr key={i} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
                             <td className="p-3 font-bold text-slate-900 dark:text-white">{s.name}</td>
                             <td className="p-3 text-center font-mono">{s.totalPurchases.toLocaleString()}</td>
                             <td className="p-3 text-center font-mono text-amber-600 font-bold">{s.creditPurchases.toLocaleString()}</td>
@@ -1177,7 +1084,7 @@
                               {Math.abs(s.balance).toLocaleString()} ج.م
                             </td>
                             <td className="p-3 text-center">
-                              <button onClick={()=>setSelectedSupplierDetail(s.name)} className="bg-indigo-50 dark:bg-slate-800 text-indigo-600 hover:bg-indigo-100 px-3 py-1 rounded-lg font-bold text-[11px]">
+                              <button onClick={()=>setSelectedSupplierDetail(s.name)} className="bg-indigo-50 dark:bg-slate-700 text-indigo-600 hover:bg-indigo-100 px-3 py-1 rounded-lg font-bold text-[11px]">
                                 📑 عرض كشف
                               </button>
                             </td>
@@ -1190,7 +1097,7 @@
               )}
 
               {activeTab === "statement" && isAdmin && (
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs space-y-4">
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs space-y-4">
                   <div className="flex justify-between items-center pb-3 border-b dark:border-slate-700 print-hidden">
                     <h3 className="font-black text-sm text-slate-900 dark:text-white">📑 كشف حساب وموقف مالي متكامل للمشروع</h3>
                     <button onClick={() => window.print()} className="bg-slate-900 dark:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold">🖨️ طباعة عادية</button>
@@ -1255,7 +1162,7 @@
 
               {activeTab === "extracts" && (isAdmin || isAccountant) && (
                 <div className="space-y-4">
-                  <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs print-hidden">
+                  <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs print-hidden">
                     <h3 className="font-black text-sm text-slate-900 dark:text-white mb-3">📄 اعتماد مستخلص أعمال جديد</h3>
                     <form onSubmit={(e) => {
                       e.preventDefault();
@@ -1373,7 +1280,7 @@
               )}
 
               {activeTab === "audit_log" && isSuperAdminExact && (
-                <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs space-y-3">
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl border dark:border-slate-700 shadow-xs text-xs space-y-3">
                   <h3 className="font-black text-sm text-slate-900 dark:text-white">🛡 سجل الدخول والنشاط</h3>
                   <div className="overflow-x-auto custom-scroll">
                     <table className="w-full text-right whitespace-nowrap">
@@ -1394,7 +1301,7 @@
 
               {activeTab === "settings" && isAdmin && (
                 <div className="space-y-4 text-xs font-bold">
-                  <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
+                  <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
                     <h3 className="text-sm font-black text-slate-900 dark:text-white">💾 النسخ الاحتياطي والترحيل</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <button onClick={exportJsonBackup} className="p-3 bg-slate-50 dark:bg-slate-700 rounded-2xl flex items-center justify-between hover:bg-slate-200 transition">
@@ -1406,7 +1313,7 @@
                     </div>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
+                  <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
                     <h3 className="text-sm font-black text-slate-900 dark:text-white">🖼 شعار الترويسة المعتمد:</h3>
                     <input type="file" accept="image/*" onChange={(e)=>{
                       if(!isAdmin) return;
@@ -1421,7 +1328,7 @@
                   </div>
 
                   {isSuperAdminExact && (
-                    <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border dark:border-slate-700 shadow-xs space-y-3">
                       <h3 className="text-sm font-black text-slate-900 dark:text-white">🛡️ إدارة الصلاحيات للإنشاءات</h3>
                       <form onSubmit={handleSaveRole} className="flex flex-col sm:flex-row gap-2.5">
                         <input type="email" placeholder="بريد Google..." value={newRoleInput.email} onChange={e=>setNewRoleInput({...newRoleInput, email: e.target.value})} className="flex-1 border dark:border-slate-700 p-2.5 rounded-xl dark:bg-slate-800" required/>
@@ -1521,11 +1428,7 @@
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(
-      <ErrorBoundary>
-        <App />
-      </ErrorBoundary>
-    );
+    root.render(<App />);
   </script>
 </body>
 </html>
